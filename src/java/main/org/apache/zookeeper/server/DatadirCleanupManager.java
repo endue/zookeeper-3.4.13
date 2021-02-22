@@ -45,13 +45,13 @@ public class DatadirCleanupManager {
     }
 
     private PurgeTaskStatus purgeTaskStatus = PurgeTaskStatus.NOT_STARTED;
-
+    // 如果没有特别指明，ZooKeeper将内存中的数据库和事务日志写入该位置
     private final String snapDir;
-
+    // 该选项将事务日志写入dataLogDir而不是dataDir，从而将事物日志和数据快照分开
     private final String dataLogDir;
-
+    // 快照保存的数量，默认3
     private final int snapRetainCount;
-
+    // PurgeTask触发的时间间隔(单位小时)，默认0
     private final int purgeInterval;
 
     private Timer timer;
@@ -60,9 +60,9 @@ public class DatadirCleanupManager {
      * Constructor of DatadirCleanupManager. It takes the parameters to schedule
      * the purge task.
      * 
-     * @param snapDir
+     * @param snapDir 用于存放内存数据快照的文件夹，同时用于集群的myid文件也存在这个文件夹里
      *            snapshot directory
-     * @param dataLogDir
+     * @param dataLogDir 事务日志写入该配置指定的目录，而不是“ dataDir ”所指定的目录
      *            transaction log directory
      * @param snapRetainCount
      *            number of snapshots to be retained after purge

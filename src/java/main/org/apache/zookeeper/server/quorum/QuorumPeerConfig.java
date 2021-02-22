@@ -50,7 +50,9 @@ public class QuorumPeerConfig {
     private static final Logger LOG = LoggerFactory.getLogger(QuorumPeerConfig.class);
 
     protected InetSocketAddress clientPortAddress;
+    // 如果没有特别指明，ZooKeeper将内存中的数据库和事务日志写入该位置
     protected String dataDir;
+    // 该选项将事务日志写入dataLogDir而不是dataDir，从而将事物日志和数据快照分开
     protected String dataLogDir;
     protected int tickTime = ZooKeeperServer.DEFAULT_TICK_TIME;
     protected int maxClientCnxns = 60;
@@ -74,7 +76,9 @@ public class QuorumPeerConfig {
     protected HashMap<Long, Long> serverGroup = new HashMap<Long, Long>();
     protected int numGroups = 0;
     protected QuorumVerifier quorumVerifier;
+    // 快照保存的数量，默认3
     protected int snapRetainCount = 3;
+    // PurgeTask触发的时间间隔(单位小时)，默认0
     protected int purgeInterval = 0;
     protected boolean syncEnabled = true;
 

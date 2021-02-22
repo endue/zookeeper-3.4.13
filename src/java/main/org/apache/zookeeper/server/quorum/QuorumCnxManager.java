@@ -343,6 +343,7 @@ public class QuorumCnxManager {
         authLearner.authenticate(sock, view.get(sid).hostname);
 
         // If lost the challenge, then drop the new connection
+        // 这里可以避免重复建立连接
         if (sid > this.mySid) {
             LOG.info("Have smaller server identifier, so dropping the " +
                      "connection: (" + sid + ", " + this.mySid + ")");
@@ -357,8 +358,9 @@ public class QuorumCnxManager {
             
             if(vsw != null)
                 vsw.finish();
-            
+            // 这里可以看出senderWorkerMap 持有SendWorker，而SendWorker持有RecvWorker
             senderWorkerMap.put(sid, sw);
+            // queueSendMap记录发送出去的数据队列
             queueSendMap.putIfAbsent(sid, new ArrayBlockingQueue<ByteBuffer>(SEND_CAPACITY));
             
             sw.start();
@@ -467,6 +469,7 @@ public class QuorumCnxManager {
         authServer.authenticate(sock, din);
 
         //If wins the challenge, then close the new connection.
+        // 这里也避免重复建立连接
         if (sid < this.mySid) {
             /*
              * This replica might still believe that the connection to sid is
