@@ -212,8 +212,9 @@ public class FastLeaderElection implements Election {
          */
         long peerEpoch;
     }
-
+    // 记录要发送的选票
     LinkedBlockingQueue<ToSend> sendqueue;
+    // 记录接收到的消息
     LinkedBlockingQueue<Notification> recvqueue;
 
     /**
@@ -246,6 +247,7 @@ public class FastLeaderElection implements Election {
                 while (!stop) {
                     // Sleeps on receive
                     try{
+                        // 读取消息
                         response = manager.pollRecvQueue(3000, TimeUnit.MILLISECONDS);
                         if(response == null) continue;
 
@@ -451,6 +453,7 @@ public class FastLeaderElection implements Election {
                                                         m.zxid, 
                                                         m.electionEpoch, 
                                                         m.peerEpoch);
+                // 发送消息
                 manager.toSend(m.sid, requestBuffer);
             }
         }
@@ -518,6 +521,7 @@ public class FastLeaderElection implements Election {
     public FastLeaderElection(QuorumPeer self, QuorumCnxManager manager){
         this.stop = false;
         this.manager = manager;
+        // 里面会初始化并启动WorkerSender
         starter(self, manager);
     }
 
@@ -569,6 +573,7 @@ public class FastLeaderElection implements Election {
     /**
      * Send notifications to all peers upon a change in our vote
      */
+    // 发送选票
     private void sendNotifications() {
         for (QuorumServer server : self.getVotingView().values()) {
             long sid = server.id;
@@ -812,6 +817,7 @@ public class FastLeaderElection implements Election {
 
             LOG.info("New election. My id =  " + self.getId() +
                     ", proposed zxid=0x" + Long.toHexString(proposedZxid));
+            // 发送选票
             sendNotifications();
 
             /*

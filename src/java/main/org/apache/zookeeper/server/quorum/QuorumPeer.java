@@ -811,7 +811,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         return new Observer(this, new ObserverZooKeeperServer(logFactory,
                 this, new ZooKeeperServer.BasicDataTreeBuilder(), this.zkDb));
     }
-
+    // 创建选举算法，默认FastLeaderElection
     protected Election createElectionAlgorithm(int electionAlgorithm){
         Election le=null;
                 
@@ -832,6 +832,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             // 创建listener监听其他节点发生过来的请求
             QuorumCnxManager.Listener listener = qcm.listener;
             if(listener != null){
+                // 启动listener
                 listener.start();
                 le = new FastLeaderElection(this, qcm);
             } else {
@@ -912,6 +913,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
              * Main loop
              */
             while (running) {
+                // 获取当前机器的状态
                 switch (getPeerState()) {
                 case LOOKING:
                     LOG.info("LOOKING");
