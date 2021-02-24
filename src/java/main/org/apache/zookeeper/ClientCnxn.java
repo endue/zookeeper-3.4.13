@@ -399,8 +399,9 @@ public class ClientCnxn {
         connectTimeout = sessionTimeout / hostProvider.size();
         readTimeout = sessionTimeout * 2 / 3;
         readOnly = canBeReadOnly;
-
+        // 负责基于底层socket与服务端进行通信，发送数据
         sendThread = new SendThread(clientCnxnSocket);
+        // 负责服务端发送过来的事件
         eventThread = new EventThread();
 
     }
@@ -1061,6 +1062,7 @@ public class ClientCnxn {
                         } else {
                             serverAddress = hostProvider.next(1000);
                         }
+                        // 建立连接
                         startConnect(serverAddress);
                         clientCnxnSocket.updateLastSendAndHeard();
                     }

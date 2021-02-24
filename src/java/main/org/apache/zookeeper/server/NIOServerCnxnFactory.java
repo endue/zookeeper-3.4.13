@@ -189,7 +189,7 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
             return s.size();
         }
     }
-
+    // 不断while循环，处理客户端的请求
     public void run() {
         while (!ss.socket().isClosed()) {
             try {

@@ -448,8 +448,10 @@ public class ZooKeeper {
                 connectString);
         HostProvider hostProvider = new StaticHostProvider(
                 connectStringParser.getServerAddresses());
-        cnxn = new ClientCnxn(connectStringParser.getChrootPath(),
+        // 初始化cnxn，这个cnxn是客户端的核心组件
+        cnxn = new ClientCnxn(connectStringParser.getChrootPath(),// 这个配置在客户端建立连接的时候可以指定路径，后续操作都在该路径下执行
                 hostProvider, sessionTimeout, this, watchManager,
+                // 初始化一个ClientCnxnSocket
                 getClientCnxnSocket(), canBeReadOnly);
         cnxn.start();
     }

@@ -133,7 +133,10 @@ public class QuorumPeerMain {
   
       LOG.info("Starting quorum peer");
       try {
+          // 初始化处理客户端网络连接的通信组件
+          // 基于NIO
           ServerCnxnFactory cnxnFactory = ServerCnxnFactory.createFactory();
+          // 设置线程但并没有启动
           cnxnFactory.configure(config.getClientPortAddress(),
                                 config.getMaxClientCnxns());
           // 一个zk节点启动，核心内容就是quorumPeer
