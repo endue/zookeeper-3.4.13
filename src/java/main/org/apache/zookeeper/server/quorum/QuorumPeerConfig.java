@@ -48,7 +48,7 @@ import org.apache.zookeeper.server.quorum.flexible.QuorumVerifier;
 @InterfaceAudience.Public
 public class QuorumPeerConfig {
     private static final Logger LOG = LoggerFactory.getLogger(QuorumPeerConfig.class);
-
+    // 配置文件中的：clientPortAddress
     protected InetSocketAddress clientPortAddress;
     // 如果没有特别指明，ZooKeeper将内存中的数据库和事务日志写入该位置
     protected String dataDir;

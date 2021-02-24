@@ -70,7 +70,8 @@ import org.slf4j.LoggerFactory;
  * when consolidating peer communication. This is to be verified, though.
  * 
  */
-
+// 负责zk集群间选举过程中网络IO的管理器
+// 每台zk服务启动的时候，都会启动一个QuorumCnxManager，用来维持各台服务器之间的网络通信。
 public class QuorumCnxManager {
     private static final Logger LOG = LoggerFactory.getLogger(QuorumCnxManager.class);
 
@@ -148,6 +149,8 @@ public class QuorumCnxManager {
     /*
      * Listener thread
      */
+    // 监听器
+    // 监听连接，维护与其他服务器的连接
     public final Listener listener;
 
     /*
@@ -625,6 +628,7 @@ public class QuorumCnxManager {
     /**
      * Check if all queues are empty, indicating that all messages have been delivered.
      */
+    // 检查队列是否都为空，如果为空说明与其他zkServer连接是没有问题的
     boolean haveDelivered() {
         for (ArrayBlockingQueue<ByteBuffer> queue : queueSendMap.values()) {
             LOG.debug("Queue size: " + queue.size());
@@ -833,6 +837,7 @@ public class QuorumCnxManager {
          * @param sid
          *            Server identifier of remote peer
          */
+        // 负责根据Listener保存的连接信息 向对应的server发送（投票）信息
         SendWorker(Socket sock, Long sid) {
             super("SendWorker:" + sid);
             // 客户端的sid
@@ -975,6 +980,7 @@ public class QuorumCnxManager {
      * Thread to receive messages. Instance waits on a socket read. If the
      * channel breaks, then removes itself from the pool of receivers.
      */
+    // 获取其他server的（投票）信息 并存入队列
     class RecvWorker extends ZooKeeperThread {
         // 客户端的sid
         Long sid;

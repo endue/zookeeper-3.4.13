@@ -99,9 +99,10 @@ public class QuorumPeerMain {
     protected void initializeAndRun(String[] args)
         throws ConfigException, IOException
     {
-        // 创建解析文件相关类，配置文件为zoo.cfg
+        // 创建解析文件相关类
         QuorumPeerConfig config = new QuorumPeerConfig();
         if (args.length == 1) {
+            // 解析配置文件
             config.parse(args[0]);
         }
 
@@ -136,11 +137,10 @@ public class QuorumPeerMain {
           // 初始化处理客户端网络连接的通信组件
           // 基于NIO
           ServerCnxnFactory cnxnFactory = ServerCnxnFactory.createFactory();
-          // 设置线程但并没有启动
+          // 配置ServerCnxnFactory，初始化内部的ServerSocketChannel并监听OP_ACCEPT事件
           cnxnFactory.configure(config.getClientPortAddress(),
                                 config.getMaxClientCnxns());
           // 一个zk节点启动，核心内容就是quorumPeer
-          // 可以把它看做一个zk节点
           quorumPeer = getQuorumPeer();
 
           quorumPeer.setQuorumPeers(config.getServers());

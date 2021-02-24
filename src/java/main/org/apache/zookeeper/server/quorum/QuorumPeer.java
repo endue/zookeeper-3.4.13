@@ -90,6 +90,7 @@ import org.slf4j.LoggerFactory;
  *
  * The request for the current leader will consist solely of an xid: int xid;
  */
+// QuorumPeer不断地检测当前的zk机器的状态，执行对应的逻辑
 public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider {
     private static final Logger LOG = LoggerFactory.getLogger(QuorumPeer.class);
 
@@ -110,8 +111,10 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
      * bootup and only thrown away in case of a truncate
      * message from the leader
      */
+    // 内存数据库
     private ZKDatabase zkDb;
 
+    // 集群中服务实例类
     public static class QuorumServer {
         private QuorumServer(long id, InetSocketAddress addr,
                 InetSocketAddress electionAddr) {
@@ -298,6 +301,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     /**
      * The servers that make up the cluster
      */
+    // 记录集群中各个服务实例信息
     protected Map<Long, QuorumServer> quorumPeers;
     public int getQuorumSize(){
         return getVotingView().size();
@@ -325,6 +329,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     /**
      * This is who I think the leader currently is.
      */
+    // 当前选票
     volatile private Vote currentVote;
     
     /**
@@ -554,10 +559,13 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     }
 
     private int electionType;
-
+    // 选举算法默认FastLeaderElection
     Election electionAlg;
-
+    // 处理客户端连接工厂
+    // 默认NIOServerCnxnFactory
     ServerCnxnFactory cnxnFactory;
+    // 磁盘数据管理
+    // 默认FileTxnSnapLog
     private FileTxnSnapLog logFactory = null;
 
     private final QuorumStats quorumStats;
@@ -633,13 +641,14 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     @Override
     public synchronized void start() {
         loadDataBase();
-        // 启动cnxnFactory
+        // 启动cnxnFactory，处理客户端的相关连接
         cnxnFactory.start();
-        // 进行leader选举
+        // 进行leader选举等操作
         startLeaderElection();
         super.start();
     }
 
+    // 加载数据
     private void loadDataBase() {
         File updating = new File(getTxnFactory().getSnapDir(),
                                  UPDATING_EPOCH_FILENAME);
