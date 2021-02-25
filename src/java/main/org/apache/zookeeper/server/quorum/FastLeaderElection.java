@@ -920,12 +920,15 @@ public class FastLeaderElection implements Election {
                         }
                         // 记录收到的选票
                         recvset.put(n.sid, new Vote(n.leader, n.zxid, n.electionEpoch, n.peerEpoch));
-
+                        // 验证当前zkServer的提案收到的选票是否符合过半
                         if (termPredicate(recvset,
                                 new Vote(proposedLeader, proposedZxid,
                                         logicalclock.get(), proposedEpoch))) {
 
                             // Verify if there is any change in the proposed leader
+                            // 从接收消息队列中获取消息
+                            // 1.没有消息，说明没有比当前更好的投票结果 n == null
+                            // 2.有消息，说明有比当前更好的投票结果 n != null
                             while((n = recvqueue.poll(finalizeWait,
                                     TimeUnit.MILLISECONDS)) != null){
                                 if(totalOrderPredicate(n.leader, n.zxid, n.peerEpoch,
@@ -939,7 +942,9 @@ public class FastLeaderElection implements Election {
                              * This predicate is true once we don't read any new
                              * relevant message from the reception queue
                              */
+                            // 如果n == null说明没有比当前更好的投票结果
                             if (n == null) {
+                                // 更新leader节点的id判断是否为当前zkServer来设置当前zkServer的状态为FOLLOWING或OBSERVING
                                 self.setPeerState((proposedLeader == self.getId()) ?
                                         ServerState.LEADING: learningState());
 
@@ -947,6 +952,7 @@ public class FastLeaderElection implements Election {
                                                         proposedZxid,
                                                         logicalclock.get(),
                                                         proposedEpoch);
+                                // 清空队列
                                 leaveInstance(endVote);
                                 return endVote;
                             }
