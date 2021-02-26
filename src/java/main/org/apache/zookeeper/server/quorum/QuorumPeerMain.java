@@ -108,11 +108,11 @@ public class QuorumPeerMain {
         }
 
         // Start and schedule the the purge task
-        // 创建磁盘数据清理任务
+        // 创建数据快照和事物日志清理任务
         DatadirCleanupManager purgeMgr = new DatadirCleanupManager(config
                 .getDataDir(), config.getDataLogDir(), config
                 .getSnapRetainCount(), config.getPurgeInterval());
-        // 启动清理任务
+        // 启动任务
         purgeMgr.start();
         // 以集群模式启动
         if (args.length == 1 && config.servers.size() > 0) {

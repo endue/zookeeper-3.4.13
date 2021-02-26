@@ -87,6 +87,7 @@ public class FileTxnSnapLog {
         // 创建数据快照和事物日志对应的新的文件
         this.dataDir = new File(dataDir, version + VERSION);
         this.snapDir = new File(snapDir, version + VERSION);
+        // 做一些校验
         if (!this.dataDir.exists()) {
             if (!this.dataDir.mkdirs()) {
                 throw new IOException("Unable to create data directory "

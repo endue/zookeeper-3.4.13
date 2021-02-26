@@ -104,7 +104,7 @@ public class DatadirCleanupManager {
             LOG.info("Purge task is not scheduled.");
             return;
         }
-        // 创建定时清理任务并传入日志相关目录，然后启动并定期执行
+        // 创建定时清理任务并传入数据快照和事物日志的路径，然后启动并定期执行
         timer = new Timer("PurgeTask", true);
         TimerTask task = new PurgeTask(dataLogDir, snapDir, snapRetainCount);
         timer.scheduleAtFixedRate(task, 0, TimeUnit.HOURS.toMillis(purgeInterval));
@@ -124,7 +124,7 @@ public class DatadirCleanupManager {
             LOG.warn("Purge task not started. Ignoring shutdown!");
         }
     }
-    // 清理数据的任务
+    // 清理数据快照和事物日志的任务
     static class PurgeTask extends TimerTask {
         // 事物日志路径
         private String logsDir;
