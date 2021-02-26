@@ -89,6 +89,7 @@ import org.slf4j.LoggerFactory;
  *     0 padded to EOF (filled during preallocation stage)
  * </pre></blockquote> 
  */
+// 事物日志类，提供了访问和添加事物日志的功能
 public class FileTxnLog implements TxnLog {
     private static final Logger LOG;
 

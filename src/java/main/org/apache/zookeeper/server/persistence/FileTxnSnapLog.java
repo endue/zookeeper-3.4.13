@@ -46,14 +46,19 @@ import org.slf4j.LoggerFactory;
  * of txnlog and snapshot 
  * classes
  */
+// 事物日志和数据快照类
 public class FileTxnSnapLog {
     //the direcotry containing the 
     //the transaction logs
+    // 事物日志文件
     private final File dataDir;
     //the directory containing the
     //the snapshot directory
+    // 数据快照文件
     private final File snapDir;
+    // 事物日志类
     private TxnLog txnLog;
+    // 数据快照类
     private SnapShot snapLog;
     public final static int VERSION = 2;
     public final static String version = "version-";
@@ -79,7 +84,7 @@ public class FileTxnSnapLog {
      */
     public FileTxnSnapLog(File dataDir, File snapDir) throws IOException {
         LOG.debug("Opening datadir:{} snapDir:{}", dataDir, snapDir);
-
+        // 创建数据快照和事物日志对应的新的文件
         this.dataDir = new File(dataDir, version + VERSION);
         this.snapDir = new File(snapDir, version + VERSION);
         if (!this.dataDir.exists()) {
@@ -104,11 +109,12 @@ public class FileTxnSnapLog {
 
         // check content of transaction log and snapshot dirs if they are two different directories
         // See ZOOKEEPER-2967 for more details
+        // 如果数据快照和事物日志路径不一样，则分别进行不同的校验
         if(!this.dataDir.getPath().equals(this.snapDir.getPath())){
             checkLogDir();
             checkSnapDir();
         }
-
+        // 分别创建事物日志和数据快照两个类
         txnLog = new FileTxnLog(this.dataDir);
         snapLog = new FileSnap(this.snapDir);
     }
@@ -117,6 +123,7 @@ public class FileTxnSnapLog {
         txnLog.setServerStats(serverStats);
     }
 
+    // 校验事物日志
     private void checkLogDir() throws LogDirContentCheckException {
         File[] files = this.dataDir.listFiles(new FilenameFilter() {
             @Override
@@ -128,7 +135,7 @@ public class FileTxnSnapLog {
             throw new LogDirContentCheckException("Log directory has snapshot files. Check if dataLogDir and dataDir configuration is correct.");
         }
     }
-
+    // 校验数据快照
     private void checkSnapDir() throws SnapDirContentCheckException {
         File[] files = this.snapDir.listFiles(new FilenameFilter() {
             @Override
@@ -349,6 +356,7 @@ public class FileTxnSnapLog {
      * the most recent in front
      * @throws IOException
      */
+    // 最近的n个数据快照文件
     public List<File> findNRecentSnapshots(int n) throws IOException {
         FileSnap snaplog = new FileSnap(snapDir);
         return snaplog.findNRecentSnapshots(n);

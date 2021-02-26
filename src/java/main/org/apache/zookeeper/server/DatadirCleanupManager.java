@@ -43,13 +43,13 @@ public class DatadirCleanupManager {
     public enum PurgeTaskStatus {
         NOT_STARTED, STARTED, COMPLETED;
     }
-
+    // 记录启动状态
     private PurgeTaskStatus purgeTaskStatus = PurgeTaskStatus.NOT_STARTED;
-    // 如果没有特别指明，ZooKeeper将内存中的数据库和事务日志写入该位置
+    // 如果没有特别指明，ZooKeeper将内存中的数据和事务日志写入该位置
     private final String snapDir;
-    // 该选项将事务日志写入dataLogDir而不是dataDir，从而将事物日志和数据快照分开
+    // 如果配置选项则将事务日志写入dataLogDir而不是dataDir，从而将事物日志和数据快照分开
     private final String dataLogDir;
-    // 快照保存的数量，默认3
+    // 快照保存的数量，默认3，最小也为3
     private final int snapRetainCount;
     // PurgeTask触发的时间间隔(单位小时)，默认0
     private final int purgeInterval;
@@ -91,21 +91,24 @@ public class DatadirCleanupManager {
      * 
      * @see PurgeTxnLog#purge(File, File, int)
      */
+    //
     public void start() {
+        // 校验启动状态
         if (PurgeTaskStatus.STARTED == purgeTaskStatus) {
             LOG.warn("Purge task is already running.");
             return;
         }
         // Don't schedule the purge task with zero or negative purge interval.
+        // 校验执行间隔
         if (purgeInterval <= 0) {
             LOG.info("Purge task is not scheduled.");
             return;
         }
-
+        // 创建定时清理任务并传入日志相关目录，然后启动并定期执行
         timer = new Timer("PurgeTask", true);
         TimerTask task = new PurgeTask(dataLogDir, snapDir, snapRetainCount);
         timer.scheduleAtFixedRate(task, 0, TimeUnit.HOURS.toMillis(purgeInterval));
-
+        // 标记为启动状态
         purgeTaskStatus = PurgeTaskStatus.STARTED;
     }
 
@@ -121,10 +124,13 @@ public class DatadirCleanupManager {
             LOG.warn("Purge task not started. Ignoring shutdown!");
         }
     }
-
+    // 清理数据的任务
     static class PurgeTask extends TimerTask {
+        // 事物日志路径
         private String logsDir;
+        // 数据快照路径
         private String snapsDir;
+        // 保存的数量
         private int snapRetainCount;
 
         public PurgeTask(String dataDir, String snapDir, int count) {

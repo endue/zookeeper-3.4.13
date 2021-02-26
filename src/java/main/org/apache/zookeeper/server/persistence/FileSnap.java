@@ -48,6 +48,8 @@ import org.apache.zookeeper.server.util.SerializeUtils;
  * and deserializing the right snapshot.
  * and provides access to the snapshots.
  */
+// 实现SnapShot接口，实现了存储、序列化、反序列化数据快照功能
+// 同时提供了访问数据快照的功能
 public class FileSnap implements SnapShot {
     File snapDir;
     private volatile boolean close = false;
@@ -184,6 +186,7 @@ public class FileSnap implements SnapShot {
      * @return the last n snapshots
      * @throws IOException
      */
+    // 查找最近n个数据快照文件
     public List<File> findNRecentSnapshots(int n) throws IOException {
         List<File> files = Util.sortDataDir(snapDir.listFiles(), SNAPSHOT_FILE_PREFIX, false);
         int count = 0;

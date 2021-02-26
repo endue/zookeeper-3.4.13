@@ -115,6 +115,7 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
                         p.createBB();
                     }
                     sock.write(p.bb);
+                    // 处理发送数据时的拆包问题
                     if (!p.bb.hasRemaining()) {
                         sentCount++;
                         outgoingQueue.removeFirstOccurrence(p);

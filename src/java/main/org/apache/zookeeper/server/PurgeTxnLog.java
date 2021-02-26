@@ -42,6 +42,7 @@ import org.slf4j.LoggerFactory;
  * files and snapdir files keeping the last "-n" snapshot files
  * and the corresponding logs.
  */
+// 清理数据快照的类
 @InterfaceAudience.Public
 public class PurgeTxnLog {
     private static final Logger LOG = LoggerFactory.getLogger(PurgeTxnLog.class);
@@ -71,16 +72,19 @@ public class PurgeTxnLog {
      * @param num the number of snapshots to keep
      * @throws IOException
      */
+    // 清理数据快照
     public static void purge(File dataDir, File snapDir, int num) throws IOException {
+        // 这里校验snapRetainCount配置至少为3
         if (num < 3) {
             throw new IllegalArgumentException(COUNT_ERR_MSG);
         }
 
         FileTxnSnapLog txnLog = new FileTxnSnapLog(dataDir, snapDir);
-
+        // 获取最近num个数据快照文件
         List<File> snaps = txnLog.findNRecentSnapshots(num);
         int numSnaps = snaps.size();
         if (numSnaps > 0) {
+            // 开始删除来的数据快照文件
             purgeOlderSnapshots(txnLog, snaps.get(numSnaps - 1));
         }
     }
@@ -148,6 +152,7 @@ public class PurgeTxnLog {
         }
 
         // remove the old files
+        // 删除数据快照和事物日志
         for(File f: files)
         {
             final String msg = "Removing file: "+

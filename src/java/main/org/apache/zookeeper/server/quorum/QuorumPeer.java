@@ -640,6 +640,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     
     @Override
     public synchronized void start() {
+        // 加载磁盘上数据
         loadDataBase();
         // 启动cnxnFactory，处理客户端的相关连接
         cnxnFactory.start();
@@ -648,7 +649,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         super.start();
     }
 
-    // 加载数据
+    // 加载磁盘数据
     private void loadDataBase() {
         File updating = new File(getTxnFactory().getSnapDir(),
                                  UPDATING_EPOCH_FILENAME);

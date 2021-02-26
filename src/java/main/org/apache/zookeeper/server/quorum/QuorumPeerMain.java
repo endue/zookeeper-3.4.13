@@ -75,6 +75,7 @@ public class QuorumPeerMain {
      * the command line.
      * @param args path to the configfile
      */
+    // 启动zk入口
     public static void main(String[] args) {
         QuorumPeerMain main = new QuorumPeerMain();
         try {
@@ -99,20 +100,20 @@ public class QuorumPeerMain {
     protected void initializeAndRun(String[] args)
         throws ConfigException, IOException
     {
-        // 创建解析文件相关类
+        // 创建全局配置类
         QuorumPeerConfig config = new QuorumPeerConfig();
         if (args.length == 1) {
-            // 解析配置文件
+            // 解析args中的参数
             config.parse(args[0]);
         }
 
         // Start and schedule the the purge task
-        // 创建并启动清理任务
+        // 创建磁盘数据清理任务
         DatadirCleanupManager purgeMgr = new DatadirCleanupManager(config
                 .getDataDir(), config.getDataLogDir(), config
                 .getSnapRetainCount(), config.getPurgeInterval());
+        // 启动清理任务
         purgeMgr.start();
-        // zoo.cfg文件存在 并存在其他服务器
         // 以集群模式启动
         if (args.length == 1 && config.servers.size() > 0) {
             runFromConfig(config);
@@ -135,7 +136,6 @@ public class QuorumPeerMain {
       LOG.info("Starting quorum peer");
       try {
           // 初始化处理客户端网络连接的通信组件
-          // 基于NIO
           ServerCnxnFactory cnxnFactory = ServerCnxnFactory.createFactory();
           // 配置ServerCnxnFactory，初始化内部的ServerSocketChannel并监听OP_ACCEPT事件
           cnxnFactory.configure(config.getClientPortAddress(),

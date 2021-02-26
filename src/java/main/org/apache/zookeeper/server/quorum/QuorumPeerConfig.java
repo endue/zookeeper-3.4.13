@@ -48,19 +48,25 @@ import org.apache.zookeeper.server.quorum.flexible.QuorumVerifier;
 @InterfaceAudience.Public
 public class QuorumPeerConfig {
     private static final Logger LOG = LoggerFactory.getLogger(QuorumPeerConfig.class);
-    // 配置文件中的：clientPortAddress
+    // 配置文件中的：clientPortAddress和clientPort两个配置封装的一个对象
+    // 3.3.0版本新增的配置，客户端连接
     protected InetSocketAddress clientPortAddress;
     // 如果没有特别指明，ZooKeeper将内存中的数据库和事务日志写入该位置
     protected String dataDir;
-    // 该选项将事务日志写入dataLogDir而不是dataDir，从而将事物日志和数据快照分开
+    // 该选项将事务日志写入dataLogDir而不是dataDir，从而将事物日志和数据分开
     protected String dataLogDir;
+    // 默认3000
+    // ZooKeeper使用的基本时间单位，以毫秒为单位，用于调节心跳和超时。如，最小会话超时时间将为2个tickTime
     protected int tickTime = ZooKeeperServer.DEFAULT_TICK_TIME;
+    // 限制客户端的最大连接数
     protected int maxClientCnxns = 60;
     /** defaults to -1 if not set explicitly */
+    // 最小会话超时时间，默认2个tickTime
     protected int minSessionTimeout = -1;
     /** defaults to -1 if not set explicitly */
+    // 最大会话超时时间，默认20个tickTime
     protected int maxSessionTimeout = -1;
-
+    //
     protected int initLimit;
     protected int syncLimit;
     protected int electionAlg = 3;
