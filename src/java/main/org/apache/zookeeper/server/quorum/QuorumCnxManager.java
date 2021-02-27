@@ -124,10 +124,12 @@ public class QuorumCnxManager {
     /*
      * Mapping from Peer to Thread number
      */
-    // 记录sid和对应的SendWorker
+    // 记录sid和对应的SendWorker，SendWorker采用BIO
     final ConcurrentHashMap<Long, SendWorker> senderWorkerMap;
-    // 记录sid和对应存储要发送的消息的队列
+    // 记录sid服务和对应的队列
+    // 该队列用来存储要发送到sid服务的数据
     final ConcurrentHashMap<Long, ArrayBlockingQueue<ByteBuffer>> queueSendMap;
+    // 记录sid服务最近发送过的一条数据
     final ConcurrentHashMap<Long, ByteBuffer> lastMessageSent;
 
     /*
@@ -210,7 +212,7 @@ public class QuorumCnxManager {
                 quorumSaslAuthEnabled);
 
         // Starts listener thread that waits for connection requests
-        // 启动处理连接请求的线程
+        // 初始化Listener
         listener = new Listener();
     }
 
@@ -718,6 +720,7 @@ public class QuorumCnxManager {
     /**
      * Thread to listen on some port
      */
+    // 负责与其他zkServer建立连接并初始化好对应的SendWorker和RecvWorker
     public class Listener extends ZooKeeperThread {
 
         volatile ServerSocket ss = null;
@@ -731,6 +734,7 @@ public class QuorumCnxManager {
         /**
          * Sleeps on accept().
          */
+        // 监听集群中其他节点发生过来的连接请求
         @Override
         public void run() {
             int numRetries = 0;
@@ -758,7 +762,7 @@ public class QuorumCnxManager {
                     while (!shutdown) {
                         // 获取新的连接
                         Socket client = ss.accept();
-                        // 处理客户端连接
+
                         setSockOpts(client);
                         LOG.info("Received connection request "
                                 + client.getRemoteSocketAddress());
@@ -771,6 +775,7 @@ public class QuorumCnxManager {
                         if (quorumSaslAuthEnabled) {
                             receiveConnectionAsync(client);
                         } else {
+                            // 处理客户端连接
                             receiveConnection(client);
                         }
 
@@ -821,6 +826,8 @@ public class QuorumCnxManager {
      * soon as there is one available. If connection breaks, then opens a new
      * one.
      */
+    // 负责发送集群间的消息
+    // 采用的是BIO
     class SendWorker extends ZooKeeperThread {
         Long sid;
         Socket sock;
@@ -896,7 +903,8 @@ public class QuorumCnxManager {
             threadCnt.decrementAndGet();
             return running;
         }
-        
+
+        // 发送ByteBuffer
         synchronized void send(ByteBuffer b) throws IOException {
             byte[] msgBytes = new byte[b.capacity()];
             try {
@@ -928,9 +936,13 @@ public class QuorumCnxManager {
                  * message than that stored in lastMessage. To avoid sending
                  * stale message, we should send the message in the send queue.
                  */
+                // 获取发送到sid服务的数据所对应的队列
                 ArrayBlockingQueue<ByteBuffer> bq = queueSendMap.get(sid);
+                // 队列为null或者为空
                 if (bq == null || isSendQueueEmpty(bq)) {
+                    // 获取最近发送过的消息
                    ByteBuffer b = lastMessageSent.get(sid);
+                   // 如果不为空，那么立即发生出去
                    if (b != null) {
                        LOG.debug("Attempting to send lastMessage to sid=" + sid);
                        // 发送数据
@@ -943,12 +955,18 @@ public class QuorumCnxManager {
             }
             
             try {
+                // 不断的循环，整体流程:
+                // 1.获取sid服务在queueSendMap中对应的数据队列bq
+                // 2.获取数据队列bq中的一条数据
+                // 3.将数据发送出去
                 while (running && !shutdown && sock != null) {
 
                     ByteBuffer b = null;
                     try {
+                        // 获取发送到sid服务的数据所对应的队列
                         ArrayBlockingQueue<ByteBuffer> bq = queueSendMap
                                 .get(sid);
+                        // 队列不为空，获取队列中的一条数据
                         if (bq != null) {
                             b = pollSendQueue(bq, 1000, TimeUnit.MILLISECONDS);
                         } else {
@@ -956,9 +974,10 @@ public class QuorumCnxManager {
                                       "server " + sid);
                             break;
                         }
-
+                        // 数据不为空，将数据暂存到lastMessageSent
                         if(b != null){
                             lastMessageSent.put(sid, b);
+                            // 发送数据
                             send(b);
                         }
                     } catch (InterruptedException e) {

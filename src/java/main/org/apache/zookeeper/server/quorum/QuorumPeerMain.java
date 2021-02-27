@@ -135,7 +135,7 @@ public class QuorumPeerMain {
   
       LOG.info("Starting quorum peer");
       try {
-          // 初始化ServerCnxnFactory
+          // 初始化ServerCnxnFactory,负责与客户端之前通信
           ServerCnxnFactory cnxnFactory = ServerCnxnFactory.createFactory();
           // 配置ServerCnxnFactory，初始化内部的ServerSocketChannel并监听OP_ACCEPT事件
           // 此时没有启动ServerCnxnFactory

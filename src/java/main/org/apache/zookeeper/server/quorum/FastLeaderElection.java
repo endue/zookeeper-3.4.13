@@ -75,7 +75,7 @@ public class FastLeaderElection implements Election {
      * communication between peers, and QuorumCnxManager manages
      * such connections.
      */
-
+    // 集群间中管理器
     QuorumCnxManager manager;
 
 
@@ -522,7 +522,7 @@ public class FastLeaderElection implements Election {
     public FastLeaderElection(QuorumPeer self, QuorumCnxManager manager){
         this.stop = false;
         this.manager = manager;
-        // 里面会初始化并启动WorkerSender
+        // 里面会初始化并启动WorkerSender WorkerReceiver
         starter(self, manager);
     }
 

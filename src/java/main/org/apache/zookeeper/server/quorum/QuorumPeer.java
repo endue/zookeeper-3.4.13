@@ -97,6 +97,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     QuorumBean jmxQuorumBean;
     LocalPeerBean jmxLocalPeerBean;
     LeaderElectionBean jmxLeaderElectionBean;
+    // 负责集群间网络通信的组件
     QuorumCnxManager qcm;
     QuorumAuthServer authServer;
     QuorumAuthLearner authLearner;
@@ -646,7 +647,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         cnxnFactory.start();
         // 进行leader选举等操作
         startLeaderElection();
-        // QuorumPeer实现了ZooKeeperThread而ZooKeeperThread实现了Thread
+        // QuorumPeer继承了ZooKeeperThread而ZooKeeperThread继续了Thread
         // 所以不用猜了，当前类中肯定有个run()方法
         super.start();
     }
@@ -840,13 +841,15 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             le = new AuthFastLeaderElection(this, true);
             break;
         case 3:
-            // zk节点之间的通信组件
+            // zk节点之间的通信组件QuorumCnxManager
             qcm = createCnxnManager();
-            // 创建listener监听其他节点发生过来的请求
+            // 创建QuorumCnxManager里的listener
+            // 用来监听集群中其他节点发生过来的连接请求
             QuorumCnxManager.Listener listener = qcm.listener;
             if(listener != null){
                 // 启动listener
                 listener.start();
+                // 进行leader选举
                 le = new FastLeaderElection(this, qcm);
             } else {
                 LOG.error("Null listener when initializing cnx manager");
