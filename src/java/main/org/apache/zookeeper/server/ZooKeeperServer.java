@@ -613,7 +613,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         return sessionId != 0
                 && Arrays.equals(passwd, generatePasswd(sessionId));
     }
-
+    // 创建session
     long createSession(ServerCnxn cnxn, byte passwd[], int timeout) {
         long sessionId = sessionTracker.createSession(timeout);
         Random r = new Random(sessionId ^ superSecret);
@@ -948,6 +948,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         } else {
             LOG.info("Client attempting to establish new session at "
                     + cnxn.getRemoteSocketAddress());
+            // 创建sessionId
             createSession(cnxn, passwd, sessionTimeout);
         }
     }

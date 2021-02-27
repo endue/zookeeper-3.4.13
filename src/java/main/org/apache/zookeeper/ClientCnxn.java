@@ -971,7 +971,7 @@ public class ClientCnxn {
             }
             return paths;
         }
-
+        // 发送ping
         private void sendPing() {
             lastPingSentNs = System.nanoTime();
             RequestHeader h = new RequestHeader(-2, OpCode.ping);
@@ -1121,6 +1121,7 @@ public class ClientCnxn {
                         		((clientCnxnSocket.getIdleSend() > 1000) ? 1000 : 0);
                         //send a ping request either time is due or no packet sent out within MAX_SEND_PING_INTERVAL
                         if (timeToNextPing <= 0 || clientCnxnSocket.getIdleSend() > MAX_SEND_PING_INTERVAL) {
+                            // 发送ping心跳
                             sendPing();
                             clientCnxnSocket.updateLastSend();
                         } else {
