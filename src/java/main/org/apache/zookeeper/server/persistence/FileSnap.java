@@ -187,13 +187,23 @@ public class FileSnap implements SnapShot {
      * @throws IOException
      */
     // 查找最近n个数据快照文件
+    // 比如目前磁盘上此次snapshot文件如下：
+    // snapshot.0
+    // snapshot.1c
+    // snapshot.1d
+    // snapshot.300000000
+    // snapshot.b00000098
+    // n为3时，返回的是snapshot.1d、snapshot.300000000、snapshot.b00000098
     public List<File> findNRecentSnapshots(int n) throws IOException {
+        // 获取snapDir下所有以snapshot为前缀的文件并降序排列
         List<File> files = Util.sortDataDir(snapDir.listFiles(), SNAPSHOT_FILE_PREFIX, false);
         int count = 0;
+        // 遍历文件最多获取n个
         List<File> list = new ArrayList<File>();
         for (File f: files) {
             if (count == n)
                 break;
+            // 获取文件名的zxid
             if (Util.getZxidFromName(f.getName(), SNAPSHOT_FILE_PREFIX) != -1) {
                 count++;
                 list.add(f);

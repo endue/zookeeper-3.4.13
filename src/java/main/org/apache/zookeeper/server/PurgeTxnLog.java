@@ -84,13 +84,16 @@ public class PurgeTxnLog {
         List<File> snaps = txnLog.findNRecentSnapshots(num);
         int numSnaps = snaps.size();
         if (numSnaps > 0) {
-            // 开始删除旧的数据快照文件
+            // 删除旧的数据快照和事物日志文件
+            // 传入的参数为最近num个数据快照文件中zxid最大的文件
             purgeOlderSnapshots(txnLog, snaps.get(numSnaps - 1));
         }
     }
 
     // VisibleForTesting
+    // 删除旧的数据快照和事物日志文件
     static void purgeOlderSnapshots(FileTxnSnapLog txnLog, File snapShot) {
+        // 获取snapShot的zxid
         final long leastZxidToBeRetain = Util.getZxidFromName(
                 snapShot.getName(), PREFIX_SNAPSHOT);
 
@@ -122,6 +125,7 @@ public class PurgeTxnLog {
          * Finds all candidates for deletion, which are files with a zxid in their name that is less
          * than leastZxidToBeRetain.  There's an exception to this rule, as noted above.
          */
+        // 文件过滤器
         class MyFileFilter implements FileFilter{
             private final String prefix;
             MyFileFilter(String prefix){

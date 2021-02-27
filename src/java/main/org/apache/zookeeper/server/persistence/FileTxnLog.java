@@ -247,7 +247,7 @@ public class FileTxnLog implements TxnLog {
      * @param snapshotZxid return files at, or before this zxid
      * @return
      */
-    //
+    // 获取 >= snapshotZxid的事物日志文件
     public static File[] getLogFiles(File[] logDirList,long snapshotZxid) {
         List<File> files = Util.sortDataDir(logDirList, LOG_FILE_PREFIX, true);
         long logZxid = 0;

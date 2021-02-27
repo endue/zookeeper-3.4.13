@@ -178,6 +178,7 @@ public class FileTxnSnapLog {
      * @return the highest zxid restored
      * @throws IOException
      */
+    // 恢复当前服务器上存储的数据快照和事物日志
     public long restore(DataTree dt, Map<Long, Integer> sessions, 
             PlayBackListener listener) throws IOException {
         snapLog.deserialize(dt, sessions);
@@ -372,6 +373,7 @@ public class FileTxnSnapLog {
      * zxid
      * @return
      */
+    // 获取事物日志文件中 >= zxid的文件
     public File[] getSnapshotLogs(long zxid) {
         return FileTxnLog.getLogFiles(dataDir.listFiles(), zxid);
     }

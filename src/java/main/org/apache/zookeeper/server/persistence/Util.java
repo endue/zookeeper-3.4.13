@@ -130,19 +130,23 @@ public class Util {
      * Extracts zxid from the file name. The file name should have been created
      * using one of the {@link makeLogName} or {@link makeSnapshotName}.
      * 
-     * @param name the file name to parse
-     * @param prefix the file name prefix (snapshot or log)
+     * @param name the file name to parse 需要解析的文件名
+     * @param prefix the file name prefix (snapshot or log) 文件名前缀
      * @return zxid
      */
     public static long getZxidFromName(String name, String prefix) {
         long zxid = -1;
+        // 以.分割文件名
         String nameParts[] = name.split("\\.");
+        // 判断文件名是否符合规范
         if (nameParts.length == 2 && nameParts[0].equals(prefix)) {
             try {
+                // 解析文件名.后面的部分并转换为16进制
                 zxid = Long.parseLong(nameParts[1], 16);
             } catch (NumberFormatException e) {
             }
         }
+        // 返回zxid
         return zxid;
     }
 
@@ -269,7 +273,8 @@ public class Util {
             this.prefix = prefix;
             this.ascending = ascending;
         }
-
+        // 比较文件的zxid
+        // 也就是排除前缀的部分
         public int compare(File o1, File o2) {
             long z1 = Util.getZxidFromName(o1.getName(), prefix);
             long z2 = Util.getZxidFromName(o2.getName(), prefix);
