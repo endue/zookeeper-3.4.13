@@ -104,7 +104,9 @@ public abstract class ServerCnxnFactory {
     }
 
     public abstract void closeAll();
-    
+
+    // 初始化ServerCnxnFactory，默认为NIOServerCnxnFactory
+    // 用于处理客户端的连接
     static public ServerCnxnFactory createFactory() throws IOException {
         String serverCnxnFactoryName =
             System.getProperty(ZOOKEEPER_SERVER_CNXN_FACTORY);
@@ -143,6 +145,7 @@ public abstract class ServerCnxnFactory {
     private final Map<ServerCnxn, ConnectionBean> connectionBeans
         = new ConcurrentHashMap<ServerCnxn, ConnectionBean>();
 
+    // 记录所有的NIOServerCnxn
     protected final HashSet<ServerCnxn> cnxns = new HashSet<ServerCnxn>();
     public void unregisterConnection(ServerCnxn serverCnxn) {
         ConnectionBean jmxConnectionBean = connectionBeans.remove(serverCnxn);

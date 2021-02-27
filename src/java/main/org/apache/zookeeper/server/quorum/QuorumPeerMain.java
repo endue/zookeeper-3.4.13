@@ -135,12 +135,13 @@ public class QuorumPeerMain {
   
       LOG.info("Starting quorum peer");
       try {
-          // 初始化处理客户端网络连接的通信组件
+          // 初始化ServerCnxnFactory
           ServerCnxnFactory cnxnFactory = ServerCnxnFactory.createFactory();
           // 配置ServerCnxnFactory，初始化内部的ServerSocketChannel并监听OP_ACCEPT事件
+          // 此时没有启动ServerCnxnFactory
           cnxnFactory.configure(config.getClientPortAddress(),
                                 config.getMaxClientCnxns());
-          // 一个zk节点启动，核心内容就是quorumPeer
+          // 初始化QuorumPeer并进行相关配置
           quorumPeer = getQuorumPeer();
 
           quorumPeer.setQuorumPeers(config.getServers());
@@ -178,7 +179,7 @@ public class QuorumPeerMain {
 
           quorumPeer.setQuorumCnxnThreadsSize(config.quorumCnxnThreadsSize);
           quorumPeer.initialize();
-
+          // 启动QuorumPeer
           quorumPeer.start();
           quorumPeer.join();
       } catch (InterruptedException e) {

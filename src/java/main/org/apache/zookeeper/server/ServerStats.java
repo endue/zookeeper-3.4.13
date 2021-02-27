@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 public class ServerStats {
     private long packetsSent;
+    // 接收到的完整的数据包的数量
     private long packetsReceived;
     private long maxLatency;
     private long minLatency = Long.MAX_VALUE;

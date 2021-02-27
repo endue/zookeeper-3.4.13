@@ -55,19 +55,20 @@ import org.apache.zookeeper.server.util.OSMXBean;
  * This class handles communication with clients using NIO. There is one per
  * client, but only one thread doing the communication.
  */
+// 服务端针对某个客户端的ip+port，会保存一个对应的NIOServerCnxn
 public class NIOServerCnxn extends ServerCnxn {
     static final Logger LOG = LoggerFactory.getLogger(NIOServerCnxn.class);
 
     NIOServerCnxnFactory factory;
-
+    // 客户端的SocketChannel
     final SocketChannel sock;
-
+    // 触发事件的sk
     protected final SelectionKey sk;
 
     boolean initialized;
-
+    // 报文长度buffer
     ByteBuffer lenBuffer = ByteBuffer.allocate(4);
-
+    // 初始化读取报文数据的buffer
     ByteBuffer incomingBuffer = lenBuffer;
 
     LinkedBlockingQueue<ByteBuffer> outgoingBuffers = new LinkedBlockingQueue<ByteBuffer>();
@@ -191,7 +192,15 @@ public class NIOServerCnxn extends ServerCnxn {
     }
 
     /** Read the request payload (everything following the length prefix) */
+    // 读取数据
+    // 这里有两种情况
+    // 1.根据lenBuffer重新初始化incomingBuffer后，
+    //  1.1第一次从SocketChannel读取数据到incomingBuffer
+    //  1.2由于数据拆包，后续数据发送过来继续读取到incomingBuffer
+    // 2.数据已经全部读取完毕
     private void readPayload() throws IOException, InterruptedException {
+        // 从SocketChannel读取数据到incomingBuffer
+        // 有可能是第一次读取，也有可能是拆包后，处理后续发送过来的数据
         if (incomingBuffer.remaining() != 0) { // have we read length bytes?
             int rc = sock.read(incomingBuffer); // sock is non-blocking, so ok
             if (rc < 0) {
@@ -201,13 +210,18 @@ public class NIOServerCnxn extends ServerCnxn {
                         + ", likely client has closed socket");
             }
         }
-
+        // 数据读取完毕
+        // 清空incomingBuffer和lenBuffer
+        // 将incomingBuffer重置为lenBuffer
         if (incomingBuffer.remaining() == 0) { // have we read length bytes?
+            // 更新统计相关
             packetReceived();
             incomingBuffer.flip();
             if (!initialized) {
+                // 处理连接请求
                 readConnectRequest();
             } else {
+                // 处理其他请求
                 readRequest();
             }
             lenBuffer.clear();
@@ -218,6 +232,7 @@ public class NIOServerCnxn extends ServerCnxn {
     /**
      * Only used in order to allow testing
      */
+    // 当前sock是否开启
     protected boolean isSocketOpen() {
         return sock.isOpen();
     }
@@ -234,15 +249,20 @@ public class NIOServerCnxn extends ServerCnxn {
     /**
      * Handles read/write IO on connection.
      */
+    // 处理读或写事件
     void doIO(SelectionKey k) throws InterruptedException {
         try {
+            // 校验客户端是否开启
             if (isSocketOpen() == false) {
                 LOG.warn("trying to do i/o on a null socket for session:0x"
                          + Long.toHexString(sessionId));
 
                 return;
             }
+            // 处理读事件
             if (k.isReadable()) {
+                // 初始化当前类时incomingBuffer == lenBuffer 4个字节长度
+                // 读取数据到incomingBuffer
                 int rc = sock.read(incomingBuffer);
                 if (rc < 0) {
                     throw new EndOfStreamException(
@@ -250,17 +270,26 @@ public class NIOServerCnxn extends ServerCnxn {
                             + Long.toHexString(sessionId)
                             + ", likely client has closed socket");
                 }
+                // 1.incomingBuffer.remaining() != 0 表示发生了拆包,不会处理此次请求中的数据会继续等待后续的数据
+                // 2.incomingBuffer.remaining() == 0 处理请求，因为incomingBuffer读满了，也就是此次请求的数据全部读取到了或者此次请求的数据长度已经读取到了
+                //  2.1 incomingBuffer == lenBuffer 表示是一次新的数据请求，此时incomingBuffer中存储的是数据的长度
+                //  2.2 incomingBuffer != lenBuffer 表示不是新的一次数据请求，在上次读取数据的发生了拆包，所以这次继续读取incomingBuffer中的数据
                 if (incomingBuffer.remaining() == 0) {
                     boolean isPayload;
+                    // 一次新的请求
                     if (incomingBuffer == lenBuffer) { // start of next request
+                        // 读取这次新的请求中数据的长度，并重新初始化incomingBuffer
                         incomingBuffer.flip();
                         isPayload = readLength(k);
                         incomingBuffer.clear();
                     } else {
                         // continuation
+                        // 继续处理上次拆包后的数据
                         isPayload = true;
                     }
+                    // 如果isPayload为true表示不是4字节命令
                     if (isPayload) { // not the case for 4letterword
+                        // 读取数据
                         readPayload();
                     }
                     else {
@@ -270,11 +299,13 @@ public class NIOServerCnxn extends ServerCnxn {
                     }
                 }
             }
+            // 处理写事件
             if (k.isWritable()) {
                 // ZooLog.logTraceMessage(LOG,
                 // ZooLog.CLIENT_DATA_PACKET_TRACE_MASK
                 // "outgoingBuffers.size() = " +
                 // outgoingBuffers.size());
+                // 判断outgoingBuffers是否有待发送的数据
                 if (outgoingBuffers.size() > 0) {
                     // ZooLog.logTraceMessage(LOG,
                     // ZooLog.CLIENT_DATA_PACKET_TRACE_MASK,
@@ -289,14 +320,16 @@ public class NIOServerCnxn extends ServerCnxn {
                      */
                     ByteBuffer directBuffer = factory.directBuffer;
                     directBuffer.clear();
-
+                    // 遍历outgoingBuffers中待处理的数据
                     for (ByteBuffer b : outgoingBuffers) {
+                        // 如果directBuffer中剩余空间不足以放置当前b中的数据
                         if (directBuffer.remaining() < b.remaining()) {
                             /*
                              * When we call put later, if the directBuffer is to
                              * small to hold everything, nothing will be copied,
                              * so we've got to slice the buffer if it's too big.
                              */
+                            // 根据当前directBuffer中的剩余空间从b中获取对应大小的数据
                             b = (ByteBuffer) b.slice().limit(
                                     directBuffer.remaining());
                         }
@@ -307,9 +340,11 @@ public class NIOServerCnxn extends ServerCnxn {
                          * needed), so we save and reset the position after the
                          * copy
                          */
+                        //将b中的数据赋值给directBuffer
                         int p = b.position();
                         directBuffer.put(b);
                         b.position(p);
+                        // 没有剩余空间了，跳出当前循环
                         if (directBuffer.remaining() == 0) {
                             break;
                         }
@@ -318,8 +353,9 @@ public class NIOServerCnxn extends ServerCnxn {
                      * Do the flip: limit becomes position, position gets set to
                      * 0. This sets us up for the write.
                      */
+                    // 发送directBuffer中的数据
                     directBuffer.flip();
-
+                    // 获取本次发送的数据大小
                     int sent = sock.write(directBuffer);
                     ByteBuffer bb;
 
@@ -388,7 +424,7 @@ public class NIOServerCnxn extends ServerCnxn {
             close();
         }
     }
-
+    // 将收到的数据交给ZooKeeperServer
     private void readRequest() throws IOException {
         zkServer.processPacket(this, incomingBuffer);
     }
@@ -980,6 +1016,8 @@ public class NIOServerCnxn extends ServerCnxn {
      * @return true if length read, otw false (wasn't really the length)
      * @throws IOException if buffer size exceeds maxBuffer size
      */
+    // 读取数据的总长度，为incomingBuffer重新分配空间
+    // 同时还判断是否为4字节命令
     private boolean readLength(SelectionKey k) throws IOException {
         // Read the length, now get the buffer
         int len = lenBuffer.getInt();
@@ -1108,6 +1146,7 @@ public class NIOServerCnxn extends ServerCnxn {
      * @see org.apache.zookeeper.server.ServerCnxnIface#sendResponse(org.apache.zookeeper.proto.ReplyHeader,
      *      org.apache.jute.Record, java.lang.String)
      */
+    // 发送响应
     @Override
     synchronized public void sendResponse(ReplyHeader h, Record r, String tag) {
         try {

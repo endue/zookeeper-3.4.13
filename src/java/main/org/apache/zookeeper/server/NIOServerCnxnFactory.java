@@ -37,6 +37,8 @@ import org.slf4j.LoggerFactory;
 
 /**
  * 负责处理客户端的相关连接等操作
+ * 该类实现了Runnable接口并且包含ServerSocketChannel，所以可以肯定run()方法包含在一个循环的whlie中，来处理客户端的相关连接
+ * 同时也会将当前类交给一个Thread来启动
  */
 public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable {
     private static final Logger LOG = LoggerFactory.getLogger(NIOServerCnxnFactory.class);
@@ -53,9 +55,10 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
             LOG.error("Selector failed to open", ie);
         }
     }
-
+    // ServerSocketChannel
+    // 监听配置文件中配置的clientPortAddress(默认不配置取当前服务器IP)和clientPort
     ServerSocketChannel ss;
-
+    // 初始化Selector
     final Selector selector = Selector.open();
 
     /**
@@ -63,11 +66,11 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
      * sender thread per NIOServerCnxn instance, we can use a member variable to
      * only allocate it once.
     */
+    // 内存缓存区，64kb
     final ByteBuffer directBuffer = ByteBuffer.allocateDirect(64 * 1024);
-
-    final HashMap<InetAddress, Set<NIOServerCnxn>> ipMap =
-        new HashMap<InetAddress, Set<NIOServerCnxn>>( );
-
+    // 记录InetAddress(只包含IP地址,不包含端口号)对应的Set<NIOServerCnxn>
+    final HashMap<InetAddress, Set<NIOServerCnxn>> ipMap = new HashMap<InetAddress, Set<NIOServerCnxn>>( );
+    // 单个客户端最大连接数
     int maxClientCnxns = 60;
 
     /**
@@ -78,17 +81,25 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
      */
     public NIOServerCnxnFactory() throws IOException {
     }
-
+    // 由于当前NIOServerCnxnFactory实现了Runable接口，所以在configure()方法中，将当前类传入了该thread
+    // 最后靠启动thread来执行NIOServerCnxnFactory类中的run()方法
     Thread thread;
+
+    /**
+     * 配置ServerSocketChannel并监听OP_ACCEPT事件
+     * @param addr 当前服务器的InetSocketAddress对象
+     * @param maxcc 客户端最大连接数
+     * @throws IOException
+     */
     @Override
     public void configure(InetSocketAddress addr, int maxcc) throws IOException {
         configureSaslLogin();
-
+        // 创建thread并传入当前类，这里并没有启动thread
         thread = new ZooKeeperThread(this, "NIOServerCxn.Factory:" + addr);
         thread.setDaemon(true);
+        // 设置客户端最大连接数
         maxClientCnxns = maxcc;
-        // 初始化ServerSocketChannel
-        // 并注册监听OP_ACCEPT事件
+        // 初始化ServerSocketChannel，并监听OP_ACCEPT事件
         this.ss = ServerSocketChannel.open();
         ss.socket().setReuseAddress(true);
         LOG.info("binding to port " + addr);
@@ -107,6 +118,7 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
         maxClientCnxns = max;
     }
 
+    // 集群模式启动方法
     @Override
     public void start() {
         // ensure thread is started once and only once
@@ -115,6 +127,7 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
         }
     }
 
+    // 单机模式启动方法
     @Override
     public void startup(ZooKeeperServer zks) throws IOException,
             InterruptedException {
@@ -134,6 +147,7 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
         return ss.socket().getLocalPort();
     }
 
+    // 添加一个NIOServerCnxn
     private void addCnxn(NIOServerCnxn cnxn) {
         synchronized (cnxns) {
             cnxns.add(cnxn);
@@ -155,7 +169,7 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
             }
         }
     }
-
+    // 删除NIOServerCnxn
     public void removeCnxn(NIOServerCnxn cnxn) {
         synchronized(cnxns) {
             // Remove the related session from the sessionMap.
@@ -179,11 +193,12 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
         }
     }
 
+    // 初始化一个NIOServerCnxn
     protected NIOServerCnxn createConnection(SocketChannel sock,
             SelectionKey sk) throws IOException {
         return new NIOServerCnxn(zkServer, sock, sk, this);
     }
-
+    // 获取InetAddress当前的连接数
     private int getClientCnxnCount(InetAddress cl) {
         // The ipMap lock covers both the map, and its contents
         // (that is, the cnxn sets shouldn't be modified outside of
@@ -194,40 +209,60 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
             return s.size();
         }
     }
+    // 当该类被调用startup()或start()方法时会执行该方法
     // 不断while循环，处理客户端的请求
     public void run() {
         while (!ss.socket().isClosed()) {
             try {
+                // 超时等待1000
                 selector.select(1000);
+                // 获取就绪的SelectionKey
                 Set<SelectionKey> selected;
                 synchronized (this) {
                     selected = selector.selectedKeys();
                 }
+                // 就绪key存储到list
                 ArrayList<SelectionKey> selectedList = new ArrayList<SelectionKey>(
                         selected);
+                // 打乱SelectionKey，随机排序
+                // 反之出现总是先处理某个客户端的请求
                 Collections.shuffle(selectedList);
+                // 遍历处理
                 for (SelectionKey k : selectedList) {
+                    // 当前通道是否已完成连接操作
                     if ((k.readyOps() & SelectionKey.OP_ACCEPT) != 0) {
                         SocketChannel sc = ((ServerSocketChannel) k
                                 .channel()).accept();
+                        // 获取客户端的InetAddress对象
                         InetAddress ia = sc.socket().getInetAddress();
+                        // 获取客户端当前的连接数
                         int cnxncount = getClientCnxnCount(ia);
+                        // 超过单个客户端允许的最大连接
                         if (maxClientCnxns > 0 && cnxncount >= maxClientCnxns){
                             LOG.warn("Too many connections from " + ia
                                      + " - max is " + maxClientCnxns );
+                            // 关闭当前连接
                             sc.close();
+                        // 未超过
                         } else {
                             LOG.info("Accepted socket connection from "
                                      + sc.socket().getRemoteSocketAddress());
+                            // 监听OP_READ事件
                             sc.configureBlocking(false);
                             SelectionKey sk = sc.register(selector,
                                     SelectionKey.OP_READ);
+                            // 初始化一个NIOServerCnxn
                             NIOServerCnxn cnxn = createConnection(sc, sk);
+                            // 将NIOServerCnxn绑定到SelectionKey上
                             sk.attach(cnxn);
+                            // 添加NIOServerCnxn
                             addCnxn(cnxn);
                         }
+                    // 当前通道是否已准备好读或者写
                     } else if ((k.readyOps() & (SelectionKey.OP_READ | SelectionKey.OP_WRITE)) != 0) {
+                        // 获取这个key之前绑定的NIOServerCnxn
                         NIOServerCnxn c = (NIOServerCnxn) k.attachment();
+                        // 这里可以看出每个key的事件处理会交给它所对应的NIOServerCnxn
                         c.doIO(k);
                     } else {
                         if (LOG.isDebugEnabled()) {
@@ -236,6 +271,7 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
                         }
                     }
                 }
+                // 最后清空selected
                 selected.clear();
             } catch (RuntimeException e) {
                 LOG.warn("Ignoring unexpected runtime exception", e);

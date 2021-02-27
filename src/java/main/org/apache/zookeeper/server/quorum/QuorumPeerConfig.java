@@ -326,6 +326,7 @@ public class QuorumPeerConfig {
         if (clientPort == 0) {
             throw new IllegalArgumentException("clientPort is not set");
         }
+        // 未配置clientPortAddress，则以当前服务器IP为clientPortAddress
         if (clientPortAddress != null) {
             this.clientPortAddress = new InetSocketAddress(
                     InetAddress.getByName(clientPortAddress), clientPort);

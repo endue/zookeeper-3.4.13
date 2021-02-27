@@ -642,10 +642,12 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     public synchronized void start() {
         // 加载磁盘上数据
         loadDataBase();
-        // 启动cnxnFactory，处理客户端的相关连接
+        // 启动ServerCnxnFactory来处理客户端的相关连接
         cnxnFactory.start();
         // 进行leader选举等操作
         startLeaderElection();
+        // QuorumPeer实现了ZooKeeperThread而ZooKeeperThread实现了Thread
+        // 所以不用猜了，当前类中肯定有个run()方法
         super.start();
     }
 
