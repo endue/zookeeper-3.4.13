@@ -734,7 +734,9 @@ public class QuorumCnxManager {
         /**
          * Sleeps on accept().
          */
-        // 监听集群中其他节点发生过来的连接请求
+        // 不断地监听到来自其他zk服务的创建连接请求，
+        // 为了避免两台机器之间重复地创建TCP连接，Zookeeper只允许SID大的服务器主动和其他机器建立连接，否则断开连接
+        //
         @Override
         public void run() {
             int numRetries = 0;

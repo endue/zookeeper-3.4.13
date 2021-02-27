@@ -72,6 +72,7 @@ public class ZKDatabase {
     protected static int commitLogBuffer = 700;
     protected LinkedList<Proposal> committedLog = new LinkedList<Proposal>();
     protected ReentrantReadWriteLock logLock = new ReentrantReadWriteLock();
+    // 在启动的时候从磁盘加载完数据会初始化为true
     volatile private boolean initialized = false;
     
     /**

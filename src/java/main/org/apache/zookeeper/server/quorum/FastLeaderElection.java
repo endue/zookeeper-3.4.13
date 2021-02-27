@@ -495,6 +495,7 @@ public class FastLeaderElection implements Election {
     }
 
     QuorumPeer self;
+    // 发送收发zkServer直接的选票
     Messenger messenger;
     // 逻辑时钟，记录选举的epoch
     AtomicLong logicalclock = new AtomicLong(); /* Election instance */
@@ -875,7 +876,8 @@ public class FastLeaderElection implements Election {
                     switch (n.state) {
                     case LOOKING:
                         // If notification > current, replace and send messages out
-                        // 收到n服务通知里的epoch > 当前服务上的epoch，说明当前zkServer上进行的本轮选举已经过时
+                        // 收到n服务选票里的epoch > 当前服务上的选票epoch，说明当前zkServer上进行的本轮选举已经过时，更新自己的选举轮次(logicalclock)
+                        // 清空所有已经收到的投票，然后使用初始化的投票来进行PK以确定是否变更内部投票。最终再将内部投票发送出去
                         if (n.electionEpoch > logicalclock.get()) {
                             // 更新当前服务上的epoch，将已过时的当前zkServer上的选票更新为当前最新的选票
                             logicalclock.set(n.electionEpoch);
@@ -895,7 +897,7 @@ public class FastLeaderElection implements Election {
                             // 发送通知
                             sendNotifications();
                         // 收到n服务通知里的epoch < 当前服务上的epoch
-                        // 不处理
+                        // 不处理，说明n服务的选票过期了
                         } else if (n.electionEpoch < logicalclock.get()) {
                             if(LOG.isDebugEnabled()){
                                 LOG.debug("Notification election epoch is smaller than logicalclock. n.electionEpoch = 0x"

@@ -645,31 +645,39 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         loadDataBase();
         // 启动ServerCnxnFactory来处理客户端的相关连接
         cnxnFactory.start();
-        // 进行leader选举等操作
+        // 对选举进行初始化
         startLeaderElection();
         // QuorumPeer继承了ZooKeeperThread而ZooKeeperThread继续了Thread
         // 所以不用猜了，当前类中肯定有个run()方法
+        // 开始监听zk集群间的状态并进行选举
         super.start();
     }
 
     // 加载磁盘数据
     private void loadDataBase() {
+        // 获取updatingEpoch文件
         File updating = new File(getTxnFactory().getSnapDir(),
                                  UPDATING_EPOCH_FILENAME);
 		try {
+		    // 加载磁盘数据到内存数据库
             zkDb.loadDataBase();
 
             // load the epochs
+            // 获取最后处理的zxid
             long lastProcessedZxid = zkDb.getDataTree().lastProcessedZxid;
+            // 从zxid中解析出最后的epoch
     		long epochOfZxid = ZxidUtils.getEpochFromZxid(lastProcessedZxid);
             try {
+                // 从currentEpoch文件中解析出当前zkServer所处的epoch
             	currentEpoch = readLongFromFile(CURRENT_EPOCH_FILENAME);
                 if (epochOfZxid > currentEpoch && updating.exists()) {
                     LOG.info("{} found. The server was terminated after " +
                              "taking a snapshot but before updating current " +
                              "epoch. Setting current epoch to {}.",
                              UPDATING_EPOCH_FILENAME, epochOfZxid);
+                    // 更新当zkServer的epoch并写入文件
                     setCurrentEpoch(epochOfZxid);
+                    // 删除updatingEpoch文件
                     if (!updating.delete()) {
                         throw new IOException("Failed to delete " +
                                               updating.toString());
@@ -689,6 +697,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             	throw new IOException("The current epoch, " + ZxidUtils.zxidToString(currentEpoch) + ", is older than the last zxid, " + lastProcessedZxid);
             }
             try {
+                // 读取acceptedEpoch文件中的数据
             	acceptedEpoch = readLongFromFile(ACCEPTED_EPOCH_FILENAME);
             } catch(FileNotFoundException e) {
             	// pick a reasonable epoch number
@@ -841,13 +850,14 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             le = new AuthFastLeaderElection(this, true);
             break;
         case 3:
-            // zk节点之间的通信组件QuorumCnxManager
+            // 创建QuorumCnxManager
+            // 负责zk服务之间Leader选举过程中的网络通信
             qcm = createCnxnManager();
             // 创建QuorumCnxManager里的listener
             // 用来监听集群中其他节点发生过来的连接请求
             QuorumCnxManager.Listener listener = qcm.listener;
             if(listener != null){
-                // 启动listener
+                // 启动listener，监听其他zkServer发送过来的连接请求
                 listener.start();
                 // 进行leader选举
                 le = new FastLeaderElection(this, qcm);
