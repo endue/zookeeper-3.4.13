@@ -66,11 +66,28 @@ import org.apache.zookeeper.server.quorum.QuorumPeerConfig.ConfigException;
 
 public class QuorumHierarchical implements QuorumVerifier {
     private static final Logger LOG = LoggerFactory.getLogger(QuorumHierarchical.class);
-
+    // 记录权重，key是zk服务ID，value是权重
+    // Weight可以调节一个组内单个节点的权重，默认每个节点的权重是1（如果配置是0不参与leader的选举）.每个组有一个法定数的概念，
+    // 法定数等于组内所有节点的权重之和.此时判断一个组是否稳定，是要判断存活的节点权重之和是否大于该组法定数的权重
+    // weight.1=3
+    // weight.2=1
+    // weight.3=1
+    // weight.4=1
+    // weight.5=1
+    // weight.6=1
+    // weight.7=1
+    // Group1的法定数是：3+1+1=5，只要节点权重之和过半该组就是稳定的，当2,3,4,5,6挂掉，此时Group1和Group3是稳定状态，整个集群是稳定的
     HashMap<Long, Long> serverWeight;
+    // group组成员
+    // key是zk服务ID，value是组ID
+    // group.1=1:2:3
+    // group.2=4:5:6
+    // group.3=7
     HashMap<Long, Long> serverGroup;
+    // 记录组的权重信息
+    // key是groupId，value是权重
     HashMap<Long, Long> groupWeight;
-    
+    //  录组的数量
     int numGroups;
    
     /**
@@ -118,10 +135,10 @@ public class QuorumHierarchical implements QuorumVerifier {
             HashMap<Long, Long> serverWeight,
             HashMap<Long, Long> serverGroup)
     {
+
         this.serverWeight = serverWeight;
         this.serverGroup = serverGroup;
         this.groupWeight = new HashMap<Long, Long>();
-        
         this.numGroups = numGroups;
         computeGroupWeight();   
     }
@@ -205,7 +222,10 @@ public class QuorumHierarchical implements QuorumVerifier {
      * when validating a given set. We compute the weights of groups in 
      * different places, so we have a separate method.
      */
+    // 计算组的权重
     private void computeGroupWeight(){
+        // 1.遍历所有的组，计算每个组的权重
+        // key是zk服务ID，value是组ID
         for(Entry<Long, Long> entry : serverGroup.entrySet()){
             Long sid = entry.getKey();
             Long gid = entry.getValue();
@@ -220,6 +240,7 @@ public class QuorumHierarchical implements QuorumVerifier {
         /*
          * Do not consider groups with weight zero
          */
+        // 2.上面处理完所有组的权重后，过滤出权重为0的组，然后修改组的数量
         for(long weight: groupWeight.values()){
             LOG.debug("Group weight: " + weight);
             if(weight == ((long) 0)){

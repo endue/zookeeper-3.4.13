@@ -105,10 +105,17 @@ public class QuorumCnxManager {
     /*
      * Local IP address
      */
+    // myid文件中配置的值
     final long mySid;
     final int socketTimeout;
+    // 关联配置server
+    // 记录zk服务，key是zk服务ID
     final Map<Long, QuorumPeer.QuorumServer> view;
     final boolean tcpKeepAlive = Boolean.getBoolean("zookeeper.tcpKeepAlive");
+    // 关联配置quorumListenOnAllIPs
+    // 当设置为true时，ZooKeeper服务器将监听所有可用IP地址的连接，
+    // 而不仅仅是配置文件中的服务器列表中配置的地址。
+    // 它影响处理ZAB协议和Fast Leader选举协议的连接。默认值为false
     final boolean listenOnAllIPs;
     private ThreadPoolExecutor connectionExecutor;
     private final Set<Long> inprogressConnections = Collections
@@ -124,12 +131,13 @@ public class QuorumCnxManager {
     /*
      * Mapping from Peer to Thread number
      */
-    // 记录sid和对应的SendWorker，SendWorker采用BIO
+    // 记录zk服务和对应的SendWorker，SendWorker采用BIO
+    // key是zk服务id
     final ConcurrentHashMap<Long, SendWorker> senderWorkerMap;
-    // 记录sid服务和对应的队列
-    // 该队列用来存储要发送到sid服务的数据
+    // 记录zk服务和对应的队列，key是zk服务id
+    // 该队列用来存储要发送到zk服务的数据
     final ConcurrentHashMap<Long, ArrayBlockingQueue<ByteBuffer>> queueSendMap;
-    // 记录sid服务最近发送过的一条数据
+    // 记录发送到zk服务最近的一条数据
     final ConcurrentHashMap<Long, ByteBuffer> lastMessageSent;
 
     /*
@@ -556,6 +564,7 @@ public class QuorumCnxManager {
      * 
      *  @param sid  server id
      */
+    // 尝试与sid服务建立连接
     synchronized public void connectOne(long sid){
         if (!connectedToPeer(sid)){
             InetSocketAddress electionAddr;
@@ -746,21 +755,22 @@ public class QuorumCnxManager {
                     // 创建ServerSocket
                     ss = new ServerSocket();
                     ss.setReuseAddress(true);
-                    // 获取addr和port
-                    if (listenOnAllIPs) {
+                    // 设置监听的ip和端口
+                    if (listenOnAllIPs) {// 这个值默认为false
                         int port = view.get(QuorumCnxManager.this.mySid)
                             .electionAddr.getPort();
                         addr = new InetSocketAddress(port);
                     } else {
+                        // 监听指定ip和端口
                         addr = view.get(QuorumCnxManager.this.mySid)
                             .electionAddr;
                     }
                     LOG.info("My election bind port: " + addr.toString());
                     setName(view.get(QuorumCnxManager.this.mySid)
                             .electionAddr.toString());
-                    // 设置ServerSocket绑定的地址和端口
+                    // 设置ServerSocket监听的ip和端口
                     ss.bind(addr);
-                    // 不断轮询
+                    // 不断轮询获取连接
                     while (!shutdown) {
                         // 获取新的连接
                         Socket client = ss.accept();

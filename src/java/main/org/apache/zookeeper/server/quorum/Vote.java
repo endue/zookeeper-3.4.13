@@ -91,9 +91,9 @@ public class Vote {
     final private long id;
     
     final private long zxid;
-    
+    // 选举周期，用于判断是不是同一个选举周期，从0开始累计
     final private long electionEpoch;
-    
+    // 被推举的Leader的epoch
     final private long peerEpoch;
     
     public int getVersion() {

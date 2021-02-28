@@ -71,16 +71,39 @@ public class QuorumPeerConfig {
     protected int syncLimit;
     protected int electionAlg = 3;
     protected int electionPort = 2182;
+    // 当设置为true时，ZooKeeper服务器将监听所有可用IP地址的连接，
+    // 而不仅仅是配置文件中的服务器列表中配置的地址。
+    // 它影响处理ZAB协议和Fast Leader选举协议的连接。默认值为false
     protected boolean quorumListenOnAllIPs = false;
+    // 记录zk服务，key是zk服务ID
     protected final HashMap<Long,QuorumServer> servers =
         new HashMap<Long, QuorumServer>();
+    // 记录zk服务中observers类型，key是zk服务ID
     protected final HashMap<Long,QuorumServer> observers =
         new HashMap<Long, QuorumServer>();
-
+    // 也就是myid文件里配置的值
     protected long serverId;
+    // 记录权重，key是zk服务ID，value是权重
+    // Weight可以调节一个组内单个节点的权重，默认每个节点的权重是1（如果配置是0不参与leader的选举）.每个组有一个法定数的概念，
+    // 法定数等于组内所有节点的权重之和.此时判断一个组是否稳定，是要判断存活的节点权重之和是否大于该组法定数的权重
+    // weight.1=3
+    // weight.2=1
+    // weight.3=1
+    // weight.4=1
+    // weight.5=1
+    // weight.6=1
+    // weight.7=1
+    // Group1的法定数是：3+1+1=5，只要节点权重之和过半该组就是稳定的，当2,3,4,5,6挂掉，此时Group1和Group3是稳定状态，整个集群是稳定的
     protected HashMap<Long, Long> serverWeight = new HashMap<Long, Long>();
+    // group组成员
+    // key是zk服务ID，value是组ID
+    // group.1=1:2:3
+    // group.2=4:5:6
+    // group.3=7
     protected HashMap<Long, Long> serverGroup = new HashMap<Long, Long>();
+    // 记录组的数量
     protected int numGroups = 0;
+    // 如果存在分组使用QuorumHierarchical，否则使用QuorumMaj
     protected QuorumVerifier quorumVerifier;
     // 快照保存的数量，默认3
     protected int snapRetainCount = 3;
@@ -220,9 +243,14 @@ public class QuorumPeerConfig {
                 snapRetainCount = Integer.parseInt(value);
             } else if (key.equals("autopurge.purgeInterval")) {
                 purgeInterval = Integer.parseInt(value);
+            // 解析server.配置，如配置文件中内容如下：
+            // server.1=192.168.6.130:2888:3888
+            // server.2=192.168.6.131:2888:3888
+            // server.3=192.168.6.132:2888:3888
             } else if (key.startsWith("server.")) {
                 int dot = key.indexOf('.');
                 long sid = Long.parseLong(key.substring(dot + 1));
+                // parts解析后内容为：[192.168.6.130,2888,3888]
                 String parts[] = splitWithLeadingHostname(value);
                 if ((parts.length != 2) && (parts.length != 3) && (parts.length !=4)) {
                     LOG.error(value
@@ -230,8 +258,11 @@ public class QuorumPeerConfig {
                        " or host:port:port:type");
                 }
                 LearnerType type = null;
+                // 获取服务器ip:192.168.6.130
                 String hostname = parts[0];
+                // 获取服务器第一个端口:2888(用来连接leader)
                 Integer port = Integer.parseInt(parts[1]);
+                // 获取服务器第二个端口:3888(用来选举leader)
                 Integer electionPort = null;
                 if (parts.length > 2){
                 	electionPort=Integer.parseInt(parts[2]);
@@ -250,12 +281,17 @@ public class QuorumPeerConfig {
                 } else {
                     servers.put(Long.valueOf(sid), new QuorumServer(sid, hostname, port, electionPort, type));
                 }
+            // 解析组,比如配置如下(上面的配置应该修改为7台zk服务而不是三台)：
+            // group.1=1:2:3
+            // group.2=4:5:6
+            // group.3=7
             } else if (key.startsWith("group")) {
                 int dot = key.indexOf('.');
+                // 获取组ID
                 long gid = Long.parseLong(key.substring(dot + 1));
-
+                // 组+1
                 numGroups++;
-
+                // 解析组中的成员并翻到对应的组中
                 String parts[] = value.split(":");
                 for(String s : parts){
                     long sid = Long.parseLong(s);
@@ -264,7 +300,14 @@ public class QuorumPeerConfig {
                     else
                         serverGroup.put(sid, gid);
                 }
-
+            // 获取权重并记录权重，配置如下
+            //  weight.1=3
+            //  weight.2=1
+            //  weight.3=1
+            //  weight.4=1
+            //  weight.5=1
+            //  weight.6=1
+            //  weight.7=1
             } else if(key.startsWith("weight")) {
                 int dot = key.indexOf('.');
                 long sid = Long.parseLong(key.substring(dot + 1));

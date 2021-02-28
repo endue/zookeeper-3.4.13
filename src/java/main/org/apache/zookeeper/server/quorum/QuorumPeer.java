@@ -115,7 +115,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     // 内存数据库
     private ZKDatabase zkDb;
 
-    // 集群中服务实例类
+    // 记录zk服务中每一个服务的信息
     public static class QuorumServer {
         private QuorumServer(long id, InetSocketAddress addr,
                 InetSocketAddress electionAddr) {
@@ -232,22 +232,26 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             // All the IP addresses are unreachable, just return the first one.
             return addresses[0];
         }
-
+        // 根据hostname + port封装的
         public InetSocketAddress addr;
-
+        // 根据hostname + electionPort封装的
         public InetSocketAddress electionAddr;
-        
+        // zk服务的ip
         public String hostname;
-
+        // zk服务用来连接leader的端口
         public int port=2888;
-
+        // zk服务用来选举leader的端口
         public int electionPort=-1;
-
+        // zk服务的id
         public long id;
         
         public LearnerType type = LearnerType.PARTICIPANT;
     }
-
+    // 记录server所处的状态
+    // LOOKING：寻找Leader状态。当服务器处于该状态时，它会认为当前集群中没有Leader，因此需要进入Leader选举状态
+    // FOLLOWING：跟随者状态。表明当前服务器角色是Follower
+    // LEADING：领导者状态。表明当前服务器角色是Leader
+    // OBSERVING：观察者状态。表明当前服务器角色是Observer
     public enum ServerState {
         LOOKING, FOLLOWING, LEADING, OBSERVING;
     }
@@ -260,6 +264,9 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
      * We need this distinction to decide which ServerState to move to when 
      * conditions change (e.g. which state to become after LOOKING). 
      */
+    // 标记zkServer是否可以参加选举
+    // PARTICIPANT,能够参与一致性的投票，以及选举leader
+    // OBSERVER，只能观察
     public enum LearnerType {
         PARTICIPANT, OBSERVER;
     }
@@ -275,11 +282,13 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     /*
      * Record leader election time
      */
+    // 记录leader选举时间
     public long start_fle, end_fle;
     
     /*
      * Default value of peer is participant
      */
+    // zkServer参数类型，默认PARTICIPANT
     private LearnerType learnerType = LearnerType.PARTICIPANT;
     
     public LearnerType getLearnerType() {
@@ -303,6 +312,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
      * The servers that make up the cluster
      */
     // 记录集群中各个服务实例信息
+    // key是zk服务ID
     protected Map<Long, QuorumServer> quorumPeers;
     public int getQuorumSize(){
         return getVotingView().size();
@@ -311,12 +321,12 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     /**
      * QuorumVerifier implementation; default (majority). 
      */
-    
     private QuorumVerifier quorumConfig;
     
     /**
      * My id
      */
+    // 也就是myid文件里配置的值
     private long myid;
 
 
@@ -558,7 +568,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     public InetSocketAddress getQuorumAddress(){
         return myQuorumAddr;
     }
-
+    // 选举算法类型编号，对应不同的electionAlg
     private int electionType;
     // 选举算法默认FastLeaderElection
     Election electionAlg;
@@ -568,7 +578,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     // 磁盘数据管理
     // 默认FileTxnSnapLog
     private FileTxnSnapLog logFactory = null;
-
+    // 状态对象
     private final QuorumStats quorumStats;
 
     public static QuorumPeer testingQuorumPeer() throws SaslException {
@@ -641,11 +651,11 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     
     @Override
     public synchronized void start() {
-        // 加载磁盘上数据
+        // 从事务日志路径dataLogDir和数据快照路径dataDir中恢复出内存数据库DataTree数据
         loadDataBase();
         // 启动ServerCnxnFactory来处理客户端的相关连接
         cnxnFactory.start();
-        // 对选举进行初始化
+        // 初始化选举算法
         startLeaderElection();
         // QuorumPeer继承了ZooKeeperThread而ZooKeeperThread继续了Thread
         // 所以不用猜了，当前类中肯定有个run()方法
@@ -852,12 +862,12 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         case 3:
             // 创建QuorumCnxManager
             // 负责zk服务之间Leader选举过程中的网络通信
+            // 内存同时创建了listener
             qcm = createCnxnManager();
-            // 创建QuorumCnxManager里的listener
-            // 用来监听集群中其他节点发生过来的连接请求
             QuorumCnxManager.Listener listener = qcm.listener;
             if(listener != null){
                 // 启动listener，监听其他zkServer发送过来的连接请求
+                // 并为连接成功的zkServer创建对应的SendWorker和RecvWorker
                 listener.start();
                 // 进行leader选举
                 le = new FastLeaderElection(this, qcm);
@@ -948,6 +958,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                         LOG.info("Attempting to start ReadOnlyZooKeeperServer");
 
                         // Create read-only server but don't start it immediately
+                        // 创建只读服务器，但不要立即启动它
                         final ReadOnlyZooKeeperServer roZk = new ReadOnlyZooKeeperServer(
                                 logFactory, this,
                                 new ZooKeeperServer.BasicDataTreeBuilder(),
@@ -977,6 +988,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                         try {
                             roZkMgr.start();
                             setBCVote(null);
+                            // 进行leader选举
                             setCurrentVote(makeLEStrategy().lookForLeader());
                         } catch (Exception e) {
                             LOG.warn("Unexpected exception",e);
@@ -990,6 +1002,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                     } else {
                         try {
                             setBCVote(null);
+                            // leader选举并设置最终的选举结果
                             setCurrentVote(makeLEStrategy().lookForLeader());
                         } catch (Exception e) {
                             LOG.warn("Unexpected exception", e);
@@ -997,7 +1010,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                         }
                     }
                     break;
-                case OBSERVING:
+                case OBSERVING:// 选举完毕后当前zkServer为OBSERVING
                     try {
                         LOG.info("OBSERVING");
                         setObserver(makeObserver(logFactory));
@@ -1010,7 +1023,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                         setPeerState(ServerState.LOOKING);
                     }
                     break;
-                case FOLLOWING:
+                case FOLLOWING:// 选举完毕后当前zkServer为FOLLOWING
                     try {
                         LOG.info("FOLLOWING");
                         setFollower(makeFollower(logFactory));
@@ -1023,7 +1036,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                         setPeerState(ServerState.LOOKING);
                     }
                     break;
-                case LEADING:
+                case LEADING:// 选举完毕后当前zkServer为LEADING
                     LOG.info("LEADING");
                     try {
                         setLeader(makeLeader(logFactory));
@@ -1081,6 +1094,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
      * A 'view' is a node's current opinion of the membership of the entire
      * ensemble.
      */
+    // 获取集群视图
     public Map<Long,QuorumPeer.QuorumServer> getView() {
         return Collections.unmodifiableMap(this.quorumPeers);
     }

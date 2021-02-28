@@ -143,7 +143,7 @@ public class QuorumPeerMain {
                                 config.getMaxClientCnxns());
           // 初始化QuorumPeer并进行相关配置
           quorumPeer = getQuorumPeer();
-
+          // 设置quorumPeers
           quorumPeer.setQuorumPeers(config.getServers());
           // 创建FileTxnSnapLog，磁盘数据管理
           quorumPeer.setTxnFactory(new FileTxnSnapLog(

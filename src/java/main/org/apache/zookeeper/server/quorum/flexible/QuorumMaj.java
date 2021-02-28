@@ -38,7 +38,7 @@ public class QuorumMaj implements QuorumVerifier {
     /**
      * Defines a majority to avoid computing it every time.
      * 
-     * @param n number of servers
+     * @param n number of servers 集群中zk服务数量，也就是"server.x"配置的数量
      */
     public QuorumMaj(int n){
         this.half = n/2;
@@ -56,6 +56,7 @@ public class QuorumMaj implements QuorumVerifier {
     /**
      * Verifies if a set is a majority.
      */
+    // 过半
     public boolean containsQuorum(Set<Long> set){
         return (set.size() > half);
     }
