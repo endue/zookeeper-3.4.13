@@ -165,6 +165,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
          * it is set with an unresolved InetSocketAddress object. this.electionAddr
          * is handled similarly.
          */
+        // 重新建立addr和electionAddr
         public void recreateSocketAddresses() {
             InetAddress address = null;
             try {
@@ -1414,8 +1415,9 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     		br.close();
     	}
     }
-
+    // 接下来接收或者要成为的epoch，会变动，稳定了之后就成了currentEpoch
     private long acceptedEpoch = -1;
+    // 当前所处的epoch，是稳定的
     private long currentEpoch = -1;
 
 	public static final String CURRENT_EPOCH_FILENAME = "currentEpoch";
