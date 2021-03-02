@@ -87,6 +87,7 @@ public class Leader {
     LearnerCnxAcceptor cnxAcceptor;
     
     // list of all the followers
+    // 记录所有的learner
     private final HashSet<LearnerHandler> learners =
         new HashSet<LearnerHandler>();
 
@@ -312,7 +313,8 @@ public class Leader {
     ConcurrentLinkedQueue<Proposal> toBeApplied = new ConcurrentLinkedQueue<Proposal>();
 
     Proposal newLeaderProposal = new Proposal();
-    
+
+    // 负责处理与leader的连接请求
     class LearnerCnxAcceptor extends ZooKeeperThread{
         private volatile boolean stop = false;
 
@@ -325,6 +327,7 @@ public class Leader {
             try {
                 while (!stop) {
                     try{
+                        // 等待learner的连接请求，这里默认监听的是2888端口
                         Socket s = ss.accept();
                         // start with the initLimit, once the ack is processed
                         // in LearnerHandler switch to the syncLimit
@@ -333,6 +336,7 @@ public class Leader {
 
                         BufferedInputStream is = new BufferedInputStream(
                                 s.getInputStream());
+                        // 针对每个learner的请求都建立一个LearnerHandler与之对应
                         LearnerHandler fh = new LearnerHandler(s, is, Leader.this);
                         fh.start();
                     } catch (SocketException e) {
@@ -385,12 +389,14 @@ public class Leader {
 
         try {
             self.tick.set(0);
+            // 加载内存最新数据
             zk.loadData();
             
             leaderStateSummary = new StateSummary(self.getCurrentEpoch(), zk.getLastProcessedZxid());
 
             // Start thread that waits for connection requests from 
             // new followers.
+            // 创建并启动LearnerCnxAcceptor接受来自leaner的连接请求
             cnxAcceptor = new LearnerCnxAcceptor();
             cnxAcceptor.start();
             

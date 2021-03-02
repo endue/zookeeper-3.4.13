@@ -1407,8 +1407,10 @@ public class ClientCnxn {
             Record response, WatchRegistration watchRegistration)
             throws InterruptedException {
         ReplyHeader r = new ReplyHeader();
+        // 发送请求，只是保存到outgoingQueue中并唤醒sendThread
         Packet packet = queuePacket(h, r, request, response, null, null, null,
                     null, watchRegistration);
+        // 同步等待
         synchronized (packet) {
             while (!packet.finished) {
                 packet.wait();

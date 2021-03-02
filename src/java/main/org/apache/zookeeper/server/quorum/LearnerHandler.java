@@ -56,6 +56,8 @@ import org.slf4j.LoggerFactory;
  * learner. All communication with a learner is handled by this
  * class.
  */
+// LearnerHandler实例都对应一个Leader与Learner服务器之间的连接，
+// 其负责Leader和Learner服务器之间几乎所有的消息通信和数据同步
 public class LearnerHandler extends ZooKeeperThread {
     private static final Logger LOG = LoggerFactory.getLogger(LearnerHandler.class);
 
@@ -71,6 +73,7 @@ public class LearnerHandler extends ZooKeeperThread {
      * it's based on the initLimit, if we are done bootstrapping it's based
      * on the syncLimit. Once the deadline is past this learner should
      * be considered no longer "sync'd" with the leader. */
+    // learner下一个ack的超时时间
     volatile long tickOfNextAckDeadline;
     
     /**
@@ -193,7 +196,7 @@ public class LearnerHandler extends ZooKeeperThread {
      * If this packet is queued, the sender thread will exit
      */
     final QuorumPacket proposalOfDeath = new QuorumPacket();
-
+    // 记录learner的类型
     private LearnerType  learnerType = LearnerType.PARTICIPANT;
     public LearnerType getLearnerType() {
         return learnerType;
@@ -313,6 +316,7 @@ public class LearnerHandler extends ZooKeeperThread {
     @Override
     public void run() {
         try {
+            // 记录新添加的learner，最终走到下面会是一个while循环
             leader.addLearnerHandler(this);
             tickOfNextAckDeadline = leader.self.tick.get()
                     + leader.self.initLimit + leader.self.syncLimit;

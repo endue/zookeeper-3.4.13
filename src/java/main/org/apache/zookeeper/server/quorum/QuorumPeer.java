@@ -239,9 +239,9 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         public InetSocketAddress electionAddr;
         // zk服务的ip
         public String hostname;
-        // zk服务用来连接leader的端口
+        // zk服务用来连接leader的端口,在QuorumPeerConfig中被赋值
         public int port=2888;
-        // zk服务用来选举leader的端口
+        // zk服务用来选举leader的端口,在QuorumPeerConfig中被赋值
         public int electionPort=-1;
         // zk服务的id
         public long id;
@@ -464,6 +464,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
      * Keeps time taken for leader election in milliseconds. Sets the value to
      * this variable only after the completion of leader election.
      */
+    // 当完成leader选举后更新该值，计算整个选举花费的时间ms
     private long electionTimeTaken = -1;
 
     /**
