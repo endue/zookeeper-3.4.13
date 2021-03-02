@@ -40,17 +40,20 @@ import org.apache.zookeeper.common.Time;
  * period. Sessions are thus expired in batches made up of sessions that expire
  * in a given interval.
  */
+// 会话管理，该类间接继承了Thread
 public class SessionTrackerImpl extends ZooKeeperCriticalThread implements SessionTracker {
     private static final Logger LOG = LoggerFactory.getLogger(SessionTrackerImpl.class);
-
+    // key是sessionId,value是对应session
     HashMap<Long, SessionImpl> sessionsById = new HashMap<Long, SessionImpl>();
-
+    // key是过期时间(也就是session的tickTime)，value是session集合
     HashMap<Long, SessionSet> sessionSets = new HashMap<Long, SessionSet>();
-
+    // key是sessionid，value是session的超时周期
     ConcurrentHashMap<Long, Integer> sessionsWithTimeout;
+    // 下一个sessionId
     long nextSessionId = 0;
+    // 下一次session过期检查的时间戳
     long nextExpirationTime;
-
+    // session过期的检查时间周期
     int expirationInterval;
 
     public static class SessionImpl implements Session {
@@ -60,10 +63,13 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
             this.tickTime = expireTime;
             isClosing = false;
         }
-
+        // 会话ID
         final long sessionId;
+        // 会话超时时间
         final int timeout;
+        // 会话超时时间点，用于检测是否过期，会不断刷新
         long tickTime;
+        // 是否关闭
         boolean isClosing;
 
         Object owner;
@@ -72,7 +78,7 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
         public int getTimeout() { return timeout; }
         public boolean isClosing() { return isClosing; }
     }
-
+    // 初始化一个sessionid
     public static long initializeNextSession(long id) {
         long nextSid = 0;
         nextSid = (Time.currentElapsedTime() << 24) >>> 8;
@@ -83,9 +89,13 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
     static class SessionSet {
         HashSet<SessionImpl> sessions = new HashSet<SessionImpl>();
     }
-
+    // 用于server检测client超时之后给client发送 会话关闭的请求
     SessionExpirer expirer;
 
+    // 会话分桶，举例：expirationInterval = 3
+    // 会话1、2过期时间分别为:3,4,计算结果为6,6
+    // 会话3、4过期时间分别为:5,6,计算结果为6,9
+    // 通过这种方式将不同的会话计算出统一的一个数
     private long roundToInterval(long time) {
         // We give a one interval grace period
         return (time / expirationInterval + 1) * expirationInterval;
@@ -105,9 +115,9 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
             addSession(e.getKey(), e.getValue());
         }
     }
-
+    // 运行标识
     volatile boolean running = true;
-
+    // 当前时间
     volatile long currentTime;
 
     synchronized public void dumpSessions(PrintWriter pwriter) {
@@ -138,23 +148,28 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
         return sw.toString();
     }
 
+    // 定期检查过期的session并处理
     @Override
     synchronized public void run() {
         try {
             while (running) {
                 currentTime = Time.currentElapsedTime();
+                // 下一次超时时间未到达，等待
                 if (nextExpirationTime > currentTime) {
                     this.wait(nextExpirationTime - currentTime);
                     continue;
                 }
                 SessionSet set;
+                // 更加过期时间，获取已经超时的时间桶
                 set = sessionSets.remove(nextExpirationTime);
                 if (set != null) {
                     for (SessionImpl s : set.sessions) {
                         setSessionClosing(s.sessionId);
+                        // 发送会话关闭的请求
                         expirer.expire(s);
                     }
                 }
+                // 更新下一次清理时间
                 nextExpirationTime += expirationInterval;
             }
         } catch (InterruptedException e) {
@@ -163,6 +178,7 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
         LOG.info("SessionTrackerImpl exited loop!");
     }
 
+    // 会话激活
     synchronized public boolean touchSession(long sessionId, int timeout) {
         if (LOG.isTraceEnabled()) {
             ZooTrace.logTraceMessage(LOG,
@@ -175,16 +191,21 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
         if (s == null || s.isClosing()) {
             return false;
         }
+        // 计算过期时间
         long expireTime = roundToInterval(Time.currentElapsedTime() + timeout);
+        // 没有过期不处理
         if (s.tickTime >= expireTime) {
             // Nothing needs to be done
             return true;
         }
+        // 从旧的过期时间"桶"中移除当前session
         SessionSet set = sessionSets.get(s.tickTime);
         if (set != null) {
             set.sessions.remove(s);
         }
+        // 更新会话超时时间点
         s.tickTime = expireTime;
+        // 获取新的分桶并转移到新的分桶集合中
         set = sessionSets.get(s.tickTime);
         if (set == null) {
             set = new SessionSet();
