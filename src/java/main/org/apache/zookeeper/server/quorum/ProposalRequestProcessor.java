@@ -68,7 +68,7 @@ public class ProposalRequestProcessor implements RequestProcessor {
          * call processRequest on the next processor.
          */
         
-        if(request instanceof LearnerSyncRequest){
+        if(request instanceof LearnerSyncRequest){// 如果是Sync请求
             zks.getLeader().processSync((LearnerSyncRequest)request);
         } else {
             // 提交请求到commitProcessor
