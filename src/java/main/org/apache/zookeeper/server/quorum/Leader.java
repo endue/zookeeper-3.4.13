@@ -568,6 +568,7 @@ public class Leader {
      *                the zxid of the proposal sent out
      * @param followerAddr
      */
+    // 处理follower的ack
     synchronized public void processAck(long sid, long zxid, SocketAddress followerAddr) {
         if (LOG.isTraceEnabled()) {
             LOG.trace("Ack zxid: 0x{}", Long.toHexString(zxid));
@@ -614,6 +615,7 @@ public class Leader {
             LOG.debug("Count for zxid: 0x{} is {}",
                     Long.toHexString(zxid), p.ackSet.size());
         }
+        // 判断收到的ack是否过半
         if (self.getQuorumVerifier().containsQuorum(p.ackSet)){             
             if (zxid != lastCommitted+1) {
                 LOG.warn("Commiting zxid 0x{} from {} not first!",
@@ -628,7 +630,9 @@ public class Leader {
             if (p.request == null) {
                 LOG.warn("Going to commmit null request for proposal: {}", p);
             }
+            // 发送commit请求
             commit(zxid);
+            // 通知observers
             inform(p);
             zk.commitProcessor.commit(p.request);
             if(pendingSyncs.containsKey(zxid)){
@@ -674,6 +678,7 @@ public class Leader {
          */
         public void processRequest(Request request) throws RequestProcessorException {
             // request.addRQRec(">tobe");
+            // 交给finalRequestProcessor
             next.processRequest(request);
             Proposal p = toBeApplied.peek();
             if (p != null && p.request != null
@@ -699,6 +704,7 @@ public class Leader {
      * @param qp
      *                the packet to be sent
      */
+    // 发送数据包到learner
     void sendPacket(QuorumPacket qp) {
         synchronized (forwardingFollowers) {
             for (LearnerHandler f : forwardingFollowers) {                
@@ -792,6 +798,7 @@ public class Leader {
 
             lastProposed = p.packet.getZxid();
             outstandingProposals.put(lastProposed, p);
+            // 同步到其他learner
             sendPacket(pp);
         }
         return p;

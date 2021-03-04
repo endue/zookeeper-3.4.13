@@ -113,7 +113,7 @@ public class FinalRequestProcessor implements RequestProcessor {
             if (request.hdr != null) {
                TxnHeader hdr = request.hdr;
                Record txn = request.txn;
-
+               // 写数据到内存数据库
                rc = zks.processTxn(hdr, txn);
             }
             // do not add non quorum packets to the queue.

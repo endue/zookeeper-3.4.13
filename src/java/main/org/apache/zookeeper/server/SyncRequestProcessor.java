@@ -126,6 +126,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
                 if (toFlush.isEmpty()) {
                     si = queuedRequests.take();
                 } else {
+                    // 当队列里积压的propose都处理完毕就刷磁盘
                     si = queuedRequests.poll();
                     if (si == null) {
                         flush(toFlush);
@@ -174,6 +175,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
                         continue;
                     }
                     toFlush.add(si);
+                    // 处理propose超过1000刷磁盘
                     if (toFlush.size() > 1000) {
                         flush(toFlush);
                     }
@@ -196,6 +198,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
         while (!toFlush.isEmpty()) {
             Request i = toFlush.remove();
             if (nextProcessor != null) {
+                // follower处理完请求，在这里将ack返回leader
                 nextProcessor.processRequest(i);
             }
         }

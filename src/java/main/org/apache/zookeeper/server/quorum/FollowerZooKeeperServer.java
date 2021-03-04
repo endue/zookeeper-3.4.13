@@ -76,8 +76,10 @@ public class FollowerZooKeeperServer extends LearnerZooKeeperServer {
                 Long.toString(getServerId()), true,
                 getZooKeeperServerListener());
         commitProcessor.start();
+        // 链条1：firstProcessor -->commitProcessor -->finalProcessor
         firstProcessor = new FollowerRequestProcessor(this, commitProcessor);
         ((FollowerRequestProcessor) firstProcessor).start();
+        // 链条2：用于将propose写入磁盘 syncProcessor-->SendAckRequestProcessor
         syncProcessor = new SyncRequestProcessor(this,
                 new SendAckRequestProcessor((Learner)getFollower()));
         syncProcessor.start();
@@ -85,6 +87,7 @@ public class FollowerZooKeeperServer extends LearnerZooKeeperServer {
 
     LinkedBlockingQueue<Request> pendingTxns = new LinkedBlockingQueue<Request>();
 
+    // 写事务日志到磁盘
     public void logRequest(TxnHeader hdr, Record txn) {
         Request request = new Request(null, hdr.getClientId(), hdr.getCxid(),
                 hdr.getType(), null, null);
