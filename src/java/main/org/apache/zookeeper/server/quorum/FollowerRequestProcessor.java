@@ -80,6 +80,7 @@ public class FollowerRequestProcessor extends ZooKeeperCriticalThread implements
                     zks.pendingSyncs.add(request);
                     zks.getFollower().request(request);
                     break;
+                // 此处下面的所有类型请求都会转发给leader来处理
                 case OpCode.create:
                 case OpCode.delete:
                 case OpCode.setData:

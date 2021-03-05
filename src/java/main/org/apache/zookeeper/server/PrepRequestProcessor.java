@@ -346,6 +346,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 int parentCVersion = parentRecord.stat.getCversion();
                 CreateMode createMode =
                     CreateMode.fromFlag(createRequest.getFlags());
+                // 如果是顺序节点
                 if (createMode.isSequential()) {
                     path = path + String.format(Locale.ENGLISH, "%010d", parentCVersion);
                 }

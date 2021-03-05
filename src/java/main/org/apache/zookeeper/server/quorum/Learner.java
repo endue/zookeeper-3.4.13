@@ -131,7 +131,7 @@ public class Learner {
      *                the proposal packet to be sent to the leader
      * @throws IOException
      */
-    // 将数据pp发送出去
+    // 将数据pp发送给leader
     void writePacket(QuorumPacket pp, boolean flush) throws IOException {
         synchronized (leaderOs) {
             if (pp != null) {
@@ -171,6 +171,7 @@ public class Learner {
      *                the request from the client
      * @throws IOException
      */
+    // 封装请求数据包到leader
     void request(Request request) throws IOException {
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         DataOutputStream oa = new DataOutputStream(baos);

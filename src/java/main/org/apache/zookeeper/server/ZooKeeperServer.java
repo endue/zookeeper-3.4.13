@@ -413,6 +413,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             createSessionTracker();
         }
         startSessionTracker();
+        // 初始化责任链
         setupRequestProcessors();
 
         registerJMX();

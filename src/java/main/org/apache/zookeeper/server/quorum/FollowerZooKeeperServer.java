@@ -67,8 +67,11 @@ public class FollowerZooKeeperServer extends LearnerZooKeeperServer {
 
     public Follower getFollower(){
         return self.follower;
-    }      
+    }
 
+    /**
+     * 设置执行链条
+     */
     @Override
     protected void setupRequestProcessors() {
         RequestProcessor finalProcessor = new FinalRequestProcessor(this);
