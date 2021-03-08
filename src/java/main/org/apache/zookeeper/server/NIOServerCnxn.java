@@ -110,6 +110,7 @@ public class NIOServerCnxn extends ServerCnxn {
         InetAddress addr = ((InetSocketAddress) sock.socket()
                 .getRemoteSocketAddress()).getAddress();
         authInfo.add(new Id("ip", addr.getHostAddress()));
+        // 监听OP_READ事件
         sk.interestOps(SelectionKey.OP_READ);
     }
 
@@ -467,10 +468,12 @@ public class NIOServerCnxn extends ServerCnxn {
         }
     }
 
+    // 初始化连接请求
     private void readConnectRequest() throws IOException, InterruptedException {
         if (!isZKServerRunning()) {
             throw new IOException("ZooKeeperServer not running");
         }
+        // 初始化session
         zkServer.processConnectRequest(this, incomingBuffer);
         initialized = true;
     }

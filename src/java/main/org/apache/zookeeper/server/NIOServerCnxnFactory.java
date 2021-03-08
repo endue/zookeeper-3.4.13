@@ -193,7 +193,7 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
         }
     }
 
-    // 初始化一个NIOServerCnxn
+    // 初始化一个NIOServerCnxn，并监听OP_READ事件
     protected NIOServerCnxn createConnection(SocketChannel sock,
             SelectionKey sk) throws IOException {
         return new NIOServerCnxn(zkServer, sock, sk, this);

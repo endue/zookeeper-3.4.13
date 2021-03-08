@@ -653,15 +653,15 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     
     @Override
     public synchronized void start() {
-        // 从事务日志路径dataLogDir和数据快照路径dataDir中恢复出内存数据库DataTree数据
+        // 1.从事务日志路径dataLogDir和数据快照路径dataDir中恢复出内存数据库DataTree数据
         loadDataBase();
-        // 启动ServerCnxnFactory来处理客户端的相关连接
+        // 2.启动ServerCnxnFactory来处理客户端的相关连接
         cnxnFactory.start();
-        // 初始化选举算法
+        // 3.初始化选举算法
         startLeaderElection();
         // QuorumPeer继承了ZooKeeperThread而ZooKeeperThread继续了Thread
         // 所以不用猜了，当前类中肯定有个run()方法
-        // 开始监听zk集群间的状态并进行选举
+        // 4.开始监听zk集群间的状态并进行选举
         super.start();
     }
 
