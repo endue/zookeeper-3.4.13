@@ -475,7 +475,7 @@ public class ClientCnxn {
 
             // materialize the watchers based on the event
             WatcherSetEventPair pair = new WatcherSetEventPair(
-                    watcher.materialize(event.getState(), event.getType(),
+                    watcher.materialize(event.getState(), event.getType(),// 这里可能会清空所有的事件监听器
                             event.getPath()),
                             event);
             // queue the pair (watch set & event) for later processing
@@ -1044,9 +1044,12 @@ public class ClientCnxn {
             InetSocketAddress serverAddress = null;
             while (state.isAlive()) {
                 try {
+                    // 连接不存在
                     if (!clientCnxnSocket.isConnected()) {
+                        // 如果不是第一次建立连接，此时可能是zk服务宕机后，进行重新连接
                         if(!isFirstConnect){
                             try {
+                                // 随机休眠一段时间
                                 Thread.sleep(r.nextInt(1000));
                             } catch (InterruptedException e) {
                                 LOG.warn("Unexpected exception", e);
@@ -1146,7 +1149,7 @@ public class ClientCnxn {
                     }
 
                     clientCnxnSocket.doTransport(to, pendingQueue, outgoingQueue, ClientCnxn.this);
-                } catch (Throwable e) {
+                } catch (Throwable e) {// 发送数据时出现异常，网络异常？zk服务异常？
                     if (closing) {
                         if (LOG.isDebugEnabled()) {
                             // closing so this is expected
@@ -1174,14 +1177,18 @@ public class ClientCnxn {
                                             RETRY_CONN_MSG,
                                             e);
                         }
+                        // 断开网络连接
                         cleanup();
                         if (state.isAlive()) {
+                            // 发布事件Disconnected
                             eventThread.queueEvent(new WatchedEvent(
                                     Event.EventType.None,
                                     Event.KeeperState.Disconnected,
                                     null));
                         }
+                        // 准备重新初始化底层网络连接
                         clientCnxnSocket.updateNow();
+                        // 更新最近发送请求和发送心跳的时间
                         clientCnxnSocket.updateLastSendAndHeard();
                     }
                 }
@@ -1250,13 +1257,16 @@ public class ClientCnxn {
         }
 
         private void cleanup() {
+            // 1.客户端主动断开连接
             clientCnxnSocket.cleanup();
+            // 2.对所有已经发送出去等待响应的请求，进行完成操作，标识为失败
             synchronized (pendingQueue) {
                 for (Packet p : pendingQueue) {
                     conLossPacket(p);
                 }
                 pendingQueue.clear();
             }
+            // 3.对所有待发送出去的请求，进行完成操作，标识为失败
             synchronized (outgoingQueue) {
                 for (Packet p : outgoingQueue) {
                     conLossPacket(p);
