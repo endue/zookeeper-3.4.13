@@ -64,7 +64,7 @@ public class NIOServerCnxn extends ServerCnxn {
     final SocketChannel sock;
     // 触发事件的sk
     protected final SelectionKey sk;
-
+    // 是否初始化连接,默认false
     boolean initialized;
     // 报文长度buffer
     ByteBuffer lenBuffer = ByteBuffer.allocate(4);

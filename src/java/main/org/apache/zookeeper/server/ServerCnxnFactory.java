@@ -96,6 +96,10 @@ public abstract class ServerCnxnFactory {
     public abstract void start();
 
     protected ZooKeeperServer zkServer;
+    // 选举完成后更新该方法
+    // 如果是learner则是LearnerZooKeeperServer
+    // 如果是leader则是LeaderZooKeeperServer
+    // 如果是readOnly则是ReadOnlyZooKeeperServer
     final public void setZooKeeperServer(ZooKeeperServer zk) {
         this.zkServer = zk;
         if (zk != null) {

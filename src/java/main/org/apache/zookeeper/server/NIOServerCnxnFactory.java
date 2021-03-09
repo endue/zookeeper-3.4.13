@@ -101,10 +101,15 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
         maxClientCnxns = maxcc;
         // 初始化ServerSocketChannel，并监听OP_ACCEPT事件
         this.ss = ServerSocketChannel.open();
+        // 为了确保一个进程被关闭后，即使它还没有释放该端口，
+        // 同一个主机上的其他进程可以立刻重用该端口，可以调用Socket的setResuseAddress(true)
+        // 注意在Socket还没有绑定到一个本地端口之前调用
         ss.socket().setReuseAddress(true);
         LOG.info("binding to port " + addr);
+        // 设置非阻塞并绑定断开
         ss.socket().bind(addr);
         ss.configureBlocking(false);
+        // 注册OP_ACCEPT事件
         ss.register(selector, SelectionKey.OP_ACCEPT);
     }
 
@@ -123,6 +128,7 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
     public void start() {
         // ensure thread is started once and only once
         if (thread.getState() == Thread.State.NEW) {
+            // 启动在configure()方法中创建的线程，也就是启动了当前类
             thread.start();
         }
     }
@@ -225,11 +231,11 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
                 ArrayList<SelectionKey> selectedList = new ArrayList<SelectionKey>(
                         selected);
                 // 打乱SelectionKey，随机排序
-                // 反之出现总是先处理某个客户端的请求
+                // 防止出现总是先处理某个客户端的请求
                 Collections.shuffle(selectedList);
-                // 遍历处理
+                // 遍历处理就绪的key
                 for (SelectionKey k : selectedList) {
-                    // 当前通道是否已完成连接操作
+                    // 客户端连接事件
                     if ((k.readyOps() & SelectionKey.OP_ACCEPT) != 0) {
                         SocketChannel sc = ((ServerSocketChannel) k
                                 .channel()).accept();
@@ -258,7 +264,7 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
                             // 添加NIOServerCnxn
                             addCnxn(cnxn);
                         }
-                    // 当前通道是否已准备好读或者写
+                    // 客户端读或写事件
                     } else if ((k.readyOps() & (SelectionKey.OP_READ | SelectionKey.OP_WRITE)) != 0) {
                         // 获取这个key之前绑定的NIOServerCnxn
                         NIOServerCnxn c = (NIOServerCnxn) k.attachment();

@@ -314,7 +314,7 @@ public class Leader {
 
     Proposal newLeaderProposal = new Proposal();
 
-    // 负责处理与leader的连接请求
+    // 负责处理与learner的连接请求
     class LearnerCnxAcceptor extends ZooKeeperThread{
         private volatile boolean stop = false;
 

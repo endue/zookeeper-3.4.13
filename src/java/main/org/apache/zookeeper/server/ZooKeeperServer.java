@@ -421,7 +421,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         setState(State.RUNNING);
         notifyAll();
     }
-
+    // 初始化处理链条
     protected void setupRequestProcessors() {
         // PrepRequestProcessor -》 SyncRequestProcessor -》finalProcessor
         RequestProcessor finalProcessor = new FinalRequestProcessor(this);
@@ -616,6 +616,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
                 && Arrays.equals(passwd, generatePasswd(sessionId));
     }
     // 创建session
+    // cnxn是针对当前客户端的NIOServerCnxn
     long createSession(ServerCnxn cnxn, byte passwd[], int timeout) {
         long sessionId = sessionTracker.createSession(timeout);
         Random r = new Random(sessionId ^ superSecret);
@@ -716,6 +717,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
     }
 
     /**
+     * 发送submit请求
      * @param cnxn
      * @param sessionId
      * @param xid
@@ -726,7 +728,9 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         Request si = new Request(cnxn, sessionId, xid, type, bb, authInfo);
         submitRequest(si);
     }
-    
+
+    // 如果是learner接收到的请求，处理链条为PrepRequestProcessor -> SyncRequestProcessor -> finalProcessor
+    // 如果是leader接收到的请求，处理链条为PrepRequestProcessor -> ProposalRequestProcessor -> CommitProcessor -> ToBeAppliedRequestProcessor -> FinalRequestProcessor
     public void submitRequest(Request si) {
         if (firstProcessor == null) {
             synchronized (this) {
@@ -887,6 +891,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
     }
 
     // 处理ConnectRequest
+    // cnxn是针对当前客户端的NIOServerCnxn
     public void processConnectRequest(ServerCnxn cnxn, ByteBuffer incomingBuffer) throws IOException {
         // 包装数据到BinaryInputArchive中
         BinaryInputArchive bia = BinaryInputArchive.getArchive(new ByteBufferInputStream(incomingBuffer));

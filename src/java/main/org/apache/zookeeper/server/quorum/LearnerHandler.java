@@ -513,6 +513,7 @@ public class LearnerHandler extends ZooKeeperThread {
             bufferedOutput.flush();
             
             // Start sending packets
+            // 与follower不断的同步数据
             new Thread() {
                 public void run() {
                     Thread.currentThread().setName(
@@ -558,6 +559,7 @@ public class LearnerHandler extends ZooKeeperThread {
             //
             queuedPackets.add(new QuorumPacket(Leader.UPTODATE, -1, null, null));
 
+            // 不断的读取follower的请求
             while (true) {
                 qp = new QuorumPacket();
                 ia.readRecord(qp, "packet");
