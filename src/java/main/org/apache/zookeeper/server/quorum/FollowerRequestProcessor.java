@@ -40,9 +40,9 @@ public class FollowerRequestProcessor extends ZooKeeperCriticalThread implements
     FollowerZooKeeperServer zks;
 
     RequestProcessor nextProcessor;
-
+    // 存放request
     LinkedBlockingQueue<Request> queuedRequests = new LinkedBlockingQueue<Request>();
-
+    // 是否关闭标识符，默认false
     boolean finished = false;
 
     public FollowerRequestProcessor(FollowerZooKeeperServer zks,
@@ -57,6 +57,7 @@ public class FollowerRequestProcessor extends ZooKeeperCriticalThread implements
     public void run() {
         try {
             while (!finished) {
+                // 出去queuedRequests中的一个请求
                 Request request = queuedRequests.take();
                 if (LOG.isTraceEnabled()) {
                     ZooTrace.logRequest(LOG, ZooTrace.CLIENT_REQUEST_TRACE_MASK,
@@ -68,6 +69,7 @@ public class FollowerRequestProcessor extends ZooKeeperCriticalThread implements
                 // We want to queue the request to be processed before we submit
                 // the request to the leader so that we are ready to receive
                 // the response
+                // 交给下一个processor处理
                 nextProcessor.processRequest(request);
                 
                 // We now ship the request to the leader. As with all
@@ -76,6 +78,7 @@ public class FollowerRequestProcessor extends ZooKeeperCriticalThread implements
                 // of the sync operations this follower has pending, so we
                 // add it to pendingSyncs.
                 switch (request.type) {
+                // sync请求
                 case OpCode.sync:
                     zks.pendingSyncs.add(request);
                     zks.getFollower().request(request);
@@ -98,6 +101,8 @@ public class FollowerRequestProcessor extends ZooKeeperCriticalThread implements
         LOG.info("FollowerRequestProcessor exited loop!");
     }
 
+    // 将请求放到queuedRequests队列中，
+    // 会有一个run()方法不断的循环处理queuedRequests中的数据
     public void processRequest(Request request) {
         if (!finished) {
             queuedRequests.add(request);

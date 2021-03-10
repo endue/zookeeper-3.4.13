@@ -337,12 +337,14 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
         }
     }
 
+    // 关闭session
     @Override
     public synchronized void closeSession(long sessionId) {
         selector.wakeup();
         closeSessionWithoutWakeup(sessionId);
     }
 
+    // 关闭session
     @SuppressWarnings("unchecked")
     private void closeSessionWithoutWakeup(long sessionId) {
         NIOServerCnxn cnxn = (NIOServerCnxn) sessionMap.remove(sessionId);

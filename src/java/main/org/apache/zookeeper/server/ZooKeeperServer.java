@@ -123,7 +123,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
      * is more of a sanity check.
      */
     static final private long superSecret = 0XB3415C00L;
-
+    // 正在处理的客户端连接请求数量
     private final AtomicInteger requestsInProcess = new AtomicInteger(0);
     final List<ChangeRecord> outstandingChanges = new ArrayList<ChangeRecord>();
     // this data structure must be accessed under the outstandingChanges lock
@@ -421,7 +421,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         setState(State.RUNNING);
         notifyAll();
     }
-    // 初始化处理链条
+    // 默认处理链条
     protected void setupRequestProcessors() {
         // PrepRequestProcessor -》 SyncRequestProcessor -》finalProcessor
         RequestProcessor finalProcessor = new FinalRequestProcessor(this);
@@ -604,6 +604,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         }
     }
 
+    // 基于id生成密码
     byte[] generatePasswd(long id) {
         Random r = new Random(id ^ superSecret);
         byte p[] = new byte[16];
@@ -611,7 +612,9 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         return p;
     }
 
+    // 校验password是否正确
     protected boolean checkPasswd(long sessionId, byte[] passwd) {
+        // sessionId不为0 && passwd和计算出来的一致
         return sessionId != 0
                 && Arrays.equals(passwd, generatePasswd(sessionId));
     }
@@ -623,7 +626,9 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         r.nextBytes(passwd);
         ByteBuffer to = ByteBuffer.allocate(4);
         to.putInt(timeout);
+        // 设置sessionId到ServerCnxn
         cnxn.setSessionId(sessionId);
+        // 封装请求
         submitRequest(cnxn, sessionId, OpCode.createSession, 0, to, null);
         return sessionId;
     }
@@ -638,29 +643,38 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         sessionTracker.setOwner(id, owner);
     }
 
+    // 激活session
     protected void revalidateSession(ServerCnxn cnxn, long sessionId,
             int sessionTimeout) throws IOException {
+        // 调用sessionTracker中的方法，重新更新该sessionId
         boolean rc = sessionTracker.touchSession(sessionId, sessionTimeout);
         if (LOG.isTraceEnabled()) {
             ZooTrace.logTraceMessage(LOG,ZooTrace.SESSION_TRACE_MASK,
                                      "Session 0x" + Long.toHexString(sessionId) +
                     " is valid: " + rc);
         }
+        // 完成session的初始化，注意第二个参数一般为true，如果上一步touchSession失败则为false
         finishSessionInit(cnxn, rc);
     }
 
+    // 重新开启session
     public void reopenSession(ServerCnxn cnxn, long sessionId, byte[] passwd,
             int sessionTimeout) throws IOException {
+        // 校验passwd
         if (!checkPasswd(sessionId, passwd)) {
+            // 校验passwd失败,第二个参数为false
             finishSessionInit(cnxn, false);
         } else {
+            // 校验passwd成功
             revalidateSession(cnxn, sessionId, sessionTimeout);
         }
     }
 
+    // 完成session初始化
     public void finishSessionInit(ServerCnxn cnxn, boolean valid) {
         // register with JMX
         try {
+            // 如果是有效的session了，那么注册cnxn
             if (valid) {
                 serverCnxnFactory.registerConnection(cnxn);
             }
@@ -685,20 +699,23 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             ByteBuffer bb = ByteBuffer.wrap(baos.toByteArray());
             bb.putInt(bb.remaining() - 4).rewind();
             cnxn.sendBuffer(bb);    
-
+            // session重新打开失败
             if (!valid) {
                 LOG.info("Invalid session 0x"
                         + Long.toHexString(cnxn.getSessionId())
                         + " for client "
                         + cnxn.getRemoteSocketAddress()
                         + ", probably expired");
+                // 发送closeConn
                 cnxn.sendBuffer(ServerCnxnFactory.closeConn);
+            // session重新打开成功
             } else {
                 LOG.info("Established session 0x"
                         + Long.toHexString(cnxn.getSessionId())
                         + " with negotiated timeout " + cnxn.getSessionTimeout()
                         + " for client "
                         + cnxn.getRemoteSocketAddress());
+                // 注册OP_READ事件
                 cnxn.enableRecv();
             }
                 
@@ -890,7 +907,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         return serverCnxnFactory.getNumAliveConnections();
     }
 
-    // 处理ConnectRequest
+    // 处理ConnectRequest,开始建立会话
     // cnxn是针对当前客户端的NIOServerCnxn
     public void processConnectRequest(ServerCnxn cnxn, ByteBuffer incomingBuffer) throws IOException {
         // 包装数据到BinaryInputArchive中
@@ -946,15 +963,22 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         cnxn.setSessionTimeout(sessionTimeout);
         // We don't want to receive any packets until we are sure that the
         // session is setup
+        // 取消监听OP_READ事件，因为还没有建立会话
         cnxn.disableRecv();
+        // 获取请求中的sessionID
         long sessionId = connReq.getSessionId();
         if (sessionId != 0) {
             long clientSessionId = connReq.getSessionId();
             LOG.info("Client attempting to renew session 0x"
                     + Long.toHexString(clientSessionId)
                     + " at " + cnxn.getRemoteSocketAddress());
+            // 关闭旧的cnxn
             serverCnxnFactory.closeSession(sessionId);
+            // 设置cnxn的sesionId，这里底层涉及两个步骤：
+            // 1.设置sessionId到serverCnxn
+            // 2.设置serverCnxn到serverCnxnFactory的sessionMap中
             cnxn.setSessionId(sessionId);
+            // 重新开启session
             reopenSession(cnxn, sessionId, passwd, sessionTimeout);
         } else {
             LOG.info("Client attempting to establish new session at "

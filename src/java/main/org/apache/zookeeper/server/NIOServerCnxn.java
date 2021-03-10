@@ -64,7 +64,7 @@ public class NIOServerCnxn extends ServerCnxn {
     final SocketChannel sock;
     // 触发事件的sk
     protected final SelectionKey sk;
-    // 是否初始化连接,默认false
+    // 是否初始化与客户端的连接,默认false
     boolean initialized;
     // 报文长度buffer
     ByteBuffer lenBuffer = ByteBuffer.allocate(4);
@@ -86,6 +86,7 @@ public class NIOServerCnxn extends ServerCnxn {
      * This is the id that uniquely identifies the session of a client. Once
      * this session is no longer active, the ephemeral nodes will go away.
      */
+    // 客户端的sessionId
     long sessionId;
 
     static long nextSessionId = 1;
@@ -452,10 +453,12 @@ public class NIOServerCnxn extends ServerCnxn {
 
     }
 
+    // 取消OP_READ事件，也就是不在读取客户端的请求数据
     public void disableRecv() {
         sk.interestOps(sk.interestOps() & (~SelectionKey.OP_READ));
     }
 
+    // 增加OP_READ事件，也就是开启读取客户端的请求数据
     public void enableRecv() {
         synchronized (this.factory) {
             sk.selector().wakeup();
@@ -475,6 +478,7 @@ public class NIOServerCnxn extends ServerCnxn {
         }
         // 初始化session
         zkServer.processConnectRequest(this, incomingBuffer);
+        // 更新初始化标识符
         initialized = true;
     }
 
@@ -1219,6 +1223,8 @@ public class NIOServerCnxn extends ServerCnxn {
         return sessionId;
     }
 
+    // 1.设置sessionId到当前的serverCnxn
+    // 2.设置当前的serverCnxn到serverCnxnFactory的sessionMap中
     @Override
     public void setSessionId(long sessionId) {
         this.sessionId = sessionId;

@@ -41,11 +41,13 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
     /**
      * Requests that we are holding until the commit comes in.
      */
+    // 记录待提交的request
     LinkedList<Request> queuedRequests = new LinkedList<Request>();
 
     /**
      * Requests that have been committed.
      */
+    // 记录已提交的request
     LinkedList<Request> committedRequests = new LinkedList<Request>();
 
     RequestProcessor nextProcessor;
@@ -64,7 +66,7 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
         this.nextProcessor = nextProcessor;
         this.matchSyncs = matchSyncs;
     }
-
+    // 是否关闭标识符
     volatile boolean finished = false;
 
     @Override
@@ -120,6 +122,7 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
 
                 synchronized (this) {
                     // Process the next requests in the queuedRequests
+                    // 处理queuedRequests中的下一个request
                     while (nextPending == null && queuedRequests.size() > 0) {
                         Request request = queuedRequests.remove();
                         switch (request.type) {
@@ -167,7 +170,7 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
             notifyAll();
         }
     }
-
+    // 处理request，保存到queuedRequests队列中
     synchronized public void processRequest(Request request) {
         // request.addRQRec(">commit");
         if (LOG.isDebugEnabled()) {
