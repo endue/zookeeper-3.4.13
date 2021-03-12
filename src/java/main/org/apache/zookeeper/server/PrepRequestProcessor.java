@@ -77,6 +77,12 @@ import org.apache.zookeeper.txn.TxnHeader;
  * outstandingRequests, so that it can take into account transactions that are
  * in the queue to be applied when generating a transaction.
  */
+
+/**
+ * PrepRequestProcessor位于处理器链条的开头
+ * 继续了ZooKeeperCriticalThread，而ZooKeeperCriticalThread继承了ZooKeeperThread，ZooKeeperThread又继承了Thread，
+ * 所以PrepRequestProcessor可以当一个线程使用
+ */
 public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
         RequestProcessor {
     private static final Logger LOG = LoggerFactory.getLogger(PrepRequestProcessor.class);
@@ -94,18 +100,22 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
      * should never be useed otherwise
      */
     private static  boolean failCreate = false;
-
+    // 记录已提交的请求
     LinkedBlockingQueue<Request> submittedRequests = new LinkedBlockingQueue<Request>();
-
+    // 下一个处理器
     RequestProcessor nextProcessor;
-
+    // zk服务器
     ZooKeeperServer zks;
 
+    // 初始化PrepRequestProcessor
     public PrepRequestProcessor(ZooKeeperServer zks,
             RequestProcessor nextProcessor) {
+        // 最后一个参数获取zk服务器中的listener交给父类ZooKeeperCriticalThread
         super("ProcessThread(sid:" + zks.getServerId() + " cport:"
                 + zks.getClientPort() + "):", zks.getZooKeeperServerListener());
+        // 下一个处理器
         this.nextProcessor = nextProcessor;
+        // zk服务器
         this.zks = zks;
     }
 
@@ -116,10 +126,15 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
     public static void setFailCreate(boolean b) {
         failCreate = b;
     }
+
+    /**
+     * 可以看出PrepRequestProcessor被当成了一个Thread来使用，内部不断的while循环处理请求
+     */
     @Override
     public void run() {
         try {
             while (true) {
+                // 获取已提交的请求
                 Request request = submittedRequests.take();
                 long traceMask = ZooTrace.CLIENT_REQUEST_TRACE_MASK;
                 if (request.type == OpCode.ping) {
@@ -128,15 +143,18 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 if (LOG.isTraceEnabled()) {
                     ZooTrace.logRequest(LOG, traceMask, 'P', request, "");
                 }
+                // 表示当前处理器已经关闭，不再处理请求(参考shutdown()方法)
                 if (Request.requestOfDeath == request) {
                     break;
                 }
+                // 开始处理请求
                 pRequest(request);
             }
         } catch (RequestProcessorException e) {
             if (e.getCause() instanceof XidRolloverException) {
                 LOG.info(e.getCause().getMessage());
             }
+            // 发生了异常
             handleException(this.getName(), e);
         } catch (Exception e) {
             handleException(this.getName(), e);
@@ -144,11 +162,13 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
         LOG.info("PrepRequestProcessor exited loop!");
     }
 
+    // 根据path获取对应的父节点ChangeRecord
     ChangeRecord getRecordForPath(String path) throws KeeperException.NoNodeException {
         ChangeRecord lastChange = null;
         synchronized (zks.outstandingChanges) {
             lastChange = zks.outstandingChangesForPath.get(path);
             if (lastChange == null) {
+                // 从内存目录树中查找父节点
                 DataNode n = zks.getZKDatabase().getNode(path);
                 if (n != null) {
                     Set<String> children;
@@ -160,9 +180,11 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 }
             }
         }
+        // 父节点没找到报错
         if (lastChange == null || lastChange.stat == null) {
             throw new KeeperException.NoNodeException(path);
         }
+        // 返回父节点
         return lastChange;
     }
 
@@ -318,6 +340,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
     protected void pRequest2Txn(int type, long zxid, Request request, Record record, boolean deserialize)
         throws KeeperException, IOException, RequestProcessorException
     {
+        // 设置请求头
         request.hdr = new TxnHeader(request.sessionId, request.cxid, zxid,
                                     Time.currentWallTime(), type);
 
@@ -326,7 +349,9 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 zks.sessionTracker.checkSession(request.sessionId, request.getOwner());
                 CreateRequest createRequest = (CreateRequest)record;   
                 if(deserialize)
+                    // 反序列化
                     ByteBufferInputStream.byteBuffer2Record(request.request, createRequest);
+                // 获取创建的路径
                 String path = createRequest.getPath();
                 int lastSlash = path.lastIndexOf('/');
                 if (lastSlash == -1 || path.indexOf('\0') != -1 || failCreate) {
@@ -338,12 +363,15 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 if (!fixupACL(request.authInfo, listACL)) {
                     throw new KeeperException.InvalidACLException(path);
                 }
+                // 获取父节点路径
                 String parentPath = path.substring(0, lastSlash);
+                // 获取父节点的ChangeRecord
                 ChangeRecord parentRecord = getRecordForPath(parentPath);
-
+                // 校验ACL权限
                 checkACL(zks, parentRecord.acl, ZooDefs.Perms.CREATE,
                         request.authInfo);
                 int parentCVersion = parentRecord.stat.getCversion();
+                // 获取创建的模式
                 CreateMode createMode =
                     CreateMode.fromFlag(createRequest.getFlags());
                 // 如果是顺序节点
@@ -352,28 +380,38 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 }
                 validatePath(path, request.sessionId);
                 try {
+                    // 路径已存在
                     if (getRecordForPath(path) != null) {
                         throw new KeeperException.NodeExistsException(path);
                     }
                 } catch (KeeperException.NoNodeException e) {
                     // ignore this one
                 }
+                // 父节点是否为临时节点，这里可以看出临时节点下不可用创建子节点
                 boolean ephemeralParent = parentRecord.stat.getEphemeralOwner() != 0;
                 if (ephemeralParent) {
                     throw new KeeperException.NoChildrenForEphemeralsException(path);
                 }
+                // 更新父节点的子节点版本号，也就是cversion
                 int newCversion = parentRecord.stat.getCversion()+1;
+                // 生成新的事务
                 request.txn = new CreateTxn(path, createRequest.getData(),
                         listACL,
                         createMode.isEphemeral(), newCversion);
                 StatPersisted s = new StatPersisted();
+                // 临时节点设置当前路径对应的sessionid，也就是ephemeralOwner
                 if (createMode.isEphemeral()) {
                     s.setEphemeralOwner(request.sessionId);
                 }
+                // 拷贝parentRecord
                 parentRecord = parentRecord.duplicate(request.hdr.getZxid());
+                // 子节点数量+1
                 parentRecord.childCount++;
+                // 更新cversion
                 parentRecord.stat.setCversion(newCversion);
+                // 将parentRecord添加到zk服务的outstandingChanges和outstandingChangesForPath中
                 addChangeRecord(parentRecord);
+                // 将新生成的ChangeRecord添加到zk服务的outstandingChanges和outstandingChangesForPath中
                 addChangeRecord(new ChangeRecord(request.hdr.getZxid(), path, s,
                         0, listACL));
                 break;
@@ -527,6 +565,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
      *
      * @param request
      */
+    // 确定请求类型，并根据请求类型不同生成不同的请求对象
     @SuppressWarnings("unchecked")
     protected void pRequest(Request request) throws RequestProcessorException {
         // LOG.info("Prep>>> cxid = " + request.cxid + " type = " +
@@ -535,9 +574,11 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
         request.txn = null;
         
         try {
+            // 判断请求类型
             switch (request.type) {
-                case OpCode.create:
+                case OpCode.create:// 创建节点请求
                 CreateRequest createRequest = new CreateRequest();
+                // 封装请求交给pRequest2Txn()方法来处理
                 pRequest2Txn(request.type, zks.getNextZxid(), request, createRequest, true);
                 break;
             case OpCode.delete:
@@ -683,6 +724,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
         nextProcessor.processRequest(request);
     }
 
+    // 去除重复的ACL
     private List<ACL> removeDuplicates(List<ACL> acl) {
 
         ArrayList<ACL> retval = new ArrayList<ACL>();
@@ -762,13 +804,18 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
         return acl.size() > 0;
     }
 
+    // 处理请求，将请求添加到submittedRequests中,内部run()方法不断重该队列中获取请求进行处理
     public void processRequest(Request request) {
         // request.addRQRec(">prep="+zks.outstandingChanges.size());
         submittedRequests.add(request);
     }
 
+    // 关闭当前处理器
     public void shutdown() {
         LOG.info("Shutting down");
+        // 1.清空队列
+        // 2.设置一个Request.requestOfDeath请求到队列中
+        // 3.关闭整个链条中的下一个处理器
         submittedRequests.clear();
         submittedRequests.add(Request.requestOfDeath);
         nextProcessor.shutdown();

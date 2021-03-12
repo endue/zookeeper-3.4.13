@@ -30,6 +30,12 @@ package org.apache.zookeeper.server;
  * When shutdown is called, the request RequestProcessor should also shutdown
  * any RequestProcessors that it is connected to.
  */
+
+/**
+ * 所有请求处理器的父接口，静态内部类RequestProcessorException表示处理过程中出现的异常
+ * 请求通过processRequest()方法教给当前对应的请求处理器来处理
+ * shutdown表示关闭处理器，其意味着该处理器要关闭和其他处理器的连接
+ */
 public interface RequestProcessor {
     @SuppressWarnings("serial")
     public static class RequestProcessorException extends Exception {
@@ -37,8 +43,8 @@ public interface RequestProcessor {
             super(msg, t);
         }
     }
-
+    // 处理请求，通过该方法将请求交给当前RequestProcessor
     void processRequest(Request request) throws RequestProcessorException;
-
+    // 关闭处理器
     void shutdown();
 }
