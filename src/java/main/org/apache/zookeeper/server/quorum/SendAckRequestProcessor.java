@@ -37,7 +37,9 @@ public class SendAckRequestProcessor implements RequestProcessor, Flushable {
         this.learner = peer;
     }
 
+    // 处理请求
     public void processRequest(Request si) {
+        // 如果请求非sync类型，则返回一个ACK给leader
         if(si.type != OpCode.sync){
             QuorumPacket qp = new QuorumPacket(Leader.ACK, si.hdr.getZxid(), null,
                 null);
@@ -56,7 +58,8 @@ public class SendAckRequestProcessor implements RequestProcessor, Flushable {
             }
         }
     }
-    
+
+    // flush刷盘方法
     public void flush() throws IOException {
         try {
             learner.writePacket(null, true);
