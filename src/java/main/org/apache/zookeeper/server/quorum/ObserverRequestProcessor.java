@@ -33,6 +33,7 @@ import org.apache.zookeeper.server.ZooTrace;
  * This RequestProcessor forwards any requests that modify the state of the
  * system to the Leader.
  */
+// 与FollowerRequestProcessor功能一致
 public class ObserverRequestProcessor extends ZooKeeperCriticalThread implements
         RequestProcessor {
     private static final Logger LOG = LoggerFactory.getLogger(ObserverRequestProcessor.class);

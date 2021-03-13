@@ -39,6 +39,7 @@ public class ProposalRequestProcessor implements RequestProcessor {
 
     SyncRequestProcessor syncProcessor;
 
+    // 构造方法，同时初始化责任链
     public ProposalRequestProcessor(LeaderZooKeeperServer zks,
             RequestProcessor nextProcessor) {
         this.zks = zks;
@@ -50,6 +51,7 @@ public class ProposalRequestProcessor implements RequestProcessor {
     /**
      * initialize this processor
      */
+    // 启动syncProcessor
     public void initialize() {
         syncProcessor.start();
     }
@@ -71,7 +73,7 @@ public class ProposalRequestProcessor implements RequestProcessor {
         if(request instanceof LearnerSyncRequest){// 如果是Sync请求
             zks.getLeader().processSync((LearnerSyncRequest)request);
         } else {
-            // 提交请求到commitProcessor
+            // 提交请求到nextProcessor
             nextProcessor.processRequest(request);
             if (request.hdr != null) {
                 // We need to sync and get consensus on any transactions
