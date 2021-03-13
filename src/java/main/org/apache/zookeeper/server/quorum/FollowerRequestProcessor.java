@@ -33,12 +33,13 @@ import org.apache.zookeeper.server.ZooTrace;
  * This RequestProcessor forwards any requests that modify the state of the
  * system to the Leader.
  */
+// 转发各种请求给laeder
 public class FollowerRequestProcessor extends ZooKeeperCriticalThread implements
         RequestProcessor {
     private static final Logger LOG = LoggerFactory.getLogger(FollowerRequestProcessor.class);
-
+    // zk服务器
     FollowerZooKeeperServer zks;
-
+    // 下一个处理器
     RequestProcessor nextProcessor;
     // 存放request
     LinkedBlockingQueue<Request> queuedRequests = new LinkedBlockingQueue<Request>();
@@ -57,12 +58,13 @@ public class FollowerRequestProcessor extends ZooKeeperCriticalThread implements
     public void run() {
         try {
             while (!finished) {
-                // 出去queuedRequests中的一个请求
+                // 从queuedRequests中取出一个请求，阻塞方法
                 Request request = queuedRequests.take();
                 if (LOG.isTraceEnabled()) {
                     ZooTrace.logRequest(LOG, ZooTrace.CLIENT_REQUEST_TRACE_MASK,
                             'F', request, "");
                 }
+                // 当前处理器已关闭
                 if (request == Request.requestOfDeath) {
                     break;
                 }
@@ -109,6 +111,7 @@ public class FollowerRequestProcessor extends ZooKeeperCriticalThread implements
         }
     }
 
+    // 关闭当前处理器
     public void shutdown() {
         LOG.info("Shutting down");
         finished = true;

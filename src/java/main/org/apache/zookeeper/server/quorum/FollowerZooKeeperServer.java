@@ -52,7 +52,7 @@ public class FollowerZooKeeperServer extends LearnerZooKeeperServer {
     /*
      * Pending sync requests
      */
-    // 等待同步的请求
+    // 等待同步的请求(sync 请求)
     ConcurrentLinkedQueue<Request> pendingSyncs;
     
     /**
