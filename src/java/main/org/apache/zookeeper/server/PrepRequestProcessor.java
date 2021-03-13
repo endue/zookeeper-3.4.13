@@ -168,7 +168,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
         synchronized (zks.outstandingChanges) {
             lastChange = zks.outstandingChangesForPath.get(path);
             if (lastChange == null) {
-                // 从内存目录树中查找父节点
+                // 从内存数据库中查找父节点
                 DataNode n = zks.getZKDatabase().getNode(path);
                 if (n != null) {
                     Set<String> children;

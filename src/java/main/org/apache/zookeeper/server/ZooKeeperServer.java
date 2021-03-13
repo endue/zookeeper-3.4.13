@@ -125,10 +125,10 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
     static final private long superSecret = 0XB3415C00L;
     // 正在处理的客户端连接请求数量
     private final AtomicInteger requestsInProcess = new AtomicInteger(0);
-    // 记录更改后还未同步到ZKDatabase中的节点信息
+    // 记录更改后还未同步到ZKDatabase(内存数据库)中的节点信息
     final List<ChangeRecord> outstandingChanges = new ArrayList<ChangeRecord>();
     // this data structure must be accessed under the outstandingChanges lock
-    // 记录更改后还未同步到ZKDatabase中的节点信息
+    // 记录更改后还未同步到ZKDatabase(内存数据库)中的节点信息
     // key是对应的path
     final HashMap<String, ChangeRecord> outstandingChangesForPath =
         new HashMap<String, ChangeRecord>();

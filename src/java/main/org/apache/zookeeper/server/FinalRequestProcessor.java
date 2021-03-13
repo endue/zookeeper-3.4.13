@@ -75,9 +75,12 @@ import org.apache.zookeeper.OpResult.ErrorResult;
  * This RequestProcessor counts on ZooKeeperServer to populate the
  * outstandingRequests member of ZooKeeperServer.
  */
+// 没有nextProcessor，作为处理器链条中的最后一个
+// FinalRequestProcessor并没有实现ZooKeeperCriticalThread只是实现了RequestProcessor，
+// 所以它不可用作为一个线程启动并且也只有RequestProcessor接口中的两个方法
 public class FinalRequestProcessor implements RequestProcessor {
     private static final Logger LOG = LoggerFactory.getLogger(FinalRequestProcessor.class);
-
+    // zk服务器
     ZooKeeperServer zks;
 
     public FinalRequestProcessor(ZooKeeperServer zks) {
@@ -97,7 +100,10 @@ public class FinalRequestProcessor implements RequestProcessor {
             ZooTrace.logRequest(LOG, traceMask, 'E', request, "");
         }
         ProcessTxnResult rc = null;
+        // 锁住zk服务器中的outstandingChanges队列
         synchronized (zks.outstandingChanges) {
+            // 当outstandingChanges队列不为空且首元素的zxid <= 请求的zxid
+            // 1.从outstandingChanges队列中取出首元素 2.剔除outstandingChangesForPath队列中对应的请求
             while (!zks.outstandingChanges.isEmpty()
                     && zks.outstandingChanges.get(0).zxid <= request.zxid) {
                 ChangeRecord cr = zks.outstandingChanges.remove(0);
@@ -110,6 +116,7 @@ public class FinalRequestProcessor implements RequestProcessor {
                     zks.outstandingChangesForPath.remove(cr.path);
                 }
             }
+            // hdr不为空，说明是写请求
             if (request.hdr != null) {
                TxnHeader hdr = request.hdr;
                Record txn = request.txn;
@@ -117,6 +124,7 @@ public class FinalRequestProcessor implements RequestProcessor {
                rc = zks.processTxn(hdr, txn);
             }
             // do not add non quorum packets to the queue.
+            // 校验是否为事务性请求，如果是则将请求添加到committedLog队列中
             if (Request.isQuorum(request.type)) {
                 zks.getZKDatabase().addCommittedProposal(request);
             }
