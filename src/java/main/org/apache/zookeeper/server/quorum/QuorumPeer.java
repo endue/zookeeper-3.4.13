@@ -666,6 +666,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     }
 
     // 加载磁盘数据
+    // 初始状态下currentEpoch = acceptedEpoch = lastProcessedZxid = 0
     private void loadDataBase() {
         // 获取updatingEpoch文件
         File updating = new File(getTxnFactory().getSnapDir(),
@@ -675,7 +676,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             zkDb.loadDataBase();
 
             // load the epochs
-            // 获取最后处理的zxid
+            // 获取最后处理的zxid,初始值为0
             long lastProcessedZxid = zkDb.getDataTree().lastProcessedZxid;
             // 从zxid中解析出最后的epoch
     		long epochOfZxid = ZxidUtils.getEpochFromZxid(lastProcessedZxid);
@@ -695,14 +696,16 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                                               updating.toString());
                     }
                 }
-            } catch(FileNotFoundException e) {
+            } catch(FileNotFoundException e) {// 当未找到CURRENT_EPOCH_FILENAME文件时
             	// pick a reasonable epoch number
             	// this should only happen once when moving to a
             	// new code version
+                // 将当前的currentEpoch初始为epochOfZxid
             	currentEpoch = epochOfZxid;
             	LOG.info(CURRENT_EPOCH_FILENAME
             	        + " not found! Creating with a reasonable default of {}. This should only happen when you are upgrading your installation",
             	        currentEpoch);
+            	// 写入CURRENT_EPOCH_FILENAME文件中
             	writeLongToFile(CURRENT_EPOCH_FILENAME, currentEpoch);
             }
             if (epochOfZxid > currentEpoch) {
@@ -711,14 +714,16 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             try {
                 // 读取acceptedEpoch文件中的数据
             	acceptedEpoch = readLongFromFile(ACCEPTED_EPOCH_FILENAME);
-            } catch(FileNotFoundException e) {
+            } catch(FileNotFoundException e) {// 当未找到ACCEPTED_EPOCH_FILENAME文件时
             	// pick a reasonable epoch number
             	// this should only happen once when moving to a
             	// new code version
+                // 将当前的acceptedEpoch初始为epochOfZxid
             	acceptedEpoch = epochOfZxid;
             	LOG.info(ACCEPTED_EPOCH_FILENAME
             	        + " not found! Creating with a reasonable default of {}. This should only happen when you are upgrading your installation",
             	        acceptedEpoch);
+            	// 写入到ACCEPTED_EPOCH_FILENAME文件中
             	writeLongToFile(ACCEPTED_EPOCH_FILENAME, acceptedEpoch);
             }
             if (acceptedEpoch < currentEpoch) {
