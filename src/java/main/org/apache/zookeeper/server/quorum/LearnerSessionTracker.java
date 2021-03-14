@@ -32,7 +32,7 @@ import org.apache.zookeeper.server.ZooKeeperServerListener;
  */
 public class LearnerSessionTracker implements SessionTracker {
     SessionExpirer expirer;
-
+    // 存储的是sessionId和sessionTimeout
     HashMap<Long, Integer> touchTable = new HashMap<Long, Integer>();
     long serverId = 1;
     long nextSessionId=0;

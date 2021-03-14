@@ -42,7 +42,7 @@ public class ObserverZooKeeperServer extends LearnerZooKeeperServer {
      * Enable since request processor for writing txnlog to disk and
      * take periodic snapshot. Default is ON.
      */
-    
+    // SyncRequestProcessor请求处理器是否可用
     private boolean syncRequestProcessorEnabled = this.self.getSyncEnabled();
     
     /*
@@ -54,6 +54,7 @@ public class ObserverZooKeeperServer extends LearnerZooKeeperServer {
     /*
      * Pending sync requests
      */
+    // 待同步请求
     ConcurrentLinkedQueue<Request> pendingSyncs = 
         new ConcurrentLinkedQueue<Request>();
         
@@ -81,6 +82,7 @@ public class ObserverZooKeeperServer extends LearnerZooKeeperServer {
      *      
      * @param request
      */
+    // 提交请求
     public void commitRequest(Request request) {     
         if (syncRequestProcessorEnabled) {
             // Write to txnlog and take periodic snapshot
@@ -93,6 +95,7 @@ public class ObserverZooKeeperServer extends LearnerZooKeeperServer {
      * Set up the request processors for an Observer:
      * firstProcesor->commitProcessor->finalProcessor
      */
+    // 设置请求处理链firstProcesor->commitProcessor->finalProcessor
     @Override
     protected void setupRequestProcessors() {      
         // We might consider changing the processor behaviour of 

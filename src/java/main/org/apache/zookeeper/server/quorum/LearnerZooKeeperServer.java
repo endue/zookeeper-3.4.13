@@ -30,6 +30,7 @@ import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
 /**
  * Parent class for all ZooKeeperServers for Learners 
  */
+// learner服务器时follower和observer的父类
 public abstract class LearnerZooKeeperServer extends QuorumZooKeeperServer {    
     public LearnerZooKeeperServer(FileTxnSnapLog logFactory, int tickTime,
             int minSessionTimeout, int maxSessionTimeout,
