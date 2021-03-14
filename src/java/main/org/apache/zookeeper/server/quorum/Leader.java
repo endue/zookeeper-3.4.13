@@ -63,12 +63,13 @@ public class Leader {
     static {
         LOG.info("TCP NoDelay set to: " + nodelay);
     }
-
+    // 提案类
     static public class Proposal {
+        // 数据包
         public QuorumPacket packet;
-
+        // 记录接受到ack的zk服务器的sid集合
         public HashSet<Long> ackSet = new HashSet<Long>();
-
+        // 请求
         public Request request;
 
         @Override
@@ -76,18 +77,20 @@ public class Leader {
             return packet.getType() + ", " + packet.getZxid() + ", " + request;
         }
     }
-
+    // zk服务器
     final LeaderZooKeeperServer zk;
-
+    // 当前集群对象
     final QuorumPeer self;
     // VisibleForTesting
+    // 是否已有过半参与者确认当前leader并且完成同步
     protected boolean quorumFormed = false;
     
     // the follower acceptor thread
+    // 接受来自learner的请求连接,为每个learner创建一个LearnerHandler
     LearnerCnxAcceptor cnxAcceptor;
     
     // list of all the followers
-    // 记录所有的learner
+    // 记录所有的learner的处理线程
     private final HashSet<LearnerHandler> learners =
         new HashSet<LearnerHandler>();
 
@@ -101,6 +104,7 @@ public class Leader {
     }
 
     // list of followers that are ready to follow (i.e synced with the leader)
+    // 记录所有follower的处理线程
     private final HashSet<LearnerHandler> forwardingFollowers =
         new HashSet<LearnerHandler>();
 
@@ -124,7 +128,7 @@ public class Leader {
             forwardingFollowers.add(lh);
         }
     }
-
+    // 记录所有observer的处理线程
     private final HashSet<LearnerHandler> observingLearners =
         new HashSet<LearnerHandler>();
         
@@ -144,6 +148,7 @@ public class Leader {
     }
 
     // Pending sync requests. Must access under 'this' lock.
+    // 正在同步的请求,需要等待ack过半才算完成
     private final HashMap<Long,List<LearnerSyncRequest>> pendingSyncs =
         new HashMap<Long,List<LearnerSyncRequest>>();
     
@@ -188,13 +193,15 @@ public class Leader {
             return forwardingFollowers.contains(peer);
         }        
     }
-    
+
+    // 与learner节点的socket连接服务端
     ServerSocket ss;
 
     Leader(QuorumPeer self,LeaderZooKeeperServer zk) throws IOException {
         this.self = self;
         this.proposalStats = new ProposalStats();
         try {
+            // 初始化socket连接服务端
             if (self.getQuorumListenOnAllIPs()) {
                 ss = new ServerSocket(self.getQuorumAddress().getPort());
             } else {
@@ -307,11 +314,11 @@ public class Leader {
      * This message type informs observers of a committed proposal.
      */
     final static int INFORM = 8;
-
+    // 已经提出但是没有处理的提案
     ConcurrentMap<Long, Proposal> outstandingProposals = new ConcurrentHashMap<Long, Proposal>();
-
+    // 即将应用的提议(已过半确认)
     ConcurrentLinkedQueue<Proposal> toBeApplied = new ConcurrentLinkedQueue<Proposal>();
-
+    // new leader提案
     Proposal newLeaderProposal = new Proposal();
 
     // 负责处理与learner的连接请求
@@ -366,8 +373,9 @@ public class Leader {
     }
 
     StateSummary leaderStateSummary;
-    
+    // 默认-1
     long epoch = -1;
+    // 是否在等待new epoch
     boolean waitingForNewEpoch = true;
     volatile boolean readyToStart = false;
     
@@ -377,6 +385,7 @@ public class Leader {
      * @throws IOException
      * @throws InterruptedException
      */
+    // leader调用的入口
     void lead() throws IOException, InterruptedException {
         self.end_fle = Time.currentElapsedTime();
         long electionTimeTaken = self.end_fle - self.start_fle;
@@ -441,7 +450,7 @@ public class Leader {
                 self.tick.incrementAndGet();
                 return;
             }
-            
+            // 启动zk服务器
             startZkServer();
             
             /**
@@ -748,6 +757,7 @@ public class Leader {
         sendObserverPacket(qp);
     }
 
+    // 最后一次提议的zxid
     long lastProposed;
 
     
@@ -880,18 +890,22 @@ public class Leader {
     }
     // VisibleForTesting
     protected Set<Long> connectingFollowers = new HashSet<Long>();
+    // 该方法会在Leader.lead()和LearnerHandler.run()方法中被调用
     public long getEpochToPropose(long sid, long lastAcceptedEpoch) throws InterruptedException, IOException {
         synchronized(connectingFollowers) {
             if (!waitingForNewEpoch) {
                 return epoch;
             }
+            // 获取集群中最大的epoch,然后更新自己的epoch + 1
             if (lastAcceptedEpoch >= epoch) {
                 epoch = lastAcceptedEpoch+1;
             }
+            // 如果sid是集群的一部分,则记录到connectingFollowers集合中
             if (isParticipant(sid)) {
                 connectingFollowers.add(sid);
             }
             QuorumVerifier verifier = self.getQuorumVerifier();
+            //
             if (connectingFollowers.contains(self.getId()) && 
                                             verifier.containsQuorum(connectingFollowers)) {
                 waitingForNewEpoch = false;
