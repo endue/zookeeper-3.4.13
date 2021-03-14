@@ -54,12 +54,17 @@ import org.slf4j.LoggerFactory;
  * ensemble: Followers and Observers. Both Followers and Observers share 
  * a good deal of code which is moved into Peer to avoid duplication. 
  */
-public class Learner {       
+// 服务器的角色,该类就是follower和observer角色的父类
+public class Learner {
+    // 表示还在PROPOSAL阶段还未COMMIT的消息记录
+    // 记录Leader发出提议，但是还没有通过过半验证的数据格式
     static class PacketInFlight {
-        TxnHeader hdr;
-        Record rec;
+        TxnHeader hdr;// 事物头
+        Record rec;// 消息记录
     }
+    // 当前集群对象
     QuorumPeer self;
+    // zk服务器
     LearnerZooKeeperServer zk;
     // 与leader节点建立的输出缓冲流
     protected BufferedOutputStream bufferedOutput;
@@ -81,12 +86,13 @@ public class Learner {
     protected int leaderProtocolVersion = 0x01;
     
     protected static final Logger LOG = LoggerFactory.getLogger(Learner.class);
-
+    // 连接leader是否允许延迟
     static final private boolean nodelay = System.getProperty("follower.nodelay", "true").equals("true");
     static {
         LOG.info("TCP NoDelay set to: " + nodelay);
     }   
-    
+    // key是sessionId或者clientId
+    // client连接到learner时，learner要向leader提出REVALIDATE请求，在收到回复之前，记录在一个map中，表示尚未处理完的验证
     final ConcurrentHashMap<Long, ServerCnxn> pendingRevalidations =
         new ConcurrentHashMap<Long, ServerCnxn>();
     
@@ -104,9 +110,12 @@ public class Learner {
      * @return
      * @throws IOException
      */
+    // session验证相关
+    // 集群版client重连时调用，learner验证会话是否有效，并激活，需要发送请求给Leader
     void validateSession(ServerCnxn cnxn, long clientId, int timeout)
             throws IOException {
         LOG.info("Revalidating client: 0x" + Long.toHexString(clientId));
+        // 创建REVALIDATE数据包
         ByteArrayOutputStream baos = new ByteArrayOutputStream();
         DataOutputStream dos = new DataOutputStream(baos);
         dos.writeLong(clientId);
@@ -114,6 +123,7 @@ public class Learner {
         dos.close();
         QuorumPacket qp = new QuorumPacket(Leader.REVALIDATE, -1, baos
                 .toByteArray(), null);
+        // 暂存到pendingRevalidations队列中
         pendingRevalidations.put(clientId, cnxn);
         if (LOG.isTraceEnabled()) {
             ZooTrace.logTraceMessage(LOG,
@@ -121,6 +131,7 @@ public class Learner {
                                      "To validate session 0x"
                                      + Long.toHexString(clientId));
         }
+        // 发送消息
         writePacket(qp, true);
     }     
     
@@ -150,6 +161,7 @@ public class Learner {
      *                the packet to be instantiated
      * @throws IOException
      */
+    // 从leader读取packet
     void readPacket(QuorumPacket pp) throws IOException {
         synchronized (leaderIs) {
             // 将数据读取到pp中
@@ -199,13 +211,13 @@ public class Learner {
     protected QuorumServer findLeader() {
         QuorumServer leaderServer = null;
         // Find the leader by id
-        // 查找leader节点
+        // 获取当前的选票,然后根据选票中记录的sid来获取leader
         Vote current = self.getCurrentVote();
         for (QuorumServer s : self.getView().values()) {
             if (s.id == current.getId()) {
                 // Ensure we have the leader's correct IP address before
                 // attempting to connect.
-                // 重新建立addr和electionAddr
+                // 重新初始化集群对象QuorumPeer中的addr和electionAddr
                 s.recreateSocketAddresses();
                 leaderServer = s;
                 break;
@@ -279,7 +291,7 @@ public class Learner {
         // 设置当前zkServer的最新epoch
     	long lastLoggedZxid = self.getLastLoggedZxid();
         QuorumPacket qp = new QuorumPacket();                
-        qp.setType(pktType);
+        qp.setType(pktType);// 设置类型为Leader.FOLLOWERINFO或者Leader.OBSERVERINFO
         qp.setZxid(ZxidUtils.makeZxid(self.getAcceptedEpoch(), 0));
         
         /*
@@ -289,6 +301,7 @@ public class Learner {
         LearnerInfo li = new LearnerInfo(self.getId(), 0x10000);
         ByteArrayOutputStream bsid = new ByteArrayOutputStream();
         BinaryOutputArchive boa = BinaryOutputArchive.getArchive(bsid);
+        // 将自己的信息封装到数据包
         boa.writeRecord(li, "LearnerInfo");
         qp.setData(bsid.toByteArray());
         // 发送qp数据包
@@ -322,6 +335,7 @@ public class Learner {
         	// 封装数据包返回给leader
         	QuorumPacket ackNewEpoch = new QuorumPacket(Leader.ACKEPOCH, lastLoggedZxid, epochBytes, null);
         	writePacket(ackNewEpoch, true);
+        	// 更新自己的zxid中高32位的epoch为新的epoch,低32为0
             return ZxidUtils.makeZxid(newEpoch, 0);
         } else {
 		    // 旧版本leader用于兼容
@@ -514,6 +528,7 @@ public class Learner {
         ack.setZxid(ZxidUtils.makeZxid(newEpoch, 0));
         writePacket(ack, true);
         sock.setSoTimeout(self.tickTime * self.syncLimit);
+        // 启动zk服务器
         zk.startup();
         /*
          * Update the election vote here to ensure that all members of the
@@ -559,13 +574,15 @@ public class Learner {
             throw new UnsupportedOperationException("Unknown server type");
         }
     }
-    
+    // 在validateSession()方法中发送出REVALIDATE消息后接受到leader返回的响应
     protected void revalidate(QuorumPacket qp) throws IOException {
+        // 读取响应
         ByteArrayInputStream bis = new ByteArrayInputStream(qp
                 .getData());
         DataInputStream dis = new DataInputStream(bis);
         long sessionId = dis.readLong();
         boolean valid = dis.readBoolean();
+        // 从pendingRevalidations队列中移除该ServerCnxn
         ServerCnxn cnxn = pendingRevalidations
         .remove(sessionId);
         if (cnxn == null) {
@@ -573,6 +590,7 @@ public class Learner {
                     + Long.toHexString(sessionId)
                     + " for validation");
         } else {
+            // 完成session的初始化
             zk.finishSessionInit(cnxn, valid);
         }
         if (LOG.isTraceEnabled()) {
@@ -582,7 +600,8 @@ public class Learner {
                     + " is valid: " + valid);
         }
     }
-        
+
+    // learner接收leader的ping命令时，返回LearnerSessionTracker的快照
     protected void ping(QuorumPacket qp) throws IOException {
         // Send back the ping with our session data
         ByteArrayOutputStream bos = new ByteArrayOutputStream();

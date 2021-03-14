@@ -128,15 +128,18 @@ public class Follower extends Learner{
                         + Long.toHexString(lastQueued + 1));
             }
             lastQueued = hdr.getZxid();
+            // 交给follower的zk服务器来处理
             fzk.logRequest(hdr, txn);
             break;
         case Leader.COMMIT:
+            // 交给follower的zk服务器来处理
             fzk.commit(qp.getZxid());
             break;
         case Leader.UPTODATE:
             LOG.error("Received an UPTODATE message after Follower started");
             break;
         case Leader.REVALIDATE:
+            // 交给follower的zk服务器来处理
             revalidate(qp);
             break;
         case Leader.SYNC:

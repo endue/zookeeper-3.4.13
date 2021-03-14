@@ -235,7 +235,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         }
         // 根据hostname + port封装的
         public InetSocketAddress addr;
-        // 根据hostname + electionPort封装的
+        // 根据hostname + electionPort封装的(leader节点的信息)
         public InetSocketAddress electionAddr;
         // zk服务的ip
         public String hostname;
