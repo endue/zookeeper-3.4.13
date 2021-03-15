@@ -359,6 +359,7 @@ public class LearnerHandler extends ZooKeeperThread {
             long peerLastZxid;
             StateSummary ss = null;
             long zxid = qp.getZxid();
+            // 更新集群中的epoch和acceptedEpoch
             long newEpoch = leader.getEpochToPropose(this.getSid(), lastAcceptedEpoch);
             
             if (this.getVersion() < 0x10000) {
@@ -368,6 +369,7 @@ public class LearnerHandler extends ZooKeeperThread {
                 // fake the message
                 leader.waitForEpochAck(this.getSid(), ss);
             } else {
+                // 发送LEADERINFO数据包并等待ACKEPOCH的响应
                 byte ver[] = new byte[4];
                 ByteBuffer.wrap(ver).putInt(0x10000);
                 QuorumPacket newEpochPacket = new QuorumPacket(Leader.LEADERINFO, ZxidUtils.makeZxid(newEpoch, 0), ver, null);

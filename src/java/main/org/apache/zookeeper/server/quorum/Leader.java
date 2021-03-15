@@ -410,6 +410,7 @@ public class Leader {
             cnxAcceptor.start();
             
             readyToStart = true;
+            // 获取集群中最大的lastAcceptedEpoch,然后+1更新到epoch中
             long epoch = getEpochToPropose(self.getId(), self.getAcceptedEpoch());
             
             zk.setZxid(ZxidUtils.makeZxid(epoch, 0));
@@ -426,7 +427,7 @@ public class Leader {
                 LOG.info("NEWLEADER proposal has Zxid of "
                         + Long.toHexString(newLeaderProposal.packet.getZxid()));
             }
-            
+            // 等待过半机器(Learner和leader)针对Leader发出的LEADERINFO回复ACKEPOCH
             waitForEpochAck(self.getId(), leaderStateSummary);
             self.setCurrentEpoch(epoch);
 
@@ -434,6 +435,7 @@ public class Leader {
             // us. We do this by waiting for the NEWLEADER packet to get
             // acknowledged
             try {
+                // 等到有过半的参与者针对Leader发出的NEWLEADER返回ACK
                 waitForNewLeaderAck(self.getId(), zk.getZxid());
             } catch (InterruptedException e) {
                 shutdown("Waiting for a quorum of followers, only synced with sids: [ "
@@ -891,6 +893,7 @@ public class Leader {
     // VisibleForTesting
     protected Set<Long> connectingFollowers = new HashSet<Long>();
     // 该方法会在Leader.lead()和LearnerHandler.run()方法中被调用
+    // 获取集群中最大的lastAcceptedEpoch,然后+1更新到epoch中
     public long getEpochToPropose(long sid, long lastAcceptedEpoch) throws InterruptedException, IOException {
         synchronized(connectingFollowers) {
             if (!waitingForNewEpoch) {
@@ -905,13 +908,16 @@ public class Leader {
                 connectingFollowers.add(sid);
             }
             QuorumVerifier verifier = self.getQuorumVerifier();
-            //
+            // connectingFollowers集合中已包含自己并且也包含过半的机器
+            // 那么就不需要在等待
             if (connectingFollowers.contains(self.getId()) && 
                                             verifier.containsQuorum(connectingFollowers)) {
+                // 更新等待标识
                 waitingForNewEpoch = false;
+                // 设置最新的acceptedEpoch
                 self.setAcceptedEpoch(epoch);
                 connectingFollowers.notifyAll();
-            } else {
+            } else {// 连接的集群未过半,那么等待一段时间后直接返回
                 long start = Time.currentElapsedTime();
                 long cur = start;
                 long end = start + self.getInitLimit()*self.getTickTime();
@@ -930,6 +936,7 @@ public class Leader {
     protected Set<Long> electingFollowers = new HashSet<Long>();
     // VisibleForTesting
     protected boolean electionFinished = false;
+    // 等待过半机器(Learner和leader)针对Leader发出的LEADERINFO回复ACKEPOCH
     public void waitForEpochAck(long id, StateSummary ss) throws IOException, InterruptedException {
         synchronized(electingFollowers) {
             if (electionFinished) {
