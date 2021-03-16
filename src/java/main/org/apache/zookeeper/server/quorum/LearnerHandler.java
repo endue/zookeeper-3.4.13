@@ -498,7 +498,7 @@ public class LearnerHandler extends ZooKeeperThread {
                                 }
                                 // 将提案添加到发送队列
                                 queuePacket(propose.packet);
-                                // 发送一个COMMIT请求,让Follower来进行提交这个提案
+                                // 发送一个COMMIT请求,让Follower来提交这个提案
                                 QuorumPacket qcommit = new QuorumPacket(Leader.COMMIT, propose.packet.getZxid(),
                                         null, null);
                                 queuePacket(qcommit);
@@ -523,12 +523,14 @@ public class LearnerHandler extends ZooKeeperThread {
                 }               
 
                 LOG.info("Sending " + Leader.getPacketType(packetToSend));
+                // todo 这里没看明白
+                // leader将已经过半提交的提案发送给learner
                 leaderLastZxid = leader.startForwarding(this, updates);
 
             } finally {
                 rl.unlock();
             }
-
+            // 构建一个NEWLEADER请求并发送
              QuorumPacket newLeaderQP = new QuorumPacket(Leader.NEWLEADER,
                     ZxidUtils.makeZxid(newEpoch, 0), null, null);
              if (getVersion() < 0x10000) {
@@ -577,6 +579,7 @@ public class LearnerHandler extends ZooKeeperThread {
              * the leader is ready, and only then we can
              * start processing messages.
              */
+            // 等待NEWLEADER请求的响应响应
             qp = new QuorumPacket();
             ia.readRecord(qp, "packet");
             if(qp.getType() != Leader.ACK){
@@ -602,7 +605,7 @@ public class LearnerHandler extends ZooKeeperThread {
             // Mutation packets will be queued during the serialize,
             // so we need to mark when the peer can actually start
             // using the data
-            //
+            // 最后发送一个UPTODATE请求,表示请求处理结束
             queuedPackets.add(new QuorumPacket(Leader.UPTODATE, -1, null, null));
 
             // 不断的读取follower的请求

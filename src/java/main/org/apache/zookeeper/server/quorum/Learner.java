@@ -379,12 +379,12 @@ public class Learner {
         // 记录收到的proposal但是还未commit
         LinkedList<PacketInFlight> packetsNotCommitted = new LinkedList<PacketInFlight>();
         synchronized (zk) {
-            // diff方式与leader的数据同步
+            //  DIFF数据包(DIFF数据包显示集群中两个节点的 lastZxid 相同)
             if (qp.getType() == Leader.DIFF) {
                 LOG.info("Getting a diff from the leader 0x{}", Long.toHexString(qp.getZxid()));
                 snapshotNeeded = false;
             }
-            // snap方式表示与leader同步,从leader复制一份镜像数据到本地内存
+            // SNAP则从leader复制一份镜像数据到本地
             else if (qp.getType() == Leader.SNAP) {
                 LOG.info("Getting a snapshot from leader 0x" + Long.toHexString(qp.getZxid()));
                 // The leader is going to dump the database
@@ -398,7 +398,7 @@ public class Learner {
                     throw new IOException("Missing signature");                   
                 }
                 zk.getZKDatabase().setlastProcessedZxid(qp.getZxid());
-            // trunc方式表示将本地数据回滚到leader节点返回的zxid的位置
+            // TRUNC表示将本地数据回滚到leader节点返回的zxid的位置
             } else if (qp.getType() == Leader.TRUNC) {
                 //we need to truncate the log to the lastzxid of the leader
                 LOG.warn("Truncating log to get in sync with the leader 0x"
@@ -410,6 +410,7 @@ public class Learner {
                             + Long.toHexString(qp.getZxid()));
                     System.exit(13);
                 }
+                // 更新本地内存数据库的lastProcessedZxid为leader发送过来的zxid
                 zk.getZKDatabase().setlastProcessedZxid(qp.getZxid());
             }
             else {
@@ -418,6 +419,7 @@ public class Learner {
                 System.exit(13);
 
             }
+            // 创建sesionTracker,来跟踪处理session会话
             zk.createSessionTracker();
             
             long lastQueued = 0;
@@ -435,7 +437,7 @@ public class Learner {
                 // 读数据
                 readPacket(qp);
                 switch(qp.getType()) {
-                // 收到一个提议
+                // 收到一个提议,将提案记录到packetsNotCommitted中
                 case Leader.PROPOSAL:
                     PacketInFlight pif = new PacketInFlight();
                     pif.hdr = new TxnHeader();
@@ -490,7 +492,7 @@ public class Learner {
                         packetsCommitted.add(qp.getZxid());
                     }
                     break;
-                // 过半机器完成了leader验证，自己也完成了数据同步,可以跳出循环
+                    // 提案已经处理结束,退出循环,说明之前残留的投票已经处理完, 则将内存中的数据写入文件, 并发送 ACK 包
                 case Leader.UPTODATE:
                     if (isPreZAB1_0) {
                         zk.takeSnapshot();
@@ -499,6 +501,7 @@ public class Learner {
                     // 注意这里此时才更新cnxnFactory中的zkServer为LearnerZooKeeperServer
                     self.cnxnFactory.setZooKeeperServer(zk);                
                     break outerLoop;
+                    // NEWLEADER请求,
                 case Leader.NEWLEADER: // Getting NEWLEADER here instead of in discovery 
                     // means this is Zab 1.0
                     // Create updatingEpoch file and remove it after current
@@ -538,6 +541,7 @@ public class Learner {
          * 
          * @see https://issues.apache.org/jira/browse/ZOOKEEPER-1732
          */
+        // 更新当前选票
         self.updateElectionVote(newEpoch);
 
         // We need to log the stuff that came in between the snapshot and the uptodate

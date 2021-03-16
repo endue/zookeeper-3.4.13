@@ -316,7 +316,7 @@ public class Leader {
     final static int INFORM = 8;
     // 已经提出但是没有处理的提案
     ConcurrentMap<Long, Proposal> outstandingProposals = new ConcurrentHashMap<Long, Proposal>();
-    // 即将应用的提议(已过半确认)
+    // 已经被CommitProcessor处理过的可被提交的Proposal
     ConcurrentLinkedQueue<Proposal> toBeApplied = new ConcurrentLinkedQueue<Proposal>();
     // new leader提案
     Proposal newLeaderProposal = new Proposal();
@@ -865,9 +865,11 @@ public class Leader {
                 if (p.packet.getZxid() <= lastSeenZxid) {
                     continue;
                 }
+                // 发送提案
                 handler.queuePacket(p.packet);
                 // Since the proposal has been committed we need to send the
                 // commit message also
+                // 发送提案对应的COMMIT
                 QuorumPacket qp = new QuorumPacket(Leader.COMMIT, p.packet
                         .getZxid(), null, null);
                 handler.queuePacket(qp);
