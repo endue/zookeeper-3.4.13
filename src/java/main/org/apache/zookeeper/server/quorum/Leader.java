@@ -371,7 +371,7 @@ public class Leader {
             stop = true;
         }
     }
-
+    // leader节点的状态信息
     StateSummary leaderStateSummary;
     // 默认-1
     long epoch = -1;
@@ -385,7 +385,7 @@ public class Leader {
      * @throws IOException
      * @throws InterruptedException
      */
-    // leader调用的入口
+    // 选举完毕后,成为leader节点的入口
     void lead() throws IOException, InterruptedException {
         self.end_fle = Time.currentElapsedTime();
         long electionTimeTaken = self.end_fle - self.start_fle;
@@ -400,25 +400,26 @@ public class Leader {
             self.tick.set(0);
             // 加载内存最新数据
             zk.loadData();
-            
+            // 生成leader节点的状态信息
             leaderStateSummary = new StateSummary(self.getCurrentEpoch(), zk.getLastProcessedZxid());
 
             // Start thread that waits for connection requests from 
             // new followers.
             // 创建并启动LearnerCnxAcceptor接受来自learner的连接请求
+            // 内部是一个线程的死循环,Socket服务器端监听相关断开,当有一个learner连接时,就会创建一个对应的LearnerHandler
             cnxAcceptor = new LearnerCnxAcceptor();
             cnxAcceptor.start();
             
             readyToStart = true;
             // 获取集群中最大的lastAcceptedEpoch,然后+1更新到epoch中
+            // 这个方法会阻塞住并返回最新的epoch
             long epoch = getEpochToPropose(self.getId(), self.getAcceptedEpoch());
-            
+            // 根据最新的epoch,更新自己的zxid
             zk.setZxid(ZxidUtils.makeZxid(epoch, 0));
-            
             synchronized(this){
                 lastProposed = zk.getZxid();
             }
-            
+            // 创建一个新leader信息的数据包,类型为NEWLEADER,包含自己当前的zxid
             newLeaderProposal.packet = new QuorumPacket(NEWLEADER, zk.getZxid(),
                     null, null);
 
@@ -427,6 +428,7 @@ public class Leader {
                 LOG.info("NEWLEADER proposal has Zxid of "
                         + Long.toHexString(newLeaderProposal.packet.getZxid()));
             }
+            // 注意这里也会阻塞
             // 等待过半机器(Learner和leader)针对Leader发出的LEADERINFO回复ACKEPOCH
             waitForEpochAck(self.getId(), leaderStateSummary);
             self.setCurrentEpoch(epoch);
@@ -759,7 +761,7 @@ public class Leader {
         sendObserverPacket(qp);
     }
 
-    // 最后一次提议的zxid
+    // 最后一次提议中的zxid
     long lastProposed;
 
     
@@ -891,40 +893,48 @@ public class Leader {
         return lastProposed;
     }
     // VisibleForTesting
+    // 记录集群中learner以及自己的sid
+    // 表示已经连接上的learner
     protected Set<Long> connectingFollowers = new HashSet<Long>();
     // 该方法会在Leader.lead()和LearnerHandler.run()方法中被调用
     // 获取集群中最大的lastAcceptedEpoch,然后+1更新到epoch中
     public long getEpochToPropose(long sid, long lastAcceptedEpoch) throws InterruptedException, IOException {
         synchronized(connectingFollowers) {
+            // 是否在等待新的epoch,不在等待时直接返回
             if (!waitingForNewEpoch) {
                 return epoch;
             }
-            // 获取集群中最大的epoch,然后更新自己的epoch + 1
+            // 如果参数lastAcceptedEpoch超过自己当前的epoch,那么将参数lastAcceptedEpoch + 1赋值给epoch
+            // 也就是获取集群中最大的epoch,然后更新自己的epoch + 1
             if (lastAcceptedEpoch >= epoch) {
                 epoch = lastAcceptedEpoch+1;
             }
-            // 如果sid是集群的一部分,则记录到connectingFollowers集合中
+            // 如果参数sid是集群的一部分,则记录到connectingFollowers集合中
             if (isParticipant(sid)) {
                 connectingFollowers.add(sid);
             }
             QuorumVerifier verifier = self.getQuorumVerifier();
-            // connectingFollowers集合中已包含自己并且也包含过半的机器
-            // 那么就不需要在等待
+            // connectingFollowers集合中已包含自己并且也包含过半的机器了
+            // 那么就不需要在继续等待
             if (connectingFollowers.contains(self.getId()) && 
                                             verifier.containsQuorum(connectingFollowers)) {
                 // 更新等待标识
                 waitingForNewEpoch = false;
                 // 设置最新的acceptedEpoch
                 self.setAcceptedEpoch(epoch);
+                // 缓存等待的线程,这里有可能其他learner注册的时候发生编发,导致阻塞在入口synchronized上
                 connectingFollowers.notifyAll();
             } else {// 连接的集群未过半,那么等待一段时间后直接返回
+                // 获取开始时间,结束时间
                 long start = Time.currentElapsedTime();
                 long cur = start;
                 long end = start + self.getInitLimit()*self.getTickTime();
+                // while循环直到超时后直接退出
                 while(waitingForNewEpoch && cur < end) {
                     connectingFollowers.wait(end - cur);
                     cur = Time.currentElapsedTime();
                 }
+                // while循环退出后校验,如果还没有过半集群连接上,那么抛出异常
                 if (waitingForNewEpoch) {
                     throw new InterruptedException("Timeout while waiting for epoch from quorum");        
                 }
@@ -933,16 +943,20 @@ public class Leader {
         }
     }
     // VisibleForTesting
+    // 记录针对Leader发出的LEADERINFO回复ACKEPOCH的服务的sid
     protected Set<Long> electingFollowers = new HashSet<Long>();
     // VisibleForTesting
+    // 记录是否已有过半的(learner针对Leader发出的LEADERINFO回复ACKEPOCH
     protected boolean electionFinished = false;
     // 等待过半机器(Learner和leader)针对Leader发出的LEADERINFO回复ACKEPOCH
+    // 该方法会被leader.lead()和LearnerHandler.run()方法调用
     public void waitForEpochAck(long id, StateSummary ss) throws IOException, InterruptedException {
         synchronized(electingFollowers) {
             if (electionFinished) {
                 return;
             }
             if (ss.getCurrentEpoch() != -1) {
+                // 校验
                 if (ss.isMoreRecentThan(leaderStateSummary)) {
                     throw new IOException("Follower is ahead of the leader, leader summary: " 
                                                     + leaderStateSummary.getCurrentEpoch()
@@ -950,18 +964,21 @@ public class Leader {
                                                     + leaderStateSummary.getLastZxid()
                                                     + " (last zxid)");
                 }
+                // 校验,记录sid
                 if (isParticipant(id)) {
                     electingFollowers.add(id);
                 }
             }
             QuorumVerifier verifier = self.getQuorumVerifier();
+            // 校验是否已过半机器针对Leader发出的LEADERINFO回复ACKEPOCH
             if (electingFollowers.contains(self.getId()) && verifier.containsQuorum(electingFollowers)) {
                 electionFinished = true;
                 electingFollowers.notifyAll();
-            } else {                
+            } else {// 如果没有过半的集群针对Leader发出的LEADERINFO回复ACKEPOCH
                 long start = Time.currentElapsedTime();
                 long cur = start;
                 long end = start + self.getInitLimit()*self.getTickTime();
+                // 循环等待,直到过半或超时
                 while(!electionFinished && cur < end) {
                     electingFollowers.wait(end - cur);
                     cur = Time.currentElapsedTime();

@@ -58,6 +58,7 @@ public class Follower extends Learner{
      *
      * @throws InterruptedException
      */
+    // 选举完毕后,成为follower节点后的入口
     void followLeader() throws InterruptedException {
         self.end_fle = Time.currentElapsedTime();
         long electionTimeTaken = self.end_fle - self.start_fle;

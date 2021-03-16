@@ -82,7 +82,7 @@ public class Learner {
     protected InputArchive leaderIs;
     protected OutputArchive leaderOs;  
     /** the protocol version of the leader */
-    // leader的协议版本
+    // leader的协议版本,写死的0x10000
     protected int leaderProtocolVersion = 0x01;
     
     protected static final Logger LOG = LoggerFactory.getLogger(Learner.class);
@@ -292,7 +292,7 @@ public class Learner {
     	long lastLoggedZxid = self.getLastLoggedZxid();
         QuorumPacket qp = new QuorumPacket();                
         qp.setType(pktType);// 设置类型为Leader.FOLLOWERINFO或者Leader.OBSERVERINFO
-        qp.setZxid(ZxidUtils.makeZxid(self.getAcceptedEpoch(), 0));
+        qp.setZxid(ZxidUtils.makeZxid(self.getAcceptedEpoch(), 0));// 设置自己的zxid
         
         /*
          * Add sid to payload
@@ -306,13 +306,14 @@ public class Learner {
         qp.setData(bsid.toByteArray());
         // 发送qp数据包
         writePacket(qp, true);
-        // 读取数据到qp
+        // 读取数据到qp,leader此时发送的数据包内容如下:QuorumPacket(Leader.LEADERINFO, ZxidUtils.makeZxid(newEpoch, 0), ver, null)
         readPacket(qp);
         // 解析leader节点的epoch
         final long newEpoch = ZxidUtils.getEpochFromZxid(qp.getZxid());
-        // 新版本的leader
+        // 响应数据包类型为LEADERINFO,这里结合org.apache.zookeeper.server.quorum.LearnerHandler.run()方法分析
 		if (qp.getType() == Leader.LEADERINFO) {
         	// we are connected to a 1.0 server so accept the new epoch and read the next packet
+            // 读取leader的版本,写死的0x10000
         	leaderProtocolVersion = ByteBuffer.wrap(qp.getData()).getInt();
         	byte epochBytes[] = new byte[4];
         	final ByteBuffer wrappedEpochBytes = ByteBuffer.wrap(epochBytes);
@@ -332,7 +333,7 @@ public class Learner {
         	} else {
         		throw new IOException("Leaders epoch, " + newEpoch + " is less than accepted epoch, " + self.getAcceptedEpoch());
         	}
-        	// 封装数据包返回给leader
+        	// 封装ACKEPOCH数据包返回给leader
         	QuorumPacket ackNewEpoch = new QuorumPacket(Leader.ACKEPOCH, lastLoggedZxid, epochBytes, null);
         	writePacket(ackNewEpoch, true);
         	// 更新自己的zxid中高32位的epoch为新的epoch,低32为0
