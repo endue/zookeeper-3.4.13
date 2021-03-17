@@ -149,11 +149,18 @@ public class QuorumPeerMain {
           quorumPeer.setTxnFactory(new FileTxnSnapLog(
                   new File(config.getDataLogDir()),
                   new File(config.getDataDir())));
+          // 设置集群Leader选举所使用的的算法(默认值3,代表FastLeaderElection)
           quorumPeer.setElectionType(config.getElectionAlg());
+          // myid配置文件中的数值,用于区分集群中的各个节点
           quorumPeer.setMyid(config.getServerId());
+          // zk的基本时间单位,默认3000ms
           quorumPeer.setTickTime(config.getTickTime());
           quorumPeer.setInitLimit(config.getInitLimit());
+          // 集群中各个节点相互连接的socket的timeout
           quorumPeer.setSyncLimit(config.getSyncLimit());
+          // 当设置为true时，ZooKeeper服务器将监听所有可用IP地址的连接，
+          // 而不仅仅是配置文件中的服务器列表中配置的地址。
+          // 它影响处理ZAB协议和Fast Leader选举协议的连接。默认值为false
           quorumPeer.setQuorumListenOnAllIPs(config.getQuorumListenOnAllIPs());
           // 传入cnxnFactory
           quorumPeer.setCnxnFactory(cnxnFactory);
@@ -164,7 +171,9 @@ public class QuorumPeerMain {
           // 创建ZKDatabase，可以理解为zk的内存数据库
           // 创建的同时传入了FileTxnSnapLog，用于恢复磁盘上的数据
           quorumPeer.setZKDatabase(new ZKDatabase(quorumPeer.getTxnFactory()));
+          // 设置当前zk服务的角色PARTICIPANT(默认)或OBSERVER
           quorumPeer.setLearnerType(config.getPeerType());
+          // Observer是否使用SyncRequestProcessor
           quorumPeer.setSyncEnabled(config.getSyncEnabled());
 
           // sets quorum sasl authentication configurations

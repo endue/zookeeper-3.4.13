@@ -109,6 +109,7 @@ public class QuorumPeerConfig {
     protected int snapRetainCount = 3;
     // PurgeTask触发的时间间隔(单位小时)，默认0
     protected int purgeInterval = 0;
+    // Observer是否使用SyncRequestProcessor,默认true
     protected boolean syncEnabled = true;
 
     protected LearnerType peerType = LearnerType.PARTICIPANT;

@@ -403,6 +403,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
      * Enables/Disables sync request processor. This option is enabled
      * by default and is to be used with observers.
      */
+    // Observer是否使用SyncRequestProcessor,默认true
     protected boolean syncEnabled = true;
 
     /**
