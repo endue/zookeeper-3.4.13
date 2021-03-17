@@ -33,11 +33,13 @@ import org.apache.zookeeper.common.PathUtils;
  * 
  * @see org.apache.zookeeper.ZooKeeper
  */
+// ZooKeeper客户端连接字符串的解析器
 public final class ConnectStringParser {
+    // 默认端口号,客户端不指定端口是使用该断开
     private static final int DEFAULT_PORT = 2181;
-
+    // 客户端所有操作的根路径
     private final String chrootPath;
-
+    // 客户端连接的服务地址
     private final ArrayList<InetSocketAddress> serverAddresses = new ArrayList<InetSocketAddress>();
 
     /**

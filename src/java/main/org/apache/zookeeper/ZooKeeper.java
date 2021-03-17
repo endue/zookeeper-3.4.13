@@ -130,6 +130,7 @@ public class ZooKeeper {
      * the public methods will not be exposed as part of the ZooKeeper client
      * API.
      */
+    // 事件监听管理器
     private static class ZKWatchManager implements ClientWatchManager {
         private final Map<String, Set<Watcher>> dataWatches =
             new HashMap<String, Set<Watcher>>();
@@ -137,7 +138,6 @@ public class ZooKeeper {
             new HashMap<String, Set<Watcher>>();
         private final Map<String, Set<Watcher>> childWatches =
             new HashMap<String, Set<Watcher>>();
-
         private volatile Watcher defaultWatcher;
 
         final private void addTo(Set<Watcher> from, Set<Watcher> to) {
@@ -443,7 +443,9 @@ public class ZooKeeper {
                 + " sessionTimeout=" + sessionTimeout + " watcher=" + watcher);
 
         watchManager.defaultWatcher = watcher;
-
+        // 解析connectString,是逗号分隔开的host:port格式的
+        // 比如:127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002/app/a
+        // 如果知道了根路径,那么后续操作都在该路径下
         ConnectStringParser connectStringParser = new ConnectStringParser(
                 connectString);
         HostProvider hostProvider = new StaticHostProvider(

@@ -143,8 +143,9 @@ public class ClientCnxn {
     /**
      * These are the packets that need to be sent.
      */
+    //
     private final LinkedList<Packet> outgoingQueue = new LinkedList<Packet>();
-
+    // 连接超时时间
     private int connectTimeout;
 
     /**
@@ -153,18 +154,19 @@ public class ClientCnxn {
      * been increased/decreased by the server which applies bounds to this
      * value.
      */
+    //
     private volatile int negotiatedSessionTimeout;
-
+    // 客户端的读取超时时间,默认sessionTimeout * 2 / 3
     private int readTimeout;
-
+    // 客户端的session超时时间
     private final int sessionTimeout;
-
+    // zk客户端
     private final ZooKeeper zooKeeper;
-
+    // 客户端的事件监听管理器
     private final ClientWatchManager watcher;
-
+    // 客户端的sessionID
     private long sessionId;
-
+    // 客户端的session密码
     private byte sessionPasswd[] = new byte[16];
 
     /**
@@ -173,12 +175,13 @@ public class ClientCnxn {
      * server on the other side of the wire is partitioned it'll accept
      * read-only clients only.
      */
+    // 客户端是否为只读模式
     private boolean readOnly;
-
+    // 客户端操作的根路径
     final String chrootPath;
-
+    // 基于底层socket与服务端进行通信，发送数据
     final SendThread sendThread;
-
+    // 处理zk服务端发送过来的事件
     final EventThread eventThread;
 
     /**
@@ -248,6 +251,7 @@ public class ClientCnxn {
     /**
      * This class allows us to pass the headers and the relevant records around.
      */
+    // 数据包
     static class Packet {
         RequestHeader requestHeader;
 
