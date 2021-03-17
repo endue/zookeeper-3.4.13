@@ -445,16 +445,19 @@ public class ZooKeeper {
         watchManager.defaultWatcher = watcher;
         // 解析connectString,是逗号分隔开的host:port格式的
         // 比如:127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002/app/a
-        // 如果知道了根路径,那么后续操作都在该路径下
+        // 如果指定了根路径,那么后续操作都在该路径下
         ConnectStringParser connectStringParser = new ConnectStringParser(
                 connectString);
+        // 解析出一组可以连接的zk服务器
         HostProvider hostProvider = new StaticHostProvider(
                 connectStringParser.getServerAddresses());
         // 初始化cnxn，这个cnxn是客户端的核心组件
+        // 内部就是初始化一些配置和两个线程,重点是初始化的两个线程
         cnxn = new ClientCnxn(connectStringParser.getChrootPath(),// 这个配置在客户端建立连接的时候可以指定路径，后续操作都在该路径下执行
                 hostProvider, sessionTimeout, this, watchManager,
-                // 初始化一个ClientCnxnSocket
+                // 初始化一个ClientCnxnSocketNIO
                 getClientCnxnSocket(), canBeReadOnly);
+        // 启动上一步创建的两个线程
         cnxn.start();
     }
 

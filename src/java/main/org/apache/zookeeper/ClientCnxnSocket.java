@@ -61,6 +61,7 @@ abstract class ClientCnxnSocket {
     protected long lastHeard;
     protected long lastSend;
     protected long now;
+    // 设置SendThread,在Clientcnxn运行SendThread时,传入该值
     protected ClientCnxn.SendThread sendThread;
 
     /**

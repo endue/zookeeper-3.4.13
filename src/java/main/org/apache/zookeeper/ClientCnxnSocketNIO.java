@@ -41,7 +41,7 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
             .getLogger(ClientCnxnSocketNIO.class);
 
     private final Selector selector = Selector.open();
-
+    // 在cleanup()方法中会被置为null
     private SelectionKey sockKey;
 
     ClientCnxnSocketNIO() throws IOException {
@@ -272,6 +272,7 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
      * @param addr the address of remote host
      * @throws IOException
      */
+    // 注册socket,如果是立即完成那么调用sendThread.primeConnection()
     void registerAndConnect(SocketChannel sock, InetSocketAddress addr) 
     throws IOException {
         sockKey = sock.register(selector, SelectionKey.OP_CONNECT);
@@ -280,7 +281,8 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
             sendThread.primeConnection();
         }
     }
-    
+
+    // 已指定的参数地址建立sock连接
     @Override
     void connect(InetSocketAddress addr) throws IOException {
         SocketChannel sock = createSock();
