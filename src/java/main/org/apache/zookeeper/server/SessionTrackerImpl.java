@@ -160,7 +160,7 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
                     continue;
                 }
                 SessionSet set;
-                // 更加过期时间，获取已经超时的时间桶
+                // 根据过期时间，获取已经超时的时间桶
                 set = sessionSets.remove(nextExpirationTime);
                 if (set != null) {
                     for (SessionImpl s : set.sessions) {
@@ -178,7 +178,7 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
         LOG.info("SessionTrackerImpl exited loop!");
     }
 
-    // 会话激活
+    // touch一下session
     synchronized public boolean touchSession(long sessionId, int timeout) {
         if (LOG.isTraceEnabled()) {
             ZooTrace.logTraceMessage(LOG,
@@ -186,6 +186,7 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
                                      "SessionTrackerImpl --- Touch session: 0x"
                     + Long.toHexString(sessionId) + " with timeout " + timeout);
         }
+        // 获取sessionId对应的SessionImpl对象
         SessionImpl s = sessionsById.get(sessionId);
         // Return false, if the session doesn't exists or marked as closing
         if (s == null || s.isClosing()) {
@@ -259,8 +260,12 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
         return nextSessionId++;
     }
 
+    // 添加sesionid以及对应的超时时间
     synchronized public void addSession(long id, int sessionTimeout) {
+        // 保存session
         sessionsWithTimeout.put(id, sessionTimeout);
+        // 获取sessionId对应的SessionImpl对象
+        // 不存在就创建一个
         if (sessionsById.get(id) == null) {
             SessionImpl s = new SessionImpl(id, sessionTimeout, 0);
             sessionsById.put(id, s);
@@ -276,6 +281,7 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
                         + Long.toHexString(id) + " " + sessionTimeout);
             }
         }
+        // touch一下sesion
         touchSession(id, sessionTimeout);
     }
 

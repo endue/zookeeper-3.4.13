@@ -432,7 +432,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
 
     // 启动zk服务器
     public synchronized void startup() {
-        // 创建会话Session跟踪器
+        // 创建会话Session跟踪器,默认SessionTrackerImpl
         if (sessionTracker == null) {
             createSessionTracker();
         }
@@ -652,7 +652,9 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
     // 创建session
     // cnxn是针对当前客户端的NIOServerCnxn
     long createSession(ServerCnxn cnxn, byte passwd[], int timeout) {
+        // 创建sessionId
         long sessionId = sessionTracker.createSession(timeout);
+        // 生成随机密码
         Random r = new Random(sessionId ^ superSecret);
         r.nextBytes(passwd);
         ByteBuffer to = ByteBuffer.allocate(4);
@@ -768,7 +770,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
     }
 
     /**
-     * 发送submit请求
+     * 提交请求
      * @param cnxn
      * @param sessionId
      * @param xid
@@ -780,8 +782,8 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         submitRequest(si);
     }
 
-    // 如果是learner接收到的请求，处理链条为PrepRequestProcessor -> SyncRequestProcessor -> finalProcessor
-    // 如果是leader接收到的请求，处理链条为PrepRequestProcessor -> ProposalRequestProcessor -> CommitProcessor -> ToBeAppliedRequestProcessor -> FinalRequestProcessor
+    // 如果是learner接收到的请求，处理链条为FollowerRequestProcessor -> CommitProcessor -> FinalRequestProcessor
+    // 如果是leader接收到的请求，处理链条为
     public void submitRequest(Request si) {
         if (firstProcessor == null) {
             synchronized (this) {
@@ -806,6 +808,8 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             touch(si.cnxn);
             boolean validpacket = Request.isValid(si.type);
             if (validpacket) {
+                // 子类会覆盖firstProcessor的初始化
+                // 如果是FollowerZookeeperServer,执行顺序为FollowerRequestProcessor -> CommitProcessor -> FinalRequestProcessor
                 firstProcessor.processRequest(si);
                 if (si.cnxn != null) {
                     incInProcess();

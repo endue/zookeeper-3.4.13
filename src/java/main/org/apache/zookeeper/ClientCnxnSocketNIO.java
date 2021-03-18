@@ -131,6 +131,7 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
                                 (p.requestHeader.getType() != OpCode.auth)) {
                             p.requestHeader.setXid(cnxn.getXid());
                         }
+                        // 封装数据包到p.bb中
                         p.createBB();
                     }
                     // 将数据写入socket
@@ -392,6 +393,7 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
                 if (sc.finishConnect()) {
                     updateLastSendAndHeard();
                     // 把watches和authData等数据发过去，并更新SelectionKey为读写
+                    // 注意内部会创建ConnectRequest
                     sendThread.primeConnection();
                 }
             // 如果是OP_READ或OP_WRITE事件

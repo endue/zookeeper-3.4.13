@@ -720,7 +720,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
             }
         }
         request.zxid = zks.getZxid();
-        // 交给ProposalRequestProcessor
+
         nextProcessor.processRequest(request);
     }
 

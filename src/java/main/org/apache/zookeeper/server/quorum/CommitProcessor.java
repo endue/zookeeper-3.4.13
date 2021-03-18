@@ -41,16 +41,17 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
     /**
      * Requests that we are holding until the commit comes in.
      */
-    // 记录待提交的request
+    // 等待ACK确认的 Request
     LinkedList<Request> queuedRequests = new LinkedList<Request>();
 
     /**
      * Requests that have been committed.
      */
-    // 记录已提交的request
+    // 已经 Proposal ACK 过半确认过的 Request, 一般的要么是 Leader 自己 commit, 要么就是 Follower 接收到 Leader 的 commit 消息
     LinkedList<Request> committedRequests = new LinkedList<Request>();
 
     RequestProcessor nextProcessor;
+    // 等待被 nextProcessor 处理的队列, 其里面的数据是从 committedRequests, queuedRequests 里面获取来的
     ArrayList<Request> toProcess = new ArrayList<Request>();
 
     /**
@@ -156,6 +157,7 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
         LOG.info("CommitProcessor exited loop!");
     }
 
+    // 收到commit请求
     synchronized public void commit(Request request) {
         if (!finished) {
             if (request == null) {

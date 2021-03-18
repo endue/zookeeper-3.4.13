@@ -897,6 +897,7 @@ public class ClientCnxn {
                      + ", initiating session");
             isFirstConnect = false;
             long sessId = (seenRwServerBefore) ? sessionId : 0;
+            // 创建ConnectRequest
             ConnectRequest conReq = new ConnectRequest(0, lastZxid,
                     sessionTimeout, sessId, sessionPasswd);
             synchronized (outgoingQueue) {
@@ -1089,7 +1090,7 @@ public class ClientCnxn {
                         }
                         // 建立socket连接
                         startConnect(serverAddress);
-                        // 更新一下最好发送和心跳的时间
+                        // 更新一下发送和心跳的时间
                         clientCnxnSocket.updateLastSendAndHeard();
                     }
                     // 2.2 超时检测
