@@ -58,46 +58,65 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
      * @throws InterruptedException
      * @throws IOException
      */
+    // 处理读或写事件
     void doIO(List<Packet> pendingQueue, LinkedList<Packet> outgoingQueue, ClientCnxn cnxn)
       throws InterruptedException, IOException {
         SocketChannel sock = (SocketChannel) sockKey.channel();
         if (sock == null) {
             throw new IOException("Socket is null!");
         }
+        // 如果是OP_READ事件
         if (sockKey.isReadable()) {
+            // 首先读取数据的长度
             int rc = sock.read(incomingBuffer);
+            // 如果这个if判断成立,说明出现了连接关闭
             if (rc < 0) {
                 throw new EndOfStreamException(
                         "Unable to read additional data from server sessionid 0x"
                                 + Long.toHexString(sessionId)
                                 + ", likely server has closed socket");
             }
+            // 判断incomingBuffer是否还有剩余空间,如果有说明出现了拆包,所以暂不处理,等待后续数据的到达
             if (!incomingBuffer.hasRemaining()) {
+                // 执行到这里说明数据已全部读取完毕,开始处理
+                // 转换一下,准备读取数据
                 incomingBuffer.flip();
+                // 如果条件成立,说明读取的是长度
                 if (incomingBuffer == lenBuffer) {
                     recvCount++;
+                    // 读取数据包的长度并根据长度,重新生成incomingBuffer
                     readLength();
+                // 如果客户端和zkServer直接还没有初始化
                 } else if (!initialized) {
+                    // 读取Connect的服务端的回复
                     readConnectResult();
+                    // 增加OP_READ事件监听
                     enableRead();
+                    // 判断是否有要发送的数据包
                     if (findSendablePacket(outgoingQueue,
                             cnxn.sendThread.clientTunneledAuthenticationInProgress()) != null) {
                         // Since SASL authentication has completed (if client is configured to do so),
                         // outgoing packets waiting in the outgoingQueue can now be sent.
+                        // 如果有,就增加OP_WRITE事件
                         enableWrite();
                     }
+                    // 清空lenBuffer并将incomingBuffer重置为lenBuffer
                     lenBuffer.clear();
                     incomingBuffer = lenBuffer;
                     updateLastHeard();
+                    // 初始化完毕
                     initialized = true;
                 } else {
+                    // 读取zkServer的响应
                     sendThread.readResponse(incomingBuffer);
+                    // 清空lenBuffer并将incomingBuffer重置为lenBuffer
                     lenBuffer.clear();
                     incomingBuffer = lenBuffer;
                     updateLastHeard();
                 }
             }
         }
+        // 如果是OP_WRITE事件
         if (sockKey.isWritable()) {
             synchronized(outgoingQueue) {
                 Packet p = findSendablePacket(outgoingQueue,
@@ -114,10 +133,12 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
                         }
                         p.createBB();
                     }
+                    // 将数据写入socket
                     sock.write(p.bb);
                     // 处理发送数据时的拆包问题
                     if (!p.bb.hasRemaining()) {
                         sentCount++;
+                        // 从outgoingQueue中取出来，放到pendingQueue中
                         outgoingQueue.removeFirstOccurrence(p);
                         if (p.requestHeader != null
                                 && p.requestHeader.getType() != OpCode.ping
@@ -128,6 +149,7 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
                         }
                     }
                 }
+                // 要发送的数据包存储队列为空,取消OP_WRITE事件
                 if (outgoingQueue.isEmpty()) {
                     // No more packets to send: turn off write interest flag.
                     // Will be turned on later by a later call to enableWrite(),
@@ -135,6 +157,7 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
                     // to attempt SASL authentication), or in either doIO() or
                     // in doTransport() if not.
                     disableWrite();
+
                 } else if (!initialized && p != null && !p.bb.hasRemaining()) {
                     // On initial connection, write the complete connect request
                     // packet, but then disable further writes until after
@@ -344,11 +367,13 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
     synchronized void wakeupCnxn() {
         selector.wakeup();
     }
-    
+
+    // 客户端进行数据的发送以及接收
     @Override
     void doTransport(int waitTimeOut, List<Packet> pendingQueue, LinkedList<Packet> outgoingQueue,
                      ClientCnxn cnxn)
             throws IOException, InterruptedException {
+        // 获取就绪的SelectionKey
         selector.select(waitTimeOut);
         Set<SelectionKey> selected;
         synchronized (this) {
@@ -358,13 +383,18 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
         // non blocking, so time is effectively a constant. That is
         // Why we just have to do this once, here
         updateNow();
+        // 遍历就绪的SelectionKey
         for (SelectionKey k : selected) {
             SocketChannel sc = ((SocketChannel) k.channel());
+            // 如果是OP_CONNECT事件,该事件出现在org.apache.zookeeper.ClientCnxnSocketNIO.registerAndConnect()方法没有立即连接成功的情况下
             if ((k.readyOps() & SelectionKey.OP_CONNECT) != 0) {
+                // 判断是否完成连接
                 if (sc.finishConnect()) {
                     updateLastSendAndHeard();
+                    // 把watches和authData等数据发过去，并更新SelectionKey为读写
                     sendThread.primeConnection();
                 }
+            // 如果是OP_READ或OP_WRITE事件
             } else if ((k.readyOps() & (SelectionKey.OP_READ | SelectionKey.OP_WRITE)) != 0) {
                 doIO(pendingQueue, outgoingQueue, cnxn);
             }

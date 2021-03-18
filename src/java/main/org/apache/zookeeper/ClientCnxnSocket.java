@@ -43,7 +43,7 @@ import org.slf4j.LoggerFactory;
  */
 abstract class ClientCnxnSocket {
     private static final Logger LOG = LoggerFactory.getLogger(ClientCnxnSocket.class);
-
+    // client和zkServer连接初始化完成标识符
     protected boolean initialized;
 
     /**
@@ -56,7 +56,9 @@ abstract class ClientCnxnSocket {
      * readLength() to receive the full message.
      */
     protected ByteBuffer incomingBuffer = lenBuffer;
+    // 发送的数据包的数量
     protected long sentCount = 0;
+    // 接收到的数据包数量
     protected long recvCount = 0;
     protected long lastHeard;
     protected long lastSend;
@@ -108,14 +110,18 @@ abstract class ClientCnxnSocket {
         this.lastHeard = now;
     }
 
+    // 读取数据包的长度并根据长度,重新生成incomingBuffer
     protected void readLength() throws IOException {
+        // 读取长度
         int len = incomingBuffer.getInt();
         if (len < 0 || len >= ClientCnxn.packetLen) {
             throw new IOException("Packet len" + len + " is out of range!");
         }
+        // 重新生成incomingBuffer
         incomingBuffer = ByteBuffer.allocate(len);
     }
 
+    // 读取Connect后,zkServer的响应
     void readConnectResult() throws IOException {
         if (LOG.isTraceEnabled()) {
             StringBuilder buf = new StringBuilder("0x[");
@@ -140,7 +146,7 @@ abstract class ClientCnxnSocket {
             // doesn't contain readOnly field
             LOG.warn("Connected to an old server; r-o mode will be unavailable");
         }
-
+        // 获取sessionId
         this.sessionId = conRsp.getSessionId();
         sendThread.onConnected(conRsp.getTimeOut(), this.sessionId,
                 conRsp.getPasswd(), isRO);

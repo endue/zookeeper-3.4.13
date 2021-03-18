@@ -138,12 +138,13 @@ public class ClientCnxn {
     /**
      * These are the packets that have been sent and are waiting for a response.
      */
+    // 已经从客户端发送出去但是还没有收到zkServer响应的数据包
     private final LinkedList<Packet> pendingQueue = new LinkedList<Packet>();
 
     /**
      * These are the packets that need to be sent.
      */
-    //
+    // 请求发送队列,记录需要被发送到zkServer的数据包
     private final LinkedList<Packet> outgoingQueue = new LinkedList<Packet>();
     // 连接超时时间
     private int connectTimeout;
@@ -962,6 +963,7 @@ public class ClientCnxn {
                 outgoingQueue.addFirst(new Packet(null, null, conReq,
                             null, null, readOnly));
             }
+            // 监听SelectionKey.OP_READ和SelectionKey.OP_WRITE两个事件
             clientCnxnSocket.enableReadWriteOnly();
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Session establishment request sent on "
