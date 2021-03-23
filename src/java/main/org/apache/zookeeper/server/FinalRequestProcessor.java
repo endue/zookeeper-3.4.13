@@ -77,7 +77,7 @@ import org.apache.zookeeper.OpResult.ErrorResult;
  */
 // 没有nextProcessor，作为处理器链条中的最后一个
 // FinalRequestProcessor并没有实现ZooKeeperCriticalThread只是实现了RequestProcessor，
-// 所以它不可用作为一个线程启动并且也只有RequestProcessor接口中的两个方法
+// 所以它不能作为一个线程启动并且也只有RequestProcessor接口中的两个方法
 public class FinalRequestProcessor implements RequestProcessor {
     private static final Logger LOG = LoggerFactory.getLogger(FinalRequestProcessor.class);
     // zk服务器
@@ -87,6 +87,7 @@ public class FinalRequestProcessor implements RequestProcessor {
         this.zks = zks;
     }
 
+    // 处理request
     public void processRequest(Request request) {
         if (LOG.isDebugEnabled()) {
             LOG.debug("Processing request:: " + request);

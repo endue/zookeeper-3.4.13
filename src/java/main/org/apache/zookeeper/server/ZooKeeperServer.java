@@ -783,7 +783,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
     }
 
     // 如果是learner接收到的请求，处理链条为FollowerRequestProcessor -> CommitProcessor -> FinalRequestProcessor
-    // 如果是leader接收到的请求，处理链条为
+    // 如果是leader接收到的请求，处理链条为PrepRequestProcessor -> ProposalRequestProcessor -> CommitProcessor -> ToBeAppliedRequestProcessor -> FinalRequestProcessor
     public void submitRequest(Request si) {
         if (firstProcessor == null) {
             synchronized (this) {
@@ -810,6 +810,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             if (validpacket) {
                 // 子类会覆盖firstProcessor的初始化
                 // 如果是FollowerZookeeperServer,执行顺序为FollowerRequestProcessor -> CommitProcessor -> FinalRequestProcessor
+                // 如果是LeaderZookeeperServer,执行顺序为PrepRequestProcessor -> ProposalRequestProcessor -> CommitProcessor -> ToBeAppliedRequestProcessor -> FinalRequestProcessor
                 firstProcessor.processRequest(si);
                 if (si.cnxn != null) {
                     incInProcess();
