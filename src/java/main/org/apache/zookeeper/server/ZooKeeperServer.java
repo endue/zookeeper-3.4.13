@@ -145,11 +145,12 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
     // 连接工厂,用来处理用户客户端的连接
     // 两个实现:NIOServerCnxnFactory和NettyServerCnxnFactory
     private ServerCnxnFactory serverCnxnFactory;
-    // zk服务器统计计数器
+    // zk服务统计类
     private final ServerStats serverStats;
     // 监听器
+    // 单机模式启动时,会创建ZooKeeperServerListenerImpl
     private final ZooKeeperServerListener listener;
-    // zkServer关闭处理器
+    // 单机模式启动时,会注册ZooKeeperServerShutdownHandler
     private ZooKeeperServerShutdownHandler zkShutdownHandler;
 
     void removeCnxn(ServerCnxn cnxn) {
@@ -419,9 +420,9 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         }
     }
     
-    public void startdata() 
-    throws IOException, InterruptedException {
+    public void startdata() throws IOException, InterruptedException {
         //check to see if zkDb is not null
+        // 初始化内存数据库
         if (zkDb == null) {
             zkDb = new ZKDatabase(this.txnLogFactory);
         }  
@@ -448,7 +449,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
     }
     // 默认处理链条
     protected void setupRequestProcessors() {
-        // PrepRequestProcessor -> SyncRequestProcessor -> finalProcessor
+        // PrepRequestProcessor -> SyncRequestProcessor -> FinalRequestProcessor
         RequestProcessor finalProcessor = new FinalRequestProcessor(this);
         RequestProcessor syncProcessor = new SyncRequestProcessor(this,
                 finalProcessor);
@@ -809,6 +810,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             boolean validpacket = Request.isValid(si.type);
             if (validpacket) {
                 // 子类会覆盖firstProcessor的初始化
+                // 如果是ZooKeeperServer,执行顺序为PrepRequestProcessor -> SyncRequestProcessor -> finalProcessor
                 // 如果是FollowerZookeeperServer,执行顺序为FollowerRequestProcessor -> CommitProcessor -> FinalRequestProcessor
                 // 如果是LeaderZookeeperServer,执行顺序为PrepRequestProcessor -> ProposalRequestProcessor -> CommitProcessor -> ToBeAppliedRequestProcessor -> FinalRequestProcessor
                 firstProcessor.processRequest(si);

@@ -66,7 +66,7 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
      * sender thread per NIOServerCnxn instance, we can use a member variable to
      * only allocate it once.
     */
-    // 内存缓存区，64kb
+    // 内存缓存区，写死64kb
     final ByteBuffer directBuffer = ByteBuffer.allocateDirect(64 * 1024);
     // 记录InetAddress(只包含IP地址,不包含端口号)对应的Set<NIOServerCnxn>
     final HashMap<InetAddress, Set<NIOServerCnxn>> ipMap = new HashMap<InetAddress, Set<NIOServerCnxn>>( );
@@ -124,6 +124,7 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
     }
 
     // 集群模式启动方法
+    // 注:单机模式也会调用该方法
     @Override
     public void start() {
         // ensure thread is started once and only once
@@ -137,9 +138,13 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
     @Override
     public void startup(ZooKeeperServer zks) throws IOException,
             InterruptedException {
+        // 启动当前类
         start();
+        // zks就是ZooKeeperServer
         setZooKeeperServer(zks);
+        // 初始化ZKDatabase
         zks.startdata();
+        // 启动ZooKeeperServer
         zks.startup();
     }
 

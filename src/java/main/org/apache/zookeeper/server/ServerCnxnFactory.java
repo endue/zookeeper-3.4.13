@@ -98,9 +98,12 @@ public abstract class ServerCnxnFactory {
 
     protected ZooKeeperServer zkServer;
     // 选举完成后更新该方法
-    // 如果是learner则是LearnerZooKeeperServer
-    // 如果是leader则是LeaderZooKeeperServer
-    // 如果是readOnly则是ReadOnlyZooKeeperServer
+    // 如果单机模式启动
+    //  1.ZooKeeperServer
+    // 如果集群模式启动
+    //  1.如果是learner则是LearnerZooKeeperServer
+    //  2.如果是leader则是LeaderZooKeeperServer
+    //  3.如果是readOnly则是ReadOnlyZooKeeperServer
     final public void setZooKeeperServer(ZooKeeperServer zk) {
         this.zkServer = zk;
         if (zk != null) {
@@ -150,7 +153,7 @@ public abstract class ServerCnxnFactory {
     private final Map<ServerCnxn, ConnectionBean> connectionBeans
         = new ConcurrentHashMap<ServerCnxn, ConnectionBean>();
 
-    // 记录所有的NIOServerCnxn
+    // 记录所有与客户端连接的NIOServerCnxn(默认)
     protected final HashSet<ServerCnxn> cnxns = new HashSet<ServerCnxn>();
     public void unregisterConnection(ServerCnxn serverCnxn) {
         ConnectionBean jmxConnectionBean = connectionBeans.remove(serverCnxn);

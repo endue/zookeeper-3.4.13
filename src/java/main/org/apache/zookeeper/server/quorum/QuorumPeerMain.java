@@ -112,7 +112,7 @@ public class QuorumPeerMain {
         DatadirCleanupManager purgeMgr = new DatadirCleanupManager(config
                 .getDataDir(), config.getDataLogDir(), config
                 .getSnapRetainCount(), config.getPurgeInterval());
-        // 启动任务
+        // 启动日志清理任务
         purgeMgr.start();
         // 以集群模式启动
         if (args.length == 1 && config.servers.size() > 0) {

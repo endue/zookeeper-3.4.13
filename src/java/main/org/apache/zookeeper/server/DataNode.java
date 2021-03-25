@@ -58,6 +58,7 @@ public class DataNode implements Record {
      * does not contain the parent path -- just the last part of the path. This
      * should be synchronized on except deserializing (for speed up issues).
      */
+    // 记录所有的子节点路径
     private Set<String> children = null;
 
     private static final Set<String> EMPTY_SET = Collections.emptySet();

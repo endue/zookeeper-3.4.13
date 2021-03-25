@@ -31,12 +31,14 @@ import org.apache.zookeeper.server.quorum.QuorumPeerConfig.ConfigException;
  * We use this instead of Properties as it's typed.
  *
  */
+// 存储服务配置,单机模式启动时使用
 @InterfaceAudience.Public
 public class ServerConfig {
     ////
     //// If you update the configuration parameters be sure
     //// to update the "conf" 4letter word
     ////
+    //
     protected InetSocketAddress clientPortAddress;
     protected String dataDir;
     protected String dataLogDir;

@@ -30,7 +30,7 @@ import org.slf4j.LoggerFactory;
 class ZooKeeperServerListenerImpl implements ZooKeeperServerListener {
     private static final Logger LOG = LoggerFactory
             .getLogger(ZooKeeperServerListenerImpl.class);
-
+    // 被监听的zk服务实例类
     private final ZooKeeperServer zkServer;
 
     ZooKeeperServerListenerImpl(ZooKeeperServer zkServer) {

@@ -34,15 +34,21 @@ import org.apache.zookeeper.jmx.ZKMBeanInfo;
 /**
  * Implementation of connection MBean interface.
  */
+// 代表一个客户端的连接
 public class ConnectionBean implements ConnectionMXBean, ZKMBeanInfo {
     private static final Logger LOG = LoggerFactory.getLogger(ConnectionBean.class);
-
+    // 与客户端的连接NIOServerCnxn(默认)
     private final ServerCnxn connection;
+    // 与客户端的连接状态,ServerCnxn实现了Stats
     private final Stats stats;
-
+    // 服务端服务器实例
+    // 如果是learner则是LearnerZooKeeperServer
+    // 如果是leader则是LeaderZooKeeperServer
+    // 如果是readOnly则是ReadOnlyZooKeeperServer
     private final ZooKeeperServer zk;
-    
+    // 客户端的id
     private final String remoteIP;
+    // 客户端的sessionId
     private final long sessionId;
 
     public ConnectionBean(ServerCnxn connection,ZooKeeperServer zk){

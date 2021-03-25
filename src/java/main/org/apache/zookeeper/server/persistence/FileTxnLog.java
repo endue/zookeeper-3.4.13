@@ -125,7 +125,7 @@ public class FileTxnLog implements TxnLog {
         new LinkedList<FileOutputStream>();
     File logFileWrite = null;
     private FilePadding filePadding = new FilePadding();
-
+    // zk服务统计类,来自ZookeeperServer
     private ServerStats serverStats;
 
     /**

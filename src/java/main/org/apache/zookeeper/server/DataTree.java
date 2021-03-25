@@ -76,6 +76,7 @@ public class DataTree {
      * This hashtable provides a fast lookup to the datanodes. The tree is the
      * source of truth and is where all the locking occurs
      */
+    // 内存目录树,记录了路径path和对应的节点信息
     private final ConcurrentHashMap<String, DataNode> nodes =
         new ConcurrentHashMap<String, DataNode>();
 
@@ -84,21 +85,26 @@ public class DataTree {
     private final WatchManager childWatches = new WatchManager();
 
     /** the root of zookeeper tree */
+    // 内存目录树的根截断
     private static final String rootZookeeper = "/";
 
     /** the zookeeper nodes that acts as the management and status node **/
+    // 值为"/zookeeper"
     private static final String procZookeeper = Quotas.procZookeeper;
 
     /** this will be the string thats stored as a child of root */
+    // 值为"zookeeper"
     private static final String procChildZookeeper = procZookeeper.substring(1);
 
     /**
      * the zookeeper quota node that acts as the quota management node for
      * zookeeper
      */
+    // 值为"/zookeeper/quota"
     private static final String quotaZookeeper = Quotas.quotaZookeeper;
 
     /** this will be the string thats stored as a child of /zookeeper */
+    // 值为"quota"
     private static final String quotaChildZookeeper = quotaZookeeper
             .substring(procZookeeper.length() + 1);
 
@@ -110,9 +116,10 @@ public class DataTree {
     /**
      * This hashtable lists the paths of the ephemeral nodes of a session.
      */
+    // 记录临时节点
     private final Map<Long, HashSet<String>> ephemerals =
         new ConcurrentHashMap<Long, HashSet<String>>();
-
+    //
     private final ReferenceCountedACLCache aclCache = new ReferenceCountedACLCache();
 
     @SuppressWarnings("unchecked")
@@ -193,6 +200,7 @@ public class DataTree {
      * This is a pointer to the root of the DataTree. It is the source of truth,
      * but we usually use the nodes hashmap to find nodes in the tree.
      */
+    // 内存目录树的根路径对应的节点
     private DataNode root = new DataNode(null, new byte[0], -1L,
             new StatPersisted());
 
@@ -209,15 +217,23 @@ public class DataTree {
     private DataNode quotaDataNode = new DataNode(procDataNode, new byte[0],
             -1L, new StatPersisted());
 
+    // 初始化内存目录树
+
+    /**
+     * 最近内存目录树结构如下
+     *  /
+     *  ..zookeeper
+     *    ..quota
+     */
     public DataTree() {
         /* Rather than fight it, let root have an alias */
         nodes.put("", root);
+        // 创建"/"路径并添加节点信息
         nodes.put(rootZookeeper, root);
 
         /** add the proc node and quota node */
         root.addChild(procChildZookeeper);
         nodes.put(procZookeeper, procDataNode);
-
         procDataNode.addChild(quotaChildZookeeper);
         nodes.put(quotaZookeeper, quotaDataNode);
     }

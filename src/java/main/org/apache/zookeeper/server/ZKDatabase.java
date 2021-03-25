@@ -65,7 +65,9 @@ public class ZKDatabase {
      * all these members.
      */
     protected DataTree dataTree;
+    // 记录sessionId和对应的过期时间戳
     protected ConcurrentHashMap<Long, Integer> sessionsWithTimeouts;
+    // 事物快照
     protected FileTxnSnapLog snapLog;
     protected long minCommittedLog, maxCommittedLog;
     public static final int commitLogCount = 500;

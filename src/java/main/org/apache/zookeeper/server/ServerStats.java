@@ -27,6 +27,7 @@ import java.util.concurrent.atomic.AtomicLong;
 /**
  * Basic Server Statistics
  */
+// zk服务统计类
 public class ServerStats {
     private long packetsSent;
     // 接收到的完整的数据包的数量
@@ -36,7 +37,7 @@ public class ServerStats {
     private long totalLatency = 0;
     private long count = 0;
     private AtomicLong fsyncThresholdExceedCount = new AtomicLong(0);
-
+    // zk服务器实例类,子类为ZooKeeperServer
     private final Provider provider;
 
     public interface Provider {

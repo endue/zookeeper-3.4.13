@@ -21,6 +21,7 @@ package org.apache.zookeeper.server;
 /**
  * This MBean represents a client connection.
  */
+// 代表一个客户端连接的Bean
 public interface ConnectionMXBean {
     /**
      * @return source (client) IP address
