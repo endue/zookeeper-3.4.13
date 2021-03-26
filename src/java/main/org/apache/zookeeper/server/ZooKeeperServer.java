@@ -783,8 +783,9 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         submitRequest(si);
     }
 
-    // 如果是learner接收到的请求，处理链条为FollowerRequestProcessor -> CommitProcessor -> FinalRequestProcessor
-    // 如果是leader接收到的请求，处理链条为PrepRequestProcessor -> ProposalRequestProcessor -> CommitProcessor -> ToBeAppliedRequestProcessor -> FinalRequestProcessor
+    // 如果是ZooKeeperServer,执行顺序为PrepRequestProcessor -> SyncRequestProcessor -> finalProcessor
+    // 如果是FollowerZookeeperServer,执行顺序为FollowerRequestProcessor -> CommitProcessor -> FinalRequestProcessor
+    // 如果是LeaderZookeeperServer,执行顺序为PrepRequestProcessor -> ProposalRequestProcessor -> CommitProcessor -> ToBeAppliedRequestProcessor -> FinalRequestProcessor
     public void submitRequest(Request si) {
         if (firstProcessor == null) {
             synchronized (this) {

@@ -82,12 +82,12 @@ public class ZooKeeperServerMain {
         }
         // 读取配置到ServerConfig
         ServerConfig config = new ServerConfig();
-        if (args.length == 1) {
+        if (args.length == 1) {// 长度为1,说明是个path,那么以文件路径形式解析
             config.parse(args[0]);
-        } else {
+        } else {// 长度非1,说明是配置的key-value,以键值对方式解析
             config.parse(args);
         }
-
+        // 启动zk
         runFromConfig(config);
     }
 
@@ -96,6 +96,7 @@ public class ZooKeeperServerMain {
      * @param config ServerConfig to use.
      * @throws IOException
      */
+    // 根据配置启动zk
     public void runFromConfig(ServerConfig config) throws IOException {
         LOG.info("Starting server");
         FileTxnSnapLog txnLog = null;

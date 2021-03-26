@@ -165,6 +165,7 @@ public class QuorumPeerConfig {
      * @param path the patch of the configuration file
      * @throws ConfigException error processing configuration
      */
+    // 解析ZooKeeper配置文件
     public void parse(String path) throws ConfigException {
         File configFile = new File(path);
 
@@ -198,6 +199,7 @@ public class QuorumPeerConfig {
      * @throws IOException
      * @throws ConfigException
      */
+    // 加载并解析配置文件
     public void parseProperties(Properties zkProp)
     throws IOException, ConfigException {
         int clientPort = 0;

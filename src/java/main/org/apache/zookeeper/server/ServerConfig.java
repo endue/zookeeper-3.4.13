@@ -38,11 +38,16 @@ public class ServerConfig {
     //// If you update the configuration parameters be sure
     //// to update the "conf" 4letter word
     ////
-    //
+    // 服务器的ip+port
     protected InetSocketAddress clientPortAddress;
+    // 内存中的数据存储成快照文件snapshot的目录
+    // 默认情况下，事务日志也会存储在这里。建议同时配置参数dataLogDir,事务日志的写性能直接影响zk性能
     protected String dataDir;
+    // 事务日志输出目录
     protected String dataLogDir;
+    // zookeeper基本时间单位,默认3000ms
     protected int tickTime = ZooKeeperServer.DEFAULT_TICK_TIME;
+    // 客户端最大连接数
     protected int maxClientCnxns;
     /** defaults to -1 if not set explicitly */
     protected int minSessionTimeout = -1;
@@ -55,13 +60,16 @@ public class ServerConfig {
      * @return ServerConfig configured wrt arguments
      * @throws IllegalArgumentException on invalid usage
      */
+    // 通过代码可以看出,参数args长度要求[2,4]两边都是闭区间
     public void parse(String[] args) {
         if (args.length < 2 || args.length > 4) {
             throw new IllegalArgumentException("Invalid number of arguments:" + Arrays.toString(args));
         }
-
+        // 数组第1个值为端口号
         clientPortAddress = new InetSocketAddress(Integer.parseInt(args[0]));
+        // 数组第2个值为内存数据库快照路径
         dataDir = args[1];
+        // 事务日志的路径
         dataLogDir = dataDir;
         if (args.length >= 3) {
             tickTime = Integer.parseInt(args[2]);
@@ -77,8 +85,10 @@ public class ServerConfig {
      * @return ServerConfig configured wrt arguments
      * @throws ConfigException error processing configuration
      */
+    // 根据路径读取配置文件
     public void parse(String path) throws ConfigException {
         QuorumPeerConfig config = new QuorumPeerConfig();
+        // 解析配置文件
         config.parse(path);
 
         // let qpconfig parse the file and then pull the stuff we are
@@ -90,6 +100,7 @@ public class ServerConfig {
      * Read attributes from a QuorumPeerConfig.
      * @param config
      */
+    // 读取配置文件
     public void readFrom(QuorumPeerConfig config) {
       clientPortAddress = config.getClientPortAddress();
       dataDir = config.getDataDir();
