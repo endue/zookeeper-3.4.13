@@ -67,7 +67,7 @@ public class ZKDatabase {
     protected DataTree dataTree;
     // 记录sessionId和对应的过期时间戳
     protected ConcurrentHashMap<Long, Integer> sessionsWithTimeouts;
-    // 事物快照
+    // FileTxnSnapLog里面记录了数据日志和事物快照的相关类
     protected FileTxnSnapLog snapLog;
     protected long minCommittedLog, maxCommittedLog;
     public static final int commitLogCount = 500;
@@ -83,7 +83,9 @@ public class ZKDatabase {
      * between a filetxnsnaplog and zkdatabase.
      * @param snapLog the FileTxnSnapLog mapping this zkdatabase
      */
+    // 初始化内存目录树
     public ZKDatabase(FileTxnSnapLog snapLog) {
+        // 创建内存目录树对象
         dataTree = new DataTree();
         sessionsWithTimeouts = new ConcurrentHashMap<Long, Integer>();
         this.snapLog = snapLog;

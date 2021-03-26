@@ -105,7 +105,7 @@ public class ZooKeeperServerMain {
             // so rather than spawning another thread, we will just call
             // run() in this thread.
             // create a file logger url from the command line args
-            // 创建zk服务实例类
+            // 1.创建zk服务实例类
             // 调用无参构造方法,初始化好ServerStats和listener
             final ZooKeeperServer zkServer = new ZooKeeperServer();
             // Registers shutdown handler which will be used to know the
@@ -113,7 +113,7 @@ public class ZooKeeperServerMain {
             final CountDownLatch shutdownLatch = new CountDownLatch(1);
             zkServer.registerServerShutdownHandler(
                     new ZooKeeperServerShutdownHandler(shutdownLatch));
-            // 创建数据日志和事物日志快照
+            // 2.创建数据快照和事物日志文件
             txnLog = new FileTxnSnapLog(new File(config.dataLogDir), new File(
                     config.dataDir));
             txnLog.setServerStats(zkServer.serverStats());
@@ -121,17 +121,18 @@ public class ZooKeeperServerMain {
             zkServer.setTickTime(config.tickTime);
             zkServer.setMinSessionTimeout(config.minSessionTimeout);
             zkServer.setMaxSessionTimeout(config.maxSessionTimeout);
-            // 默认初始化NIOServerCnxnFactory
+            // 3.默认初始化NIOServerCnxnFactory
+            // 内部启动NIOServerCnxnFactory和ZooKeeperServer
             cnxnFactory = ServerCnxnFactory.createFactory();
             cnxnFactory.configure(config.getClientPortAddress(),
                     config.getMaxClientCnxns());
             cnxnFactory.startup(zkServer);
             // Watch status of ZooKeeper server. It will do a graceful shutdown
             // if the server is not running or hits an internal error.
-            // 在这里阻塞住,等待shutdownLatch.countDown()被执行
+            // 4.在这里阻塞住,等待shutdownLatch.countDown()被调用
             shutdownLatch.await();
+            // 5.关闭
             shutdown();
-
             cnxnFactory.join();
             if (zkServer.canShutdown()) {
                 zkServer.shutdown(true);

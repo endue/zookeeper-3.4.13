@@ -111,7 +111,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
     protected int maxSessionTimeout = -1;
     // 会话Session跟踪器
     protected SessionTracker sessionTracker;
-    // 事务日志
+    // FileTxnSnapLog里面记录了数据日志和事物快照的相关类
     private FileTxnSnapLog txnLogFactory = null;
     // zk内存数据库
     private ZKDatabase zkDb;
@@ -143,7 +143,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
     final HashMap<String, ChangeRecord> outstandingChangesForPath =
         new HashMap<String, ChangeRecord>();
     // 连接工厂,用来处理用户客户端的连接
-    // 两个实现:NIOServerCnxnFactory和NettyServerCnxnFactory
+    // 两个实现:NIOServerCnxnFactory(默认)和NettyServerCnxnFactory
     private ServerCnxnFactory serverCnxnFactory;
     // zk服务统计类
     private final ServerStats serverStats;
@@ -443,8 +443,9 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         setupRequestProcessors();
 
         registerJMX();
-        // 设置当前zk服务状态
+        // 设置当前zk服务状态为RUNNING
         setState(State.RUNNING);
+        // todo 这里是通知哪里?
         notifyAll();
     }
     // 默认处理链条

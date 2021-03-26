@@ -95,7 +95,7 @@ public abstract class ServerCnxnFactory {
     public abstract void shutdown();
 
     public abstract void start();
-
+    // zk服务器实例对象
     protected ZooKeeperServer zkServer;
     // 选举完成后更新该方法
     // 如果单机模式启动
