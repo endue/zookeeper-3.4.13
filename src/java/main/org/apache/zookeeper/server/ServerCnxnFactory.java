@@ -57,6 +57,7 @@ public abstract class ServerCnxnFactory {
     /**
      * The buffer will cause the connection to be close when we do a send.
      */
+    // 标记连接关闭
     static final ByteBuffer closeConn = ByteBuffer.allocate(0);
 
     public abstract int getLocalPort();

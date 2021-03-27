@@ -331,9 +331,9 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
      * This method will be called inside the ProcessRequestThread, which is a
      * singleton, so there will be a single thread calling this code.
      *
-     * @param type
-     * @param zxid
-     * @param request
+     * @param type 请求类型
+     * @param zxid zxid
+     * @param request 请求
      * @param record
      */
     @SuppressWarnings("unchecked")

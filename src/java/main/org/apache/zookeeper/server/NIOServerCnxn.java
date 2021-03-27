@@ -58,7 +58,7 @@ import org.apache.zookeeper.server.util.OSMXBean;
 // 服务端针对某个客户端的ip+port，会保存一个对应的NIOServerCnxn
 public class NIOServerCnxn extends ServerCnxn {
     static final Logger LOG = LoggerFactory.getLogger(NIOServerCnxn.class);
-
+    //
     NIOServerCnxnFactory factory;
     // 客户端的SocketChannel
     final SocketChannel sock;
@@ -70,7 +70,7 @@ public class NIOServerCnxn extends ServerCnxn {
     ByteBuffer lenBuffer = ByteBuffer.allocate(4);
     // 初始化读取报文数据的buffer
     ByteBuffer incomingBuffer = lenBuffer;
-
+    // 记录待发送的数据
     LinkedBlockingQueue<ByteBuffer> outgoingBuffers = new LinkedBlockingQueue<ByteBuffer>();
 
     int sessionTimeout;
@@ -320,9 +320,10 @@ public class NIOServerCnxn extends ServerCnxn {
                      * with data from the non-direct buffers that we need to
                      * send.
                      */
+                    // 获取直接内存缓冲区并清空,用来存储待发送的数据
                     ByteBuffer directBuffer = factory.directBuffer;
                     directBuffer.clear();
-                    // 遍历outgoingBuffers中待处理的数据
+                    // 1.遍历outgoingBuffers中待处理的数据将数据放入directBuffer,直到directBuffer没有空间
                     for (ByteBuffer b : outgoingBuffers) {
                         // 如果directBuffer中剩余空间不足以放置当前b中的数据
                         if (directBuffer.remaining() < b.remaining()) {
@@ -331,7 +332,9 @@ public class NIOServerCnxn extends ServerCnxn {
                              * small to hold everything, nothing will be copied,
                              * so we've got to slice the buffer if it's too big.
                              */
-                            // 根据当前directBuffer中的剩余空间从b中获取对应大小的数据
+                            // 将b拷贝一份,假设叫b'然后设置b'的limit为当前directBuffer剩余空间的大小
+                            // 拷贝出来的b'和b各自的position和limit不相互受影响
+                            // 最后将b'赋值给b,注意后续操作都是针对拷贝出来的b'进行的
                             b = (ByteBuffer) b.slice().limit(
                                     directBuffer.remaining());
                         }
@@ -342,9 +345,11 @@ public class NIOServerCnxn extends ServerCnxn {
                          * needed), so we save and reset the position after the
                          * copy
                          */
-                        //将b中的数据赋值给directBuffer
+                        // 获取b当前的position
                         int p = b.position();
+                        // 将b中的数据赋值给directBuffer,内部会更新b的position
                         directBuffer.put(b);
+                        // 还原b的position(这里很重要,对下面清空outgoingBuffers有辅助作用)
                         b.position(p);
                         // 没有剩余空间了，跳出当前循环
                         if (directBuffer.remaining() == 0) {
@@ -355,30 +360,43 @@ public class NIOServerCnxn extends ServerCnxn {
                      * Do the flip: limit becomes position, position gets set to
                      * 0. This sets us up for the write.
                      */
-                    // 发送directBuffer中的数据
+                    // 2.准备写数据到socket
+
+                    // 翻转directBuffer
                     directBuffer.flip();
-                    // 获取本次发送的数据大小
+                    // 将directBuffer中的数据写入socket
+                    // 这里返回了已发送的字节数
                     int sent = sock.write(directBuffer);
                     ByteBuffer bb;
 
                     // Remove the buffers that we have sent
+                    // 3.数据已经写入socket,清空directBuffer中已发送的数据
                     while (outgoingBuffers.size() > 0) {
+                        // 非阻塞,没有就返回null,注意这里只是peek并没有出队列
                         bb = outgoingBuffers.peek();
                         if (bb == ServerCnxnFactory.closeConn) {
                             throw new CloseRequestException("close requested");
                         }
+                        // 首先拿出outgoingBuffers队列中的一个ByteBuffer
+                        // 如果该ByteBuffer剩余数据 >  被发送的数据(这个sent下面会递减) 说明出现了拆包
+                        // 当前ByteBuffer只发送了部分数据,更新ByteBuffer的position到未发生数据的初始位置
                         int left = bb.remaining() - sent;
                         if (left > 0) {
                             /*
                              * We only partially sent this buffer, so we update
                              * the position and exit the loop.
                              */
+                            // 更新ByteBuffer的position到未发生数据的初始位置
+                            // 退出while循环,此时的bb是不能从outgoingBuffers队列中剔除的
                             bb.position(bb.position() + sent);
                             break;
                         }
+                        // 统计相关
                         packetSent();
                         /* We've sent the whole buffer, so drop the buffer */
+                        // 由于bb在将数据写入directBuffer后还原了position,所以这里是可以递减的
                         sent -= bb.remaining();
+                        // 从outgoingBuffers队列中剔除这个已经被完成发送出去的ByteBuffer
                         outgoingBuffers.remove();
                     }
                     // ZooLog.logTraceMessage(LOG,
@@ -387,6 +405,7 @@ public class NIOServerCnxn extends ServerCnxn {
                 }
 
                 synchronized(this.factory){
+                    // 记录到发送数据的队列已为空,取消OP_WRITE事件
                     if (outgoingBuffers.size() == 0) {
                         if (!initialized
                                 && (sk.interestOps() & SelectionKey.OP_READ) == 0) {
@@ -394,6 +413,7 @@ public class NIOServerCnxn extends ServerCnxn {
                         }
                         sk.interestOps(sk.interestOps()
                                 & (~SelectionKey.OP_WRITE));
+                    // 如果不为空,继续监听OP_WRITE事件
                     } else {
                         sk.interestOps(sk.interestOps()
                                 | SelectionKey.OP_WRITE);

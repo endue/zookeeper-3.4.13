@@ -367,6 +367,7 @@ public abstract class ServerCnxn implements Stats, Watcher {
     protected final Date established = new Date();
     // 接收到的完整的数据包数量
     protected final AtomicLong packetsReceived = new AtomicLong();
+    // 记录已发送的数据包的数量
     protected final AtomicLong packetsSent = new AtomicLong();
 
     protected long minLatency;

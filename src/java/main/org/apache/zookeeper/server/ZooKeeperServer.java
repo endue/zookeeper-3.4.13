@@ -387,13 +387,16 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             super(msg);
         }
     }
-    
+
+    // 更新一下session
     void touch(ServerCnxn cnxn) throws MissingSessionException {
         if (cnxn == null) {
             return;
         }
+        // 获取sessionid和超时时间
         long id = cnxn.getSessionId();
         int to = cnxn.getSessionTimeout();
+        // touch session
         if (!sessionTracker.touchSession(id, to)) {
             throw new MissingSessionException(
                     "No session with sessionid 0x" + Long.toHexString(id)
@@ -663,7 +666,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         to.putInt(timeout);
         // 设置sessionId到ServerCnxn
         cnxn.setSessionId(sessionId);
-        // 封装createSession响应
+        // 封装Request准备递交给责任链来处理
         submitRequest(cnxn, sessionId, OpCode.createSession, 0, to, null);
         return sessionId;
     }
@@ -780,6 +783,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
      */
     private void submitRequest(ServerCnxn cnxn, long sessionId, int type,
             int xid, ByteBuffer bb, List<Id> authInfo) {
+        // 创建一个在责任链中传递的请求
         Request si = new Request(cnxn, sessionId, xid, type, bb, authInfo);
         submitRequest(si);
     }
@@ -809,6 +813,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         try {
             // 更新session
             touch(si.cnxn);
+            // 验证请求类型
             boolean validpacket = Request.isValid(si.type);
             if (validpacket) {
                 // 子类会覆盖firstProcessor的初始化
@@ -955,7 +960,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
     public void processConnectRequest(ServerCnxn cnxn, ByteBuffer incomingBuffer) throws IOException {
         // 包装数据到BinaryInputArchive中
         BinaryInputArchive bia = BinaryInputArchive.getArchive(new ByteBufferInputStream(incomingBuffer));
-        // 解析ByteBuffer中的数据到ConnectRequest
+        // 解析客户端发送过来的ConnectRequest
         ConnectRequest connReq = new ConnectRequest();
         connReq.deserialize(bia, "connect");
         if (LOG.isDebugEnabled()) {

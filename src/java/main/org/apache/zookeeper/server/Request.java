@@ -35,6 +35,7 @@ import org.apache.zookeeper.txn.TxnHeader;
  * RequestProcessors. There are various pieces of information that is tacked
  * onto the request as it is processed.
  */
+// 一个请求在处理链中的结构,在处理过程中会被添加上各种各样的信息
 public class Request {
     private static final Logger LOG = LoggerFactory.getLogger(Request.class);
 
@@ -69,11 +70,13 @@ public class Request {
         this.cnxn = null;
         this.authInfo = null;
     }
-
+    // sessionID
     public final long sessionId;
-
+    //
     public final int cxid;
-
+    /**
+     *  Request类型,{@link org.apache.zookeeper.ZooDefs.OpCode }
+     */
     public final int type;
 
     public final ByteBuffer request;

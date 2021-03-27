@@ -29,6 +29,7 @@ import java.util.concurrent.atomic.AtomicLong;
  */
 // zk服务统计类
 public class ServerStats {
+    // 已发送的数据包的数量
     private long packetsSent;
     // 接收到的完整的数据包的数量
     private long packetsReceived;
