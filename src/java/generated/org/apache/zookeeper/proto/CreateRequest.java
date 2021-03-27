@@ -21,11 +21,27 @@ package org.apache.zookeeper.proto;
 
 import org.apache.jute.*;
 import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.zookeeper.CreateMode;
+import org.apache.zookeeper.ZooDefs;
+
 @InterfaceAudience.Public
+// 创建节点请求
 public class CreateRequest implements Record {
+  /**
+   *  根路径
+   */
   private String path;
+  /**
+   * 携带的数据
+   */
   private byte[] data;
+  /**
+   * acl,参考 {@link ZooDefs.Ids}
+   */
   private java.util.List<org.apache.zookeeper.data.ACL> acl;
+  /**
+   * 创建zk节点的类型,参考 {@link CreateMode}
+   */
   private int flags;
   public CreateRequest() {
   }
@@ -63,7 +79,15 @@ public class CreateRequest implements Record {
   public void setFlags(int m_) {
     flags=m_;
   }
+
+  /**
+   * 序列化
+   * @param a_
+   * @param tag
+   * @throws java.io.IOException
+   */
   public void serialize(OutputArchive a_, String tag) throws java.io.IOException {
+    // 设置开始标签
     a_.startRecord(this,tag);
     a_.writeString(path,"path");
     a_.writeBuffer(data,"data");
@@ -78,8 +102,16 @@ public class CreateRequest implements Record {
       a_.endVector(acl,"acl");
     }
     a_.writeInt(flags,"flags");
+    // 设置结束标签
     a_.endRecord(this,tag);
   }
+
+  /**
+   * 反序列化
+   * @param a_
+   * @param tag
+   * @throws java.io.IOException
+   */
   public void deserialize(InputArchive a_, String tag) throws java.io.IOException {
     a_.startRecord(tag);
     path=a_.readString("path");

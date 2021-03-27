@@ -26,6 +26,7 @@ import org.apache.zookeeper.KeeperException;
  *  CreateMode value determines how the znode is created on ZooKeeper.
  */
 @InterfaceAudience.Public
+// zk客户端创建节点时决定节点的类型
 public enum CreateMode {
     
     /**

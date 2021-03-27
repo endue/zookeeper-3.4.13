@@ -663,7 +663,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         to.putInt(timeout);
         // 设置sessionId到ServerCnxn
         cnxn.setSessionId(sessionId);
-        // 封装请求
+        // 封装createSession响应
         submitRequest(cnxn, sessionId, OpCode.createSession, 0, to, null);
         return sessionId;
     }

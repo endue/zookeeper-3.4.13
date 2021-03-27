@@ -707,6 +707,8 @@ public class ZooKeeper {
      * @param clientPath path to the node
      * @return server view of the path (chroot prepended to client path)
      */
+    // 如果用户创建zk客户端时选择了某个路径作为根路径,
+    // 此方法就是将该根路径添加到当前用户操作的路径前
     private String prependChroot(String clientPath) {
         if (cnxn.chrootPath != null) {
             // handle clientPath = "/"
@@ -768,39 +770,52 @@ public class ZooKeeper {
      * @param createMode
      *                specifying whether the node to be created is ephemeral
      *                and/or sequential
-     * @return the actual path of the created node
+     * @return the actual path of the created node 创建节点的实际路径
      * @throws KeeperException if the server returns a non-zero error code
      * @throws KeeperException.InvalidACLException if the ACL is invalid, null, or empty
      * @throws InterruptedException if the transaction is interrupted
      * @throws IllegalArgumentException if an invalid path is specified
      */
-    // 创建节点
+    /**
+     * 同步创建节点
+     */
     public String create(final String path, byte data[], List<ACL> acl,
             CreateMode createMode)
         throws KeeperException, InterruptedException
     {
         final String clientPath = path;
+        // 验证路径
         PathUtils.validatePath(clientPath, createMode.isSequential());
-
+        // 根据用户选择的根路径拼接完整的操作路径
         final String serverPath = prependChroot(clientPath);
-        // 封装一个请求
+        // 1.创建一个请求头
         RequestHeader h = new RequestHeader();
+        // 1-1.设置请求头类型为OpCode.create
         h.setType(ZooDefs.OpCode.create);
+        // 2.创建请求
         CreateRequest request = new CreateRequest();
+        // 3.创建响应
         CreateResponse response = new CreateResponse();
+        // 2-1.请求携带的数据
         request.setData(data);
+        // 2-2.请求对应zk中node节点的模式
         request.setFlags(createMode.toFlag());
+        // 2-3.请求操作的根路径
         request.setPath(serverPath);
+        // acl校验不允许为空
         if (acl != null && acl.size() == 0) {
             throw new KeeperException.InvalidACLException();
         }
+        // 2-4.请求的ack
         request.setAcl(acl);
-        // 提交请求
+        // 3.提交请求
         ReplyHeader r = cnxn.submitRequest(h, request, response, null);
+        // 4.处理响应
         if (r.getErr() != 0) {
             throw KeeperException.create(KeeperException.Code.get(r.getErr()),
                     clientPath);
         }
+        // 4-1.返回创建节点的实际路径
         if (cnxn.chrootPath == null) {
             return response.getPath();
         } else {
@@ -813,7 +828,9 @@ public class ZooKeeper {
      *
      * @see #create(String, byte[], List, CreateMode)
      */
-
+    /**
+     * 异步创建节点
+     */
     public void create(final String path, byte data[], List<ACL> acl,
             CreateMode createMode,  StringCallback cb, Object ctx)
     {
@@ -831,6 +848,7 @@ public class ZooKeeper {
         request.setFlags(createMode.toFlag());
         request.setPath(serverPath);
         request.setAcl(acl);
+        // 不同于同步,这里直接调用了cnxn.queuePacket()
         cnxn.queuePacket(h, r, request, response, cb, clientPath,
                 serverPath, ctx, null);
     }

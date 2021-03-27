@@ -56,12 +56,15 @@ abstract class ClientCnxnSocket {
      * readLength() to receive the full message.
      */
     protected ByteBuffer incomingBuffer = lenBuffer;
-    // 发送的数据包的数量
+    // 记录从outgoingQueue队列中发送出去的数据包的数量
     protected long sentCount = 0;
     // 接收到的数据包数量
     protected long recvCount = 0;
+    // 最后一次发送心跳的时间戳
     protected long lastHeard;
+    // 最后一次发送消息的时间戳
     protected long lastSend;
+    // 当前时间戳
     protected long now;
     // 设置SendThread,在Clientcnxn运行SendThread时,传入该值
     protected ClientCnxn.SendThread sendThread;
@@ -121,7 +124,7 @@ abstract class ClientCnxnSocket {
         incomingBuffer = ByteBuffer.allocate(len);
     }
 
-    // 读取Connect后,zkServer的响应
+    // 读取ConnectResponse
     void readConnectResult() throws IOException {
         if (LOG.isTraceEnabled()) {
             StringBuilder buf = new StringBuilder("0x[");
@@ -148,6 +151,7 @@ abstract class ClientCnxnSocket {
         }
         // 获取sessionId
         this.sessionId = conRsp.getSessionId();
+        // 初始化响应后的连接
         sendThread.onConnected(conRsp.getTimeOut(), this.sessionId,
                 conRsp.getPasswd(), isRO);
     }

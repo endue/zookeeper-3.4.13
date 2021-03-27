@@ -117,7 +117,7 @@ public class FinalRequestProcessor implements RequestProcessor {
                     zks.outstandingChangesForPath.remove(cr.path);
                 }
             }
-            // hdr不为空，说明是写请求
+            // hdr不为空
             if (request.hdr != null) {
                TxnHeader hdr = request.hdr;
                Record txn = request.txn;

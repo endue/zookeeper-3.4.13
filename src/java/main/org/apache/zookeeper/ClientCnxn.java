@@ -110,6 +110,8 @@ public class ClientCnxn {
      * Clients automatically reset watches during session reconnect, this
      * option allows the client to turn off this behavior by setting
      * the environment variable "zookeeper.disableAutoWatchReset" to "true" */
+    // 在zk客户端建立连接后,如果watcher不为空,是否重新注册
+    // 在Client自动切换ZKServer或重连时，尚未触发的watcher能够带到新的Server上
     private static boolean disableAutoWatchReset;
     static {
         // this var should not be public, but otw there is no easy way
@@ -155,7 +157,7 @@ public class ClientCnxn {
      * been increased/decreased by the server which applies bounds to this
      * value.
      */
-    //
+    // 客户端与服务端建立连接后协商的session超时时间
     private volatile int negotiatedSessionTimeout;
     // 客户端的读取超时时间,默认sessionTimeout * 2 / 3
     private int readTimeout;
@@ -191,11 +193,13 @@ public class ClientCnxn {
      * connection (client sends session disconnect to server as part of close
      * operation)
      */
+    // 是否发送了关闭连接请求,则设置该标识为true
     private volatile boolean closing = false;
     
     /**
      * A set of ZooKeeper hosts this client could connect to.
      */
+    // 内部记录的zkServer列表
     private final HostProvider hostProvider;
 
     /**
@@ -254,29 +258,32 @@ public class ClientCnxn {
      */
     // 数据包
     static class Packet {
+        // 请求头
         RequestHeader requestHeader;
-
+        // 响应头
         ReplyHeader replyHeader;
-
+        // 请求实体
         Record request;
-
+        // 响应实体
         Record response;
-
+        // 数据
         ByteBuffer bb;
 
         /** Client's view of the path (may differ due to chroot) **/
+        // 客户端操作的路径(比如:/test1)
         String clientPath;
         /** Servers's view of the path (may differ due to chroot) **/
+        // 服务端实际的路径(比如:/stu/test1,因为客户端可以设置{@link ClientCnxn#chrootPath} )
         String serverPath;
-
+        // 是否完成标识符
         boolean finished;
-
+        // 回调
         AsyncCallback cb;
-
+        //
         Object ctx;
-
+        //
         WatchRegistration watchRegistration;
-
+        // 是否只读
         public boolean readOnly;
 
         /** Convenience ctor */
@@ -299,6 +306,19 @@ public class ClientCnxn {
             this.watchRegistration = watchRegistration;
         }
 
+        /**
+         * 将数据包的数据写入到bb中
+         * 1.header 请求头
+         * 2.
+         *  2.1 如果是ConnectRequest
+         *      connect
+         *      readOnly
+         *  2.2如果非ConnectRequest并且request不为空
+         *      request
+         * 3.len 数据包长度
+         *
+         */
+        // 根据request请求创建不同的格式的ByteBuffer
         public void createBB() {
             try {
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
@@ -307,6 +327,7 @@ public class ClientCnxn {
                 if (requestHeader != null) {
                     requestHeader.serialize(boa, "header");
                 }
+                // 更新不同的请求,调用不同的序列化方法
                 if (request instanceof ConnectRequest) {
                     request.serialize(boa, "connect");
                     // append "am-I-allowed-to-be-readonly" flag
@@ -403,6 +424,7 @@ public class ClientCnxn {
 
         connectTimeout = sessionTimeout / hostProvider.size();
         readTimeout = sessionTimeout * 2 / 3;
+        // 是否我只读模式
         readOnly = canBeReadOnly;
         // 负责基于底层socket与服务端进行通信，发送数据
         sendThread = new SendThread(clientCnxnSocket);
@@ -456,6 +478,7 @@ public class ClientCnxn {
 
     // 负责事件
     class EventThread extends ZooKeeperThread {
+        // 事件队列
         private final LinkedBlockingQueue<Object> waitingEvents =
             new LinkedBlockingQueue<Object>();
 
@@ -473,6 +496,10 @@ public class ClientCnxn {
             setDaemon(true);
         }
 
+        /**
+         * 事件入队列
+         * @param event
+         */
         public void queueEvent(WatchedEvent event) {
             if (event.getType() == EventType.None
                     && sessionState == event.getState()) {
@@ -489,6 +516,10 @@ public class ClientCnxn {
             waitingEvents.add(pair);
         }
 
+        /**
+         * 响应队列
+         * @param packet
+         */
        public void queuePacket(Packet packet) {
           if (wasKilled) {
              synchronized (waitingEvents) {
@@ -500,15 +531,20 @@ public class ClientCnxn {
           }
        }
 
+       // 将eventOfDeath放入事件等待队列
         public void queueEventOfDeath() {
             waitingEvents.add(eventOfDeath);
         }
 
+        /**
+         * 处理事件
+         */
         @Override
         public void run() {
            try {
               isRunning = true;
               while (true) {
+                  // 获取事件
                  Object event = waitingEvents.take();
                  if (event == eventOfDeath) {
                     wasKilled = true;
@@ -651,16 +687,18 @@ public class ClientCnxn {
        }
     }
 
+    // 完成数据包的处理
     private void finishPacket(Packet p) {
         if (p.watchRegistration != null) {
             p.watchRegistration.register(p.replyHeader.getErr());
         }
-
+        // 没有回调,同步发送消息,唤醒等待并设置Packet完成了处理流程
         if (p.cb == null) {
             synchronized (p) {
                 p.finished = true;
                 p.notifyAll();
             }
+        // 有回调执行回调,生成事件交给eventThread线程来处理
         } else {
             p.finished = true;
             eventThread.queuePacket(p);
@@ -740,7 +778,7 @@ public class ClientCnxn {
         private long lastPingSentNs;
         // 与zk服务端连接的socket
         private final ClientCnxnSocket clientCnxnSocket;
-        //
+
         private Random r = new Random(System.nanoTime());
         // 是否为第一次连接
         private boolean isFirstConnect = true;
@@ -751,8 +789,9 @@ public class ClientCnxn {
                     incomingBuffer);
             BinaryInputArchive bbia = BinaryInputArchive.getArchive(bbis);
             ReplyHeader replyHdr = new ReplyHeader();
-
+            // 读取响应
             replyHdr.deserialize(bbia, "header");
+            // 如果响应中的xid为-1表示ping的响应,不处理
             if (replyHdr.getXid() == -2) {
                 // -2 is the xid for pings
                 if (LOG.isDebugEnabled()) {
@@ -764,10 +803,14 @@ public class ClientCnxn {
                 }
                 return;
             }
+            // 如果响应中的xid为-4表示,表示Auth响应,读取响应触发事件
             if (replyHdr.getXid() == -4) {
-                // -4 is the xid for AuthPacket               
+                // -4 is the xid for AuthPacket
+                // 认证失败
                 if(replyHdr.getErr() == KeeperException.Code.AUTHFAILED.intValue()) {
-                    state = States.AUTH_FAILED;                    
+                    // 修改状态
+                    state = States.AUTH_FAILED;
+                    // 触发事件
                     eventThread.queueEvent( new WatchedEvent(Watcher.Event.EventType.None, 
                             Watcher.Event.KeeperState.AuthFailed, null) );            		            		
                 }
@@ -777,12 +820,14 @@ public class ClientCnxn {
                 }
                 return;
             }
+            // 如果响应中的xid为-4表示,表示一个事件通知
             if (replyHdr.getXid() == -1) {
                 // -1 means notification
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Got notification sessionid:0x"
                         + Long.toHexString(sessionId));
                 }
+                // 去读事件
                 WatcherEvent event = new WatcherEvent();
                 event.deserialize(bbia, "response");
 
@@ -799,7 +844,7 @@ public class ClientCnxn {
                     			+ chrootPath);
                     }
                 }
-
+                // 将事件交给eventThread来处理
                 WatchedEvent we = new WatchedEvent(event);
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Got " + we + " for sessionid 0x"
@@ -813,6 +858,7 @@ public class ClientCnxn {
             // If SASL authentication is currently in progress, construct and
             // send a response packet immediately, rather than queuing a
             // response as with other packets.
+            // todo 认证什么
             if (clientTunneledAuthenticationInProgress()) {
                 GetSASLRequest request = new GetSASLRequest();
                 request.deserialize(bbia,"token");
@@ -821,6 +867,7 @@ public class ClientCnxn {
                 return;
             }
 
+            // 读取pendingQueue中已发送但是还未收到响应的数据包
             Packet packet;
             synchronized (pendingQueue) {
                 if (pendingQueue.size() == 0) {
@@ -830,10 +877,13 @@ public class ClientCnxn {
                 packet = pendingQueue.remove();
             }
             /*
-             * Since requests are processed in order, we better get a response
+             * Since requests are processed in order, we better get a response to the first request!
              * to the first request!
              */
             try {
+                // 请求是按照顺序处理的,那么响应应该对应上
+
+                // 校验响应中的xid和请求中的xid是否一致,如果不一致抛出异常
                 if (packet.requestHeader.getXid() != replyHdr.getXid()) {
                     packet.replyHeader.setErr(
                             KeeperException.Code.CONNECTIONLOSS.intValue());
@@ -845,13 +895,15 @@ public class ClientCnxn {
                             + " for a packet with details: "
                             + packet );
                 }
-
+                // 从请求中获取响应的一些信息更新到请求数据包对应的ReplyHeader中
                 packet.replyHeader.setXid(replyHdr.getXid());
                 packet.replyHeader.setErr(replyHdr.getErr());
                 packet.replyHeader.setZxid(replyHdr.getZxid());
+                // 更新zxid
                 if (replyHdr.getZxid() > 0) {
                     lastZxid = replyHdr.getZxid();
                 }
+                // 读取服务端的response到请求数据包对应的response中
                 if (packet.response != null && replyHdr.getErr() == 0) {
                     packet.response.deserialize(bbia, "response");
                 }
@@ -861,6 +913,7 @@ public class ClientCnxn {
                             + Long.toHexString(sessionId) + ", packet:: " + packet);
                 }
             } finally {
+                // 完成
                 finishPacket(packet);
             }
         }
@@ -897,7 +950,7 @@ public class ClientCnxn {
                      + ", initiating session");
             isFirstConnect = false;
             long sessId = (seenRwServerBefore) ? sessionId : 0;
-            // 创建ConnectRequest
+            // 1.创建ConnectRequest
             ConnectRequest conReq = new ConnectRequest(0, lastZxid,
                     sessionTimeout, sessId, sessionPasswd);
             synchronized (outgoingQueue) {
@@ -961,6 +1014,7 @@ public class ClientCnxn {
                             OpCode.auth), null, new AuthPacket(0, id.scheme,
                             id.data), null, null));
                 }
+                // 最好将ConnectRequest添加到队列头部
                 outgoingQueue.addFirst(new Packet(null, null, conReq,
                             null, null, readOnly));
             }
@@ -1006,7 +1060,7 @@ public class ClientCnxn {
         // Set to true if and only if constructor of ZooKeeperSaslClient
         // throws a LoginException: see startConnect() below.
         private boolean saslLoginFailed = false;
-        // 初始化连接
+        // 初始化连接,更新状态为CONNECTING
         private void startConnect(InetSocketAddress addr) throws IOException {
             // initializing it for new connection
             saslLoginFailed = false;
@@ -1077,20 +1131,21 @@ public class ClientCnxn {
                             }
                         }
                         // don't re-establish connection if we are closing
-                        // 客户端也关闭了,退出while循环检测
+                        // 客户端关闭了,退出while循环检测
                         if (closing || !state.isAlive()) {
                             break;
                         }
-                        //
+                        // 读取zkserver地址
                         if (rwServerAddress != null) {
                             serverAddress = rwServerAddress;
                             rwServerAddress = null;
                         } else {
+                            // 从服务器列表中选择一个
                             serverAddress = hostProvider.next(1000);
                         }
-                        // 建立socket连接
+                        // 建立socket连接,更新状态为CONNECTING
                         startConnect(serverAddress);
-                        // 更新一下发送和心跳的时间
+                        // 更新一下发送和心跳的时间戳
                         clientCnxnSocket.updateLastSendAndHeard();
                     }
                     // 2.2 超时检测
@@ -1318,19 +1373,20 @@ public class ClientCnxn {
         /**
          * Callback invoked by the ClientCnxnSocket once a connection has been
          * established.
-         * 
-         * @param _negotiatedSessionTimeout
-         * @param _sessionId
-         * @param _sessionPasswd
-         * @param isRO
+         * zk客户端与服务端建立连接完成后，由ClientCnxnSocket回调
+         * @param _negotiatedSessionTimeout 响应中的session超时时间戳
+         * @param _sessionId sessionID
+         * @param _sessionPasswd session密码
+         * @param isRO read-only标识符
          * @throws IOException
          */
         void onConnected(int _negotiatedSessionTimeout, long _sessionId,
                 byte[] _sessionPasswd, boolean isRO) throws IOException {
             negotiatedSessionTimeout = _negotiatedSessionTimeout;
+            // 关闭连接
             if (negotiatedSessionTimeout <= 0) {
                 state = States.CLOSED;
-
+                // 触发事件
                 eventThread.queueEvent(new WatchedEvent(
                         Watcher.Event.EventType.None,
                         Watcher.Event.KeeperState.Expired, null));
@@ -1345,7 +1401,9 @@ public class ClientCnxn {
             if (!readOnly && isRO) {
                 LOG.error("Read/write client got connected to read-only server");
             }
+            // 初始化读超时时间
             readTimeout = negotiatedSessionTimeout * 2 / 3;
+            // 初始化连接超时时间
             connectTimeout = negotiatedSessionTimeout / hostProvider.size();
             hostProvider.onConnected();
             sessionId = _sessionId;
@@ -1360,6 +1418,7 @@ public class ClientCnxn {
                     + (isRO ? " (READ-ONLY mode)" : ""));
             KeeperState eventState = (isRO) ?
                     KeeperState.ConnectedReadOnly : KeeperState.SyncConnected;
+            // 触发事件
             eventThread.queueEvent(new WatchedEvent(
                     Watcher.Event.EventType.None,
                     eventState, null));
@@ -1376,17 +1435,20 @@ public class ClientCnxn {
 
         public boolean clientTunneledAuthenticationInProgress() {
             // 1. SASL client is disabled.
+            // 1.如果禁用了SASL客户端,返回false,默认true
             if (!ZooKeeperSaslClient.isEnabled()) {
                 return false;
             }
 
             // 2. SASL login failed.
+            // 2. 如果SASL登录失败,返回false
             if (saslLoginFailed == true) {
                 return false;
             }
 
             // 3. SendThread has not created the authenticating object yet,
             // therefore authentication is (at the earliest stage of being) in progress.
+            // 如果SASL客户端没有初始化返回false
             if (zooKeeperSaslClient == null) {
                 return true;
             }
@@ -1439,7 +1501,7 @@ public class ClientCnxn {
             disconnect();
         }
     }
-
+    // 客户端每次发送请求时携带的xid,自增
     private int xid = 1;
 
     // @VisibleForTesting
@@ -1454,6 +1516,15 @@ public class ClientCnxn {
         return xid++;
     }
 
+    /**
+     * 提交请求
+     * @param h 请求头
+     * @param request 请求
+     * @param response 响应
+     * @param watchRegistration 创建节点时为null
+     * @return
+     * @throws InterruptedException
+     */
     public ReplyHeader submitRequest(RequestHeader h, Record request,
             Record response, WatchRegistration watchRegistration)
             throws InterruptedException {
@@ -1461,12 +1532,13 @@ public class ClientCnxn {
         // 发送请求，只是保存到outgoingQueue中并唤醒sendThread
         Packet packet = queuePacket(h, r, request, response, null, null, null,
                     null, watchRegistration);
-        // 同步等待
+        // 同步等待,当收到服务端响应后会唤醒wait()并设置finished为true
         synchronized (packet) {
             while (!packet.finished) {
                 packet.wait();
             }
         }
+        // 返回响应
         return r;
     }
 
@@ -1491,6 +1563,19 @@ public class ClientCnxn {
         sendThread.sendPacket(p);
     }
 
+    /**
+     * 提交请求到队列
+     * @param h 请求头
+     * @param r 响应头
+     * @param request 请求体
+     * @param response 响应体
+     * @param cb 异步回调
+     * @param clientPath  客户端操作的路径(比如:/test1)
+     * @param serverPath  服务端实际的路径(比如:/stu/test1,因为客户端可以设置{@link ClientCnxn#chrootPath} )
+     * @param ctx
+     * @param watchRegistration
+     * @return
+     */
     Packet queuePacket(RequestHeader h, ReplyHeader r, Record request,
             Record response, AsyncCallback cb, String clientPath,
             String serverPath, Object ctx, WatchRegistration watchRegistration)
@@ -1501,22 +1586,29 @@ public class ClientCnxn {
         // generated later at send-time, by an implementation of ClientCnxnSocket::doIO(),
         // where the packet is actually sent.
         synchronized (outgoingQueue) {
+            // 1.封装一个数据包
             packet = new Packet(h, r, request, response, watchRegistration);
             packet.cb = cb;
             packet.ctx = ctx;
             packet.clientPath = clientPath;
             packet.serverPath = serverPath;
+            // 服务端关闭,理解判断是否需要生成响应
             if (!state.isAlive() || closing) {
                 conLossPacket(packet);
             } else {
                 // If the client is asking to close the session then
                 // mark as closing
+                // 如果是关闭连接请求,设置closing标识为true
                 if (h.getType() == OpCode.closeSession) {
                     closing = true;
                 }
+                // 2.将数据包记录到outgoingQueue队列中
                 outgoingQueue.add(packet);
             }
         }
+        /**
+         * 理解唤醒bio,在org.apache.zookeeper.ClientCnxnSocketNIO#doTransport方法中有个阻塞等待事件
+         */
         sendThread.getClientCnxnSocket().wakeupCnxn();
         return packet;
     }

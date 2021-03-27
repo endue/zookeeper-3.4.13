@@ -22,6 +22,7 @@ package org.apache.zookeeper.proto;
 import org.apache.jute.*;
 import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Public
+// 创建节点响应
 public class CreateResponse implements Record {
   private String path;
   public CreateResponse() {

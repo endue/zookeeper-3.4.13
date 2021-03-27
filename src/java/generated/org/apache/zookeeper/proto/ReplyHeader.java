@@ -22,8 +22,11 @@ package org.apache.zookeeper.proto;
 import org.apache.jute.*;
 import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Public
+// 响应头实体
 public class ReplyHeader implements Record {
+  // 响应中的xid
   private int xid;
+  //
   private long zxid;
   private int err;
   public ReplyHeader() {

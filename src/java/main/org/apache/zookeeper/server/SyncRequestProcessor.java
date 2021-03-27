@@ -182,7 +182,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
                             // 重置logCount
                             logCount = 0;
                         }
-                    // 请求中的hdr为null，会走到这里，也就是读请求
+                    // 请求中的hdr为null，会走到这里
                     } else if (toFlush.isEmpty()) {
                         // optimization for read heavy workloads
                         // iff this is a read, and there are no pending

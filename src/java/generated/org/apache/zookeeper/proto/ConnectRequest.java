@@ -21,12 +21,19 @@ package org.apache.zookeeper.proto;
 
 import org.apache.jute.*;
 import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.zookeeper.ClientCnxn;
+
 @InterfaceAudience.Public
 public class ConnectRequest implements Record {
+  // 协议版本号,写死的0
   private int protocolVersion;
+  // 客户端记录的lastZxid
   private long lastZxidSeen;
+  // 客户端的session超时时间戳
   private int timeOut;
+  // sessionId
   private long sessionId;
+  // 密码
   private byte[] passwd;
   public ConnectRequest() {
   }
@@ -72,7 +79,16 @@ public class ConnectRequest implements Record {
   public void setPasswd(byte[] m_) {
     passwd=m_;
   }
+
+  /**
+   * 序列化
+   * 参考:{@link ClientCnxn.Packet#createBB()}
+   * @param a_
+   * @param tag
+   * @throws java.io.IOException
+   */
   public void serialize(OutputArchive a_, String tag) throws java.io.IOException {
+    // 设置开始标签为 request
     a_.startRecord(this,tag);
     a_.writeInt(protocolVersion,"protocolVersion");
     a_.writeLong(lastZxidSeen,"lastZxidSeen");
@@ -81,6 +97,13 @@ public class ConnectRequest implements Record {
     a_.writeBuffer(passwd,"passwd");
     a_.endRecord(this,tag);
   }
+
+  /**
+   * 反序列化
+   * @param a_
+   * @param tag
+   * @throws java.io.IOException
+   */
   public void deserialize(InputArchive a_, String tag) throws java.io.IOException {
     a_.startRecord(tag);
     protocolVersion=a_.readInt("protocolVersion");

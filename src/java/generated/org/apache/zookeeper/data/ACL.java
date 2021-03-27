@@ -21,9 +21,18 @@ package org.apache.zookeeper.data;
 
 import org.apache.jute.*;
 import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.zookeeper.ZooDefs;
+
 @InterfaceAudience.Public
+// 权限控制
 public class ACL implements Record {
+  /**
+   * 参考{@link ZooDefs.Perms}
+   */
   private int perms;
+  /**
+   * 参考 {@link }
+   */
   private org.apache.zookeeper.data.Id id;
   public ACL() {
   }

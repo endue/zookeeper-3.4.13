@@ -42,6 +42,7 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
 
     private final Selector selector = Selector.open();
     // 在cleanup()方法中会被置为null
+    // 初始化连接后会被赋值,参考registerAndConnect()方法
     private SelectionKey sockKey;
 
     ClientCnxnSocketNIO() throws IOException {
@@ -88,7 +89,7 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
                     readLength();
                 // 如果客户端和zkServer直接还没有初始化
                 } else if (!initialized) {
-                    // 读取Connect的服务端的回复
+                    // 读取ConnectRequest对应的服务端发送过来的响应ConnectResponse
                     readConnectResult();
                     // 增加OP_READ事件监听
                     enableRead();
@@ -119,6 +120,7 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
         // 如果是OP_WRITE事件
         if (sockKey.isWritable()) {
             synchronized(outgoingQueue) {
+                // 1.查找ConnectRequest的数据包
                 Packet p = findSendablePacket(outgoingQueue,
                         cnxn.sendThread.clientTunneledAuthenticationInProgress());
 
@@ -126,24 +128,34 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
                     updateLastSend();
                     // If we already started writing p, p.bb will already exist
                     if (p.bb == null) {
+                        // 如果请求头不为null,不是ConnectRequest数据包
+                        // 如果请求头不为ping,不是ping数据包
+                        // 如果请求头不为auth,不是auth数据包
                         if ((p.requestHeader != null) &&
                                 (p.requestHeader.getType() != OpCode.ping) &&
                                 (p.requestHeader.getType() != OpCode.auth)) {
+                            // 设置请求头中的xid
                             p.requestHeader.setXid(cnxn.getXid());
                         }
-                        // 封装数据包到p.bb中
+                        // 组装数据到p.bb中
                         p.createBB();
                     }
                     // 将数据写入socket
                     sock.write(p.bb);
                     // 处理发送数据时的拆包问题
                     if (!p.bb.hasRemaining()) {
+                        // 走到这里说明数据发送完毕
+                        // 发送数+1
                         sentCount++;
                         // 从outgoingQueue中取出来，放到pendingQueue中
                         outgoingQueue.removeFirstOccurrence(p);
+                        // 如果请求头不为null,不是ConnectRequest数据包
+                        // 如果请求头不为ping,不是ping数据包
+                        // 如果请求头不为auth,不是auth数据包
                         if (p.requestHeader != null
                                 && p.requestHeader.getType() != OpCode.ping
                                 && p.requestHeader.getType() != OpCode.auth) {
+                            // 将以发送的数据包添加到pendingQueue队列中
                             synchronized (pendingQueue) {
                                 pendingQueue.add(p);
                             }
@@ -178,6 +190,15 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
         }
     }
 
+    /**
+     * 因为ConnectRequest需要发送到SASL authentication进行处理，其他Packet都需要等待直到该处理完成，
+     * ConnectRequest必须第一个处理，所以找出它并且把它放到OutgoingQueue头,也就是requestheader=null的那个
+     * 初始化ConnectRequest:new ConnectRequest(0, lastZxid, sessionTimeout, sessId, sessionPasswd)
+     * 初始化对应的Packet:new Packet(null, null, conReq,null, null, readOnly)
+     * @param outgoingQueue
+     * @param clientTunneledAuthenticationInProgress
+     * @return
+     */
     private Packet findSendablePacket(LinkedList<Packet> outgoingQueue,
                                       boolean clientTunneledAuthenticationInProgress) {
         synchronized (outgoingQueue) {
@@ -281,6 +302,7 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
      * @return the created socket channel
      * @throws IOException
      */
+    // 创建一个Socket客户端
     SocketChannel createSock() throws IOException {
         SocketChannel sock;
         sock = SocketChannel.open();
@@ -299,8 +321,11 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
     // 注册socket,如果是立即完成那么调用sendThread.primeConnection()
     void registerAndConnect(SocketChannel sock, InetSocketAddress addr) 
     throws IOException {
+        // 1.注册OP_CONNECT事件,并初始化sockKey
         sockKey = sock.register(selector, SelectionKey.OP_CONNECT);
+        // 2. 发起连接
         boolean immediateConnect = sock.connect(addr);
+        // 3. todo 立即连接成功又如何?
         if (immediateConnect) {
             sendThread.primeConnection();
         }
@@ -309,8 +334,10 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
     // 已指定的参数地址建立sock连接
     @Override
     void connect(InetSocketAddress addr) throws IOException {
+        // 1.初始化socket
         SocketChannel sock = createSock();
         try {
+            // 2.与指定的地址建立连接
            registerAndConnect(sock, addr);
         } catch (IOException e) {
             LOG.error("Unable to open socket to " + addr);
@@ -364,6 +391,7 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
         }
     }
 
+    // 唤醒阻塞的bio
     @Override
     synchronized void wakeupCnxn() {
         selector.wakeup();
@@ -383,6 +411,7 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
         // Everything below and until we get back to the select is
         // non blocking, so time is effectively a constant. That is
         // Why we just have to do this once, here
+        // 发送数据前更新一下当前时间戳
         updateNow();
         // 遍历就绪的SelectionKey
         for (SelectionKey k : selected) {
@@ -391,6 +420,7 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
             if ((k.readyOps() & SelectionKey.OP_CONNECT) != 0) {
                 // 判断是否完成连接
                 if (sc.finishConnect()) {
+                    // 更新一下最后发送数据和心跳的时间戳
                     updateLastSendAndHeard();
                     // 把watches和authData等数据发过去，并更新SelectionKey为读写
                     // 注意内部会创建ConnectRequest
@@ -398,6 +428,7 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
                 }
             // 如果是OP_READ或OP_WRITE事件
             } else if ((k.readyOps() & (SelectionKey.OP_READ | SelectionKey.OP_WRITE)) != 0) {
+                // 处理io事件
                 doIO(pendingQueue, outgoingQueue, cnxn);
             }
         }

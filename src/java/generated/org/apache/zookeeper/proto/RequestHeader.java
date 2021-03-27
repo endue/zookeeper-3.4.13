@@ -22,8 +22,15 @@ package org.apache.zookeeper.proto;
 import org.apache.jute.*;
 import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Public
+// 请求头实体
 public class RequestHeader implements Record {
+  /**
+   * 请求头中的xid,设置地点在{@link org.apache.zookeeper.ClientCnxnSocketNIO.doIO }
+   */
   private int xid;
+  /**
+   * 请求头类型,参考{@link org.apache.zookeeper.ZooDefs.OpCode}
+   */
   private int type;
   public RequestHeader() {
   }
