@@ -220,7 +220,7 @@ public class NIOServerCnxn extends ServerCnxn {
             packetReceived();
             incomingBuffer.flip();
             if (!initialized) {
-                // 处理连接请求
+                // 处理连接请求并修改initialized为true
                 readConnectRequest();
             } else {
                 // 处理其他请求

@@ -154,7 +154,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
                 // 请求不为null，处理请求
                 if (si != null) {
                     // track the number of records written to the log
-                    // 将请求添加到内存目录树，也就是FileTxnSnapLog
+                    // 将请求添加到事务日志文件FileTxnSnapLog中
                     if (zks.getZKDatabase().append(si)) {
                         logCount++;// 记录写入到内存目录树的日志数
                         // 确定是否需要刷内存目录树到磁盘(这里就和上面计算随机randRoll关联上了)
@@ -182,7 +182,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
                             // 重置logCount
                             logCount = 0;
                         }
-                    // 请求中的hdr为null，会走到这里
+                    // 请求中的hdr为null，说明是非事务请求,直接将请求交给下一个processor来处理
                     } else if (toFlush.isEmpty()) {
                         // optimization for read heavy workloads
                         // iff this is a read, and there are no pending
@@ -218,11 +218,12 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
         // 等待刷入磁盘的数据为空
         if (toFlush.isEmpty())
             return;
-        // 将内存目录树中的数据刷如磁盘
+        // 提交事务日志
         zks.getZKDatabase().commit();
         // 遍历待刷入磁盘的请求，并交给下一个请求处理
         while (!toFlush.isEmpty()) {
-            Request i = toFlush.remove();// 注意这里为移除
+            // 从toFlush队列中移除一个请求,交给下一个processor来处理
+            Request i = toFlush.remove();
             if (nextProcessor != null) {
                 nextProcessor.processRequest(i);
             }

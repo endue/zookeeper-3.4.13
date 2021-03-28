@@ -715,6 +715,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         try {
             // 如果是有效的session了，那么注册cnxn
             if (valid) {
+                // 初始化并注册一个ConnectionBean
                 serverCnxnFactory.registerConnection(cnxn);
             }
         } catch (Exception e) {
@@ -1049,6 +1050,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         // 处理数据，将数据incomingBuffer封装为一个BinaryInputArchive
         InputStream bais = new ByteBufferInputStream(incomingBuffer);
         BinaryInputArchive bia = BinaryInputArchive.getArchive(bais);
+        // 解析出RequestHeader
         RequestHeader h = new RequestHeader();
         h.deserialize(bia, "header");
         // Through the magic of byte buffers, txn will not be

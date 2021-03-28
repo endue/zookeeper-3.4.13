@@ -340,7 +340,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
     protected void pRequest2Txn(int type, long zxid, Request request, Record record, boolean deserialize)
         throws KeeperException, IOException, RequestProcessorException
     {
-        // 设置请求头
+        // 设置事务头
         request.hdr = new TxnHeader(request.sessionId, request.cxid, zxid,
                                     Time.currentWallTime(), type);
 
@@ -349,7 +349,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 zks.sessionTracker.checkSession(request.sessionId, request.getOwner());
                 CreateRequest createRequest = (CreateRequest)record;   
                 if(deserialize)
-                    // 反序列化
+                    // 反序列化request.request数据到createRequest
                     ByteBufferInputStream.byteBuffer2Record(request.request, createRequest);
                 // 获取创建的路径
                 String path = createRequest.getPath();
@@ -359,6 +359,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                             Long.toHexString(request.sessionId));
                     throw new KeeperException.BadArgumentsException(path);
                 }
+                // 获取请求中的ACL
                 List<ACL> listACL = removeDuplicates(createRequest.getAcl());
                 if (!fixupACL(request.authInfo, listACL)) {
                     throw new KeeperException.InvalidACLException(path);
@@ -387,7 +388,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 } catch (KeeperException.NoNodeException e) {
                     // ignore this one
                 }
-                // 父节点是否为临时节点，这里可以看出临时节点下不可用创建子节点
+                // 父节点是否为临时节点，这里可以看出临时节点下不可创建子节点
                 boolean ephemeralParent = parentRecord.stat.getEphemeralOwner() != 0;
                 if (ephemeralParent) {
                     throw new KeeperException.NoChildrenForEphemeralsException(path);
@@ -576,7 +577,8 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
         try {
             // 判断请求类型
             switch (request.type) {
-                case OpCode.create:// 创建节点请求
+                case OpCode.create:
+                // 创建节点请求
                 CreateRequest createRequest = new CreateRequest();
                 // 封装请求交给pRequest2Txn()方法来处理
                 pRequest2Txn(request.type, zks.getNextZxid(), request, createRequest, true);

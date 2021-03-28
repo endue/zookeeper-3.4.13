@@ -1416,6 +1416,7 @@ public class ClientCnxn {
                     + ", sessionid = 0x" + Long.toHexString(sessionId)
                     + ", negotiated timeout = " + negotiatedSessionTimeout
                     + (isRO ? " (READ-ONLY mode)" : ""));
+            // 事件的状态
             KeeperState eventState = (isRO) ?
                     KeeperState.ConnectedReadOnly : KeeperState.SyncConnected;
             // 触发事件

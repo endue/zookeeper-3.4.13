@@ -123,6 +123,7 @@ public class FileTxnLog implements TxnLog {
     long dbId;
     private LinkedList<FileOutputStream> streamsToFlush =
         new LinkedList<FileOutputStream>();
+    // 事务日志文件
     File logFileWrite = null;
     private FilePadding filePadding = new FilePadding();
     // zk服务统计类,来自ZookeeperServer
@@ -189,6 +190,7 @@ public class FileTxnLog implements TxnLog {
     }
     
     /**
+     * 添加事物日志
      * append an entry to the transaction log
      * @param hdr the header of the transaction
      * @param txn the transaction part of the entry
@@ -197,10 +199,11 @@ public class FileTxnLog implements TxnLog {
     public synchronized boolean append(TxnHeader hdr, Record txn)
         throws IOException
     {
+        // 1.事务头为空不处理
         if (hdr == null) {
             return false;
         }
-
+        // 2.
         if (hdr.getZxid() <= lastZxidSeen) {
             LOG.warn("Current zxid " + hdr.getZxid()
                     + " is <= " + lastZxidSeen + " for "
@@ -208,20 +211,24 @@ public class FileTxnLog implements TxnLog {
         } else {
             lastZxidSeen = hdr.getZxid();
         }
-
+        // 3.事务日志流未初始化
         if (logStream==null) {
            if(LOG.isInfoEnabled()){
                 LOG.info("Creating new log file: " + Util.makeLogName(hdr.getZxid()));
            }
-
+           // 初始化事务日志文件
            logFileWrite = new File(logDir, Util.makeLogName(hdr.getZxid()));
+           // 初始化事务日志流
            fos = new FileOutputStream(logFileWrite);
            logStream=new BufferedOutputStream(fos);
            oa = BinaryOutputArchive.getArchive(logStream);
+           // 封装事务日志文件头并写入到流当中
            FileHeader fhdr = new FileHeader(TXNLOG_MAGIC,VERSION, dbId);
            fhdr.serialize(oa, "fileheader");
            // Make sure that the magic number is written before padding.
+            // 输入磁盘
            logStream.flush();
+           //
            filePadding.setCurrentSize(fos.getChannel().position());
            streamsToFlush.add(fos);
         }

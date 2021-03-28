@@ -150,7 +150,8 @@ public abstract class ServerCnxnFactory {
     }
 
     public abstract InetSocketAddress getLocalAddress();
-
+    // 一个客户端连接一个ServerCnxn
+    // 该map记录了客户端的连接以及连接bean
     private final Map<ServerCnxn, ConnectionBean> connectionBeans
         = new ConcurrentHashMap<ServerCnxn, ConnectionBean>();
 
@@ -162,7 +163,8 @@ public abstract class ServerCnxnFactory {
             MBeanRegistry.getInstance().unregister(jmxConnectionBean);
         }
     }
-    
+
+    // 注册ConnectionBean
     public void registerConnection(ServerCnxn serverCnxn) {
         if (zkServer != null) {
             ConnectionBean jmxConnectionBean = new ConnectionBean(serverCnxn, zkServer);

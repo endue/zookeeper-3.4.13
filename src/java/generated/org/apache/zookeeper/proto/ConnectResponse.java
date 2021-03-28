@@ -23,9 +23,13 @@ import org.apache.jute.*;
 import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Public
 public class ConnectResponse implements Record {
+  // 协议版本号
   private int protocolVersion;
+  // 超时时间
   private int timeOut;
+  // sessionID
   private long sessionId;
+  // 密码
   private byte[] passwd;
   public ConnectResponse() {
   }
