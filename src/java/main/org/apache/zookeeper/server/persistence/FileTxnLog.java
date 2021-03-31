@@ -115,18 +115,21 @@ public class FileTxnLog implements TxnLog {
     }
     // 记录最后写入事务文件的txid
     long lastZxidSeen;
+    // 记录当前活跃事务日志文件的流
     volatile BufferedOutputStream logStream = null;
     volatile OutputArchive oa;
+    // 记录当前活跃事务日志文件的流
     volatile FileOutputStream fos = null;
-
+    // 日志文件目录
     File logDir;
     private final boolean forceSync = !System.getProperty("zookeeper.forceSync", "yes").equals("no");;
     long dbId;
     // 待同步刷磁盘的文件流
     private LinkedList<FileOutputStream> streamsToFlush =
         new LinkedList<FileOutputStream>();
-    // 事务日志文件
+    // 当前事务日志文件
     File logFileWrite = null;
+    // 记录当前事务日志文件与分配的大小
     private FilePadding filePadding = new FilePadding();
     // zk服务统计类,来自ZookeeperServer
     private ServerStats serverStats;
@@ -173,8 +176,7 @@ public class FileTxnLog implements TxnLog {
      * rollover the current log file to a new one.
      * @throws IOException
      */
-    // 将当前日志对应的流刷入磁盘,然后重置流,
-    // 也就是重新创建一个日志文件
+    // 将当前日志对应的流刷入磁盘,然后重置流,也就是等待后续重新创建一个日志文件
     public synchronized void rollLog() throws IOException {
         if (logStream != null) {
             this.logStream.flush();
@@ -187,7 +189,7 @@ public class FileTxnLog implements TxnLog {
      * close all the open file handles
      * @throws IOException
      */
-    // 关闭当前日志对应的流
+    // 关闭所有文件
     public synchronized void close() throws IOException {
         if (logStream != null) {
             logStream.close();
@@ -211,7 +213,7 @@ public class FileTxnLog implements TxnLog {
         if (hdr == null) {
             return false;
         }
-        // 2.
+        // 2.更新lastZxidSeen
         if (hdr.getZxid() <= lastZxidSeen) {
             LOG.warn("Current zxid " + hdr.getZxid()
                     + " is <= " + lastZxidSeen + " for "
@@ -224,14 +226,14 @@ public class FileTxnLog implements TxnLog {
            if(LOG.isInfoEnabled()){
                 LOG.info("Creating new log file: " + Util.makeLogName(hdr.getZxid()));
            }
-           // 4.初始化事务日志文件,根据参数hdr中的zxid创建文件
+           // 3-1.初始化事务日志文件,根据参数hdr中的zxid创建文件
            // 这里可以看出事务日志文件名中包含了文件中最小的zxid
            logFileWrite = new File(logDir, Util.makeLogName(hdr.getZxid()));
-           // 5.有了File日志文件,初始化流
+           // 3-2.有了File日志文件,初始化流
            fos = new FileOutputStream(logFileWrite);
            logStream=new BufferedOutputStream(fos);
            oa = BinaryOutputArchive.getArchive(logStream);
-           // 6.封装事务日志文件头并写入到流当中,包括:魔数,版本,数据库ID(默认是0)
+           // 3-3.封装事务日志文件头并写入到流当中,包括:魔数,版本,数据库ID(默认是0)
             // 也就如类注释中锁描述的那样
             // FileHeader: {
             //  magic 4bytes (ZKLG)
@@ -241,13 +243,17 @@ public class FileTxnLog implements TxnLog {
            FileHeader fhdr = new FileHeader(TXNLOG_MAGIC,VERSION, dbId);
            fhdr.serialize(oa, "fileheader");
            // Make sure that the magic number is written before padding.
-            // 确保在用0填充之前，先把魔数信息等写入到文件中，进行依次flush
+            // 3-4.确保在用0填充之前，先把魔数信息等写入到文件中，flush刚刚写入的内容
            logStream.flush();
+           // 3-5.根据当前事务日志文件的FileChannel初始化filePadding中的currentSize
            filePadding.setCurrentSize(fos.getChannel().position());
+           // 3-6.记录新生成的事务日志文件对应的fos到streamsToFlush中
            streamsToFlush.add(fos);
         }
+        // 4.获取当前事务日志文件的FileChannel传入filePadding中
+        // 目的是重新计算FileChannel预分配的大小从而判断是否需要填充0
         filePadding.padFile(fos.getChannel());
-        // 下面这几步就是将事务日志写入OutputArchive
+        // 5.下面这几步就是将事务日志写入OutputArchive
         // checksum Txnlen TxnHeader Record 0x42
         byte[] buf = Util.marshallTxnEntry(hdr, txn);
         if (buf == null || buf.length == 0) {
@@ -432,6 +438,7 @@ public class FileTxnLog implements TxnLog {
      * @return header that was read fomr the file
      * @throws IOException
      */
+    // 读取事务日志文件头
     private static FileHeader readHeader(File file) throws IOException {
         InputStream is =null;
         try {
@@ -453,6 +460,7 @@ public class FileTxnLog implements TxnLog {
      * the dbid of this transaction database
      * @return the dbid of this database
      */
+    // 获取事务日志的db
     public long getDbId() throws IOException {
         FileTxnIterator itr = new FileTxnIterator(logDir, 0);
         FileHeader fh=readHeader(itr.logFile);
@@ -466,6 +474,7 @@ public class FileTxnLog implements TxnLog {
      * the forceSync value. true if forceSync is enabled, false otherwise.
      * @return the forceSync value
      */
+    // 是否强制刷磁盘
     public boolean isForceSync() {
         return forceSync;
     }

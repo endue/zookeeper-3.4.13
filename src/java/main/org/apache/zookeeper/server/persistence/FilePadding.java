@@ -27,7 +27,7 @@ import java.nio.channels.FileChannel;
 
 public class FilePadding {
     private static final Logger LOG;
-    // 预分配大小为64M
+    // 预分配大小64M
     private static long preAllocSize = 65536 * 1024;
     private static final ByteBuffer fill = ByteBuffer.allocateDirect(1);
 
@@ -43,7 +43,7 @@ public class FilePadding {
             }
         }
     }
-    // 记录当前文件大小
+    // 当前文件大小
     private long currentSize;
 
     /**
@@ -73,14 +73,17 @@ public class FilePadding {
      * @param fileChannel the fileChannel of the file to be padded 要填充的事物日志文件对应的FileChannel
      * @throws IOException
      */
-    // 计算当前文件,如果有必要将其增加到下一个倍数
+    // 填充内存
     long padFile(FileChannel fileChannel) throws IOException {
+        // 重新计算fileChannel需要与分配的空间
         long newFileSize = calculateFileSizeWithPadding(fileChannel.position(), currentSize, preAllocSize);
+        // 预分配的值和当前大小不一致,填充0
         if (currentSize != newFileSize) {
             // 新文件填充0
             fileChannel.write((ByteBuffer) fill.position(0), newFileSize - fill.remaining());
             currentSize = newFileSize;
         }
+        // 当新的文件大小
         return currentSize;
     }
 
@@ -99,10 +102,14 @@ public class FilePadding {
     // VisibleForTesting
     public static long calculateFileSizeWithPadding(long position, long fileSize, long preAllocSize) {
         // If preAllocSize is positive and we are within 4KB of the known end of the file calculate a new file size
+        // fileChannel已写入的字节数 + 4k >= 预分配的大小了
+        // 那么需要重新计算预分配的大小
         if (preAllocSize > 0 && position + 4096 >= fileSize) {
             // If we have written more than we have previously preallocated we need to make sure the new
             // file size is larger than what we already have
+            // fileChannel已写入的字节数 > 预分配的大小了
             if (position > fileSize) {
+                // 重新计算一个接近preAllocSize整数倍的值
                 fileSize = position + preAllocSize;
                 fileSize -= fileSize % preAllocSize;
             } else {
