@@ -112,10 +112,12 @@ public class SerializeUtils {
         }
         return txn;
     }
-
+    // 反序列化内存数据
     public static void deserializeSnapshot(DataTree dt,InputArchive ia,
             Map<Long, Integer> sessions) throws IOException {
+        // 反序列化session个数
         int count = ia.readInt("count");
+        // 反序列化session
         while (count > 0) {
             long id = ia.readLong("id");
             int to = ia.readInt("timeout");
@@ -127,17 +129,21 @@ public class SerializeUtils {
             }
             count--;
         }
+        // 反序列化内存文件目录树
         dt.deserialize(ia, "tree");
     }
-
+    // 序列化内存数据
     public static void serializeSnapshot(DataTree dt,OutputArchive oa,
             Map<Long, Integer> sessions) throws IOException {
         HashMap<Long, Integer> sessSnap = new HashMap<Long, Integer>(sessions);
+        // 序列化session个数
         oa.writeInt(sessSnap.size(), "count");
+        // 序列化session
         for (Entry<Long, Integer> entry : sessSnap.entrySet()) {
             oa.writeLong(entry.getKey().longValue(), "id");
             oa.writeInt(entry.getValue().intValue(), "timeout");
         }
+        // 序列化内存文件目录树
         dt.serialize(oa, "tree");
     }
 

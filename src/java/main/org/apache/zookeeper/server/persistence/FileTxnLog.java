@@ -97,7 +97,7 @@ public class FileTxnLog implements TxnLog {
         ByteBuffer.wrap("ZKLG".getBytes()).getInt();
 
     public final static int VERSION = 2;
-    // 事物文件前缀
+    // 事物日志文件前缀
     public static final String LOG_FILE_PREFIX = "log";
 
     /** Maximum time we allow for elapsed fsync before WARNing */
@@ -120,7 +120,7 @@ public class FileTxnLog implements TxnLog {
     volatile OutputArchive oa;
     // 记录当前活跃事务日志文件的流
     volatile FileOutputStream fos = null;
-    // 日志文件目录
+    // 事务日志文件对应的文件目录
     File logDir;
     private final boolean forceSync = !System.getProperty("zookeeper.forceSync", "yes").equals("no");;
     long dbId;

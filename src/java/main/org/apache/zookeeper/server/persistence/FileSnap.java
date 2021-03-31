@@ -51,6 +51,7 @@ import org.apache.zookeeper.server.util.SerializeUtils;
 // 实现SnapShot接口，实现了存储、序列化、反序列化数据快照功能
 // 同时提供了访问数据快照的功能
 public class FileSnap implements SnapShot {
+    // 快照文件对应的文件夹目录
     File snapDir;
     private volatile boolean close = false;
     private static final int VERSION=2;
@@ -59,7 +60,7 @@ public class FileSnap implements SnapShot {
     // 数据快照日志文件魔术
     public final static int SNAP_MAGIC
         = ByteBuffer.wrap("ZKSN".getBytes()).getInt();
-
+    // 快照文件前缀
     public static final String SNAPSHOT_FILE_PREFIX = "snapshot";
 
     public FileSnap(File snapDir) {
@@ -70,18 +71,20 @@ public class FileSnap implements SnapShot {
      * deserialize a data tree from the most recent snapshot
      * @return the zxid of the snapshot
      */
-    // 反序列化最近的100数据快照文件到内存文件目录树
+    // 反序列化有效的数据快照文件到内存文件目录树DataTree
     public long deserialize(DataTree dt, Map<Long, Integer> sessions)
             throws IOException {
         // we run through 100 snapshots (not all of them)
         // if we cannot get it running within 100 snapshots
         // we should  give up
-        // 查找最近的100个文件
+        // 查找最近的100个有效的数据快照日志文件并降序排列
         List<File> snapList = findNValidSnapshots(100);
         if (snapList.size() == 0) {
             return -1L;
         }
+        // 标识数据快照日志文件
         File snap = null;
+        // 标识数据快照日志文件是否有效
         boolean foundValid = false;
         for (int i = 0; i < snapList.size(); i++) {
             snap = snapList.get(i);
@@ -92,12 +95,17 @@ public class FileSnap implements SnapShot {
                 snapIS = new BufferedInputStream(new FileInputStream(snap));
                 crcIn = new CheckedInputStream(snapIS, new Adler32());
                 InputArchive ia = BinaryInputArchive.getArchive(crcIn);
+                // 反序列化
                 deserialize(dt,sessions, ia);
+                // 计算数据快照日志文件CRC
                 long checkSum = crcIn.getChecksum().getValue();
+                // 获取数据快照日志文件CRC
                 long val = ia.readLong("val");
+                // 校验是否一致
                 if (val != checkSum) {
                     throw new IOException("CRC corruption in snapshot :  " + snap);
                 }
+                // 查找到一个有效的数据快照日志文件,跳出循环
                 foundValid = true;
                 break;
             } catch(IOException e) {
@@ -112,6 +120,7 @@ public class FileSnap implements SnapShot {
         if (!foundValid) {
             throw new IOException("Not able to find valid snapshots in " + snapDir);
         }
+        // 获取zxid并返回
         dt.lastProcessedZxid = Util.getZxidFromName(snap.getName(), SNAPSHOT_FILE_PREFIX);
         return dt.lastProcessedZxid;
     }
@@ -127,7 +136,9 @@ public class FileSnap implements SnapShot {
     public void deserialize(DataTree dt, Map<Long, Integer> sessions,
             InputArchive ia) throws IOException {
         FileHeader header = new FileHeader();
+        // 获取数据快照日志文件的头
         header.deserialize(ia, "fileheader");
+        // 校验魔术
         if (header.getMagic() != SNAP_MAGIC) {
             throw new IOException("mismatching magic headers "
                     + header.getMagic() + 
@@ -140,7 +151,7 @@ public class FileSnap implements SnapShot {
      * find the most recent snapshot in the database.
      * @return the file containing the most recent snapshot
      */
-    // 查找最近的一个文件
+    // 查找最近的一个有效的数据快照日志文件
     public File findMostRecentSnapshot() throws IOException {
         List<File> files = findNValidSnapshots(1);
         if (files.size() == 0) {
@@ -161,9 +172,9 @@ public class FileSnap implements SnapShot {
      * less than n in case enough snapshots are not available).
      * @throws IOException
      */
-    // 查找最近n个有效的数据快照文件
+    // 查找最近n个有效的数据快照日志文件
     private List<File> findNValidSnapshots(int n) throws IOException {
-        // 将数据快照路径下以snapshot开头的文件进行降序排列
+        // 获取snapDir目录下所有以snapshot为前缀的文件并降序排列
         List<File> files = Util.sortDataDir(snapDir.listFiles(), SNAPSHOT_FILE_PREFIX, false);
         int count = 0;
         List<File> list = new ArrayList<File>();
@@ -195,7 +206,7 @@ public class FileSnap implements SnapShot {
      * @return the last n snapshots
      * @throws IOException
      */
-    // 查找最近n个数据快照文件
+    // 查找最近n个数据快照日志文件
     // 比如目前磁盘上此次snapshot文件如下：
     // snapshot.0
     // snapshot.1c
@@ -204,10 +215,10 @@ public class FileSnap implements SnapShot {
     // snapshot.b00000098
     // n为3时，返回的是snapshot.1d、snapshot.300000000、snapshot.b00000098
     public List<File> findNRecentSnapshots(int n) throws IOException {
-        // 获取snapDir下所有以snapshot为前缀的文件并降序排列
+        // 获取snapDir目录下所有以snapshot为前缀的文件并降序排列
         List<File> files = Util.sortDataDir(snapDir.listFiles(), SNAPSHOT_FILE_PREFIX, false);
         int count = 0;
-        // 遍历文件最多获取n个
+        // 遍历文件获取n个数据快照文件
         List<File> list = new ArrayList<File>();
         for (File f: files) {
             if (count == n)
@@ -229,6 +240,7 @@ public class FileSnap implements SnapShot {
      * @param header the header of this snapshot
      * @throws IOException
      */
+    // 序列化
     protected void serialize(DataTree dt,Map<Long, Integer> sessions,
             OutputArchive oa, FileHeader header) throws IOException {
         // this is really a programmatic error and not something that can
@@ -246,6 +258,7 @@ public class FileSnap implements SnapShot {
      * @param sessions the sessions to be serialized
      * @param snapShot the file to store snapshot into
      */
+    // 序列化
     public synchronized void serialize(DataTree dt, Map<Long, Integer> sessions, File snapShot)
             throws IOException {
         if (!close) {
