@@ -56,6 +56,7 @@ public class FileSnap implements SnapShot {
     private static final int VERSION=2;
     private static final long dbId=-1;
     private static final Logger LOG = LoggerFactory.getLogger(FileSnap.class);
+    // 数据快照日志文件魔术
     public final static int SNAP_MAGIC
         = ByteBuffer.wrap("ZKSN".getBytes()).getInt();
 
@@ -68,12 +69,14 @@ public class FileSnap implements SnapShot {
     /**
      * deserialize a data tree from the most recent snapshot
      * @return the zxid of the snapshot
-     */ 
+     */
+    // 反序列化最近的100数据快照文件到内存文件目录树
     public long deserialize(DataTree dt, Map<Long, Integer> sessions)
             throws IOException {
         // we run through 100 snapshots (not all of them)
         // if we cannot get it running within 100 snapshots
         // we should  give up
+        // 查找最近的100个文件
         List<File> snapList = findNValidSnapshots(100);
         if (snapList.size() == 0) {
             return -1L;
@@ -120,6 +123,7 @@ public class FileSnap implements SnapShot {
      * @param ia the input archive to restore from
      * @throws IOException
      */
+    // 反序列化
     public void deserialize(DataTree dt, Map<Long, Integer> sessions,
             InputArchive ia) throws IOException {
         FileHeader header = new FileHeader();
@@ -136,6 +140,7 @@ public class FileSnap implements SnapShot {
      * find the most recent snapshot in the database.
      * @return the file containing the most recent snapshot
      */
+    // 查找最近的一个文件
     public File findMostRecentSnapshot() throws IOException {
         List<File> files = findNValidSnapshots(1);
         if (files.size() == 0) {
@@ -156,15 +161,19 @@ public class FileSnap implements SnapShot {
      * less than n in case enough snapshots are not available).
      * @throws IOException
      */
+    // 查找最近n个有效的数据快照文件
     private List<File> findNValidSnapshots(int n) throws IOException {
+        // 将数据快照路径下以snapshot开头的文件进行降序排列
         List<File> files = Util.sortDataDir(snapDir.listFiles(), SNAPSHOT_FILE_PREFIX, false);
         int count = 0;
         List<File> list = new ArrayList<File>();
+        // 遍历数据快照文件
         for (File f : files) {
             // we should catch the exceptions
             // from the valid snapshot and continue
             // until we find a valid one
             try {
+                // 校验文件的有效性,如果有效放入list中直到找到参数n个返回list数组
                 if (Util.isValidSnapshot(f)) {
                     list.add(f);
                     count++;

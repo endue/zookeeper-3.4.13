@@ -27,6 +27,7 @@ import java.nio.channels.FileChannel;
 
 public class FilePadding {
     private static final Logger LOG;
+    // 预分配大小为64M
     private static long preAllocSize = 65536 * 1024;
     private static final ByteBuffer fill = ByteBuffer.allocateDirect(1);
 
@@ -42,7 +43,7 @@ public class FilePadding {
             }
         }
     }
-
+    // 记录当前文件大小
     private long currentSize;
 
     /**
@@ -69,12 +70,14 @@ public class FilePadding {
     /**
      * pad the current file to increase its size to the next multiple of preAllocSize greater than the current size and position
      *
-     * @param fileChannel the fileChannel of the file to be padded
+     * @param fileChannel the fileChannel of the file to be padded 要填充的事物日志文件对应的FileChannel
      * @throws IOException
      */
+    // 计算当前文件,如果有必要将其增加到下一个倍数
     long padFile(FileChannel fileChannel) throws IOException {
         long newFileSize = calculateFileSizeWithPadding(fileChannel.position(), currentSize, preAllocSize);
         if (currentSize != newFileSize) {
+            // 新文件填充0
             fileChannel.write((ByteBuffer) fill.position(0), newFileSize - fill.remaining());
             currentSize = newFileSize;
         }

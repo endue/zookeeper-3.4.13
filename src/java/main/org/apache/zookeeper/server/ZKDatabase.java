@@ -56,6 +56,7 @@ import org.apache.zookeeper.txn.TxnHeader;
  * committed logs. It is booted up  after reading the logs
  * and snapshots from the disk.
  */
+// 内存数据库
 public class ZKDatabase {
     
     private static final Logger LOG = LoggerFactory.getLogger(ZKDatabase.class);
@@ -64,6 +65,7 @@ public class ZKDatabase {
      * make sure on a clear you take care of 
      * all these members.
      */
+    // 内存目录树
     protected DataTree dataTree;
     // 记录sessionId和对应的过期时间戳
     protected ConcurrentHashMap<Long, Integer> sessionsWithTimeouts;

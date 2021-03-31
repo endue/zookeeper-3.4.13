@@ -60,6 +60,8 @@ public class FileTxnSnapLog {
     private TxnLog txnLog;
     // 数据快照类
     private SnapShot snapLog;
+    // 以下两个属性拼接了日志文件的目录(也就是version-2)
+    // 参考构造方法
     public final static int VERSION = 2;
     public final static String version = "version-";
     
@@ -79,12 +81,12 @@ public class FileTxnSnapLog {
     /**
      * the constructor which takes the datadir and 
      * snapdir.
-     * @param dataDir the trasaction directory
-     * @param snapDir the snapshot directory
+     * @param dataDir the trasaction directory 事务日志文件夹
+     * @param snapDir the snapshot directory 数据快照文件夹
      */
     public FileTxnSnapLog(File dataDir, File snapDir) throws IOException {
         LOG.debug("Opening datadir:{} snapDir:{}", dataDir, snapDir);
-        // 创建数据快照和事物日志对应的新的文件
+        // 创建数据快照和事物日志对应的文件
         this.dataDir = new File(dataDir, version + VERSION);
         this.snapDir = new File(snapDir, version + VERSION);
         // 做一些校验
@@ -115,7 +117,7 @@ public class FileTxnSnapLog {
             checkLogDir();
             checkSnapDir();
         }
-        // 分别创建事物日志和数据快照两个类
+        // 分别创建事物日志和数据快照两个类并传入对应的日志目录
         txnLog = new FileTxnLog(this.dataDir);
         snapLog = new FileSnap(this.snapDir);
     }
@@ -124,8 +126,13 @@ public class FileTxnSnapLog {
         txnLog.setServerStats(serverStats);
     }
 
-    // 校验事物日志
+    /**
+     * 校验的前提是事物日志和数据快照不在同一个目录
+     * 校验事物日志文件夹
+     * @throws LogDirContentCheckException
+     */
     private void checkLogDir() throws LogDirContentCheckException {
+        // 获取事物日志文件夹目录下的文件
         File[] files = this.dataDir.listFiles(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String name) {
@@ -136,7 +143,14 @@ public class FileTxnSnapLog {
             throw new LogDirContentCheckException("Log directory has snapshot files. Check if dataLogDir and dataDir configuration is correct.");
         }
     }
-    // 校验数据快照
+
+    /**
+     *
+     * 校验的前提是事物日志和数据快照不在同一个目录
+     * 校验数据快照文件夹
+     *
+     * @throws SnapDirContentCheckException
+     */
     private void checkSnapDir() throws SnapDirContentCheckException {
         File[] files = this.snapDir.listFiles(new FilenameFilter() {
             @Override
@@ -243,6 +257,7 @@ public class FileTxnSnapLog {
      * @param sessions the sessions to be restored
      * @param txn the transaction to be applied
      */
+    // 处理事务请求
     public void processTransaction(TxnHeader hdr,DataTree dt,
             Map<Long, Integer> sessions, Record txn)
         throws KeeperException.NoNodeException {
@@ -389,6 +404,7 @@ public class FileTxnSnapLog {
     }
 
     /**
+     * 提交日志事务
      * commit the transaction of logs
      * @throws IOException
      */

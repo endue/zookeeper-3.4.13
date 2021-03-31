@@ -69,6 +69,7 @@ import org.slf4j.LoggerFactory;
  * full paths to DataNodes and a tree of DataNodes. All accesses to a path is
  * through the hashtable. The tree is traversed only when serializing to disk.
  */
+// 内存文件目录树
 public class DataTree {
     private static final Logger LOG = LoggerFactory.getLogger(DataTree.class);
 

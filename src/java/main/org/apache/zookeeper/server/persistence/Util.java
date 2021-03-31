@@ -290,7 +290,7 @@ public class Util {
      * @param files array of files
      * @param prefix files not matching this prefix are assumed to have a
      * version = -1)
-     * @param ascending true sorted in ascending order, false results in
+     * @param ascending true sorted in ascending order, false results in 是否升序
      * descending order
      * @return sorted input files
      */
