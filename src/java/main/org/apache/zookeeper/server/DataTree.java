@@ -85,7 +85,7 @@ public class DataTree {
     private final WatchManager childWatches = new WatchManager();
 
     /** the root of zookeeper tree */
-    // 内存目录树的根截断
+    // 内存目录树的根节点
     private static final String rootZookeeper = "/";
 
     /** the zookeeper nodes that acts as the management and status node **/

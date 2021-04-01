@@ -35,22 +35,30 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.atomic.AtomicLong;
 
+/**
+ * 该类记录了三个重点:
+ * 1.acl集合对应的long值
+ * 2.long值对应的acl集合的关系
+ * 3.记录了acl对应的long值的引用次数
+ */
 public class ReferenceCountedACLCache {
     private static final Logger LOG = LoggerFactory.getLogger(ReferenceCountedACLCache.class);
-
+    // key是long,value是acl列表
     final Map<Long, List<ACL>> longKeyMap =
             new HashMap<Long, List<ACL>>();
-
+    // key是acl列表,value是long
     final Map<List<ACL>, Long> aclKeyMap =
             new HashMap<List<ACL>, Long>();
-
+    // key是acl对应的long值,value是记录的引用次数
     final Map<Long, AtomicLongWithEquals> referenceCounter =
             new HashMap<Long, AtomicLongWithEquals>();
+    // acls列表为空时,对应的long值
     private static final long OPEN_UNSAFE_ACL_ID = -1L;
 
     /**
      * these are the number of acls that we have in the datatree
      */
+    // acls列表对应的long值每次都是根据aclIndex+1进行计算
     long aclIndex = 0;
 
     /**
@@ -59,18 +67,23 @@ public class ReferenceCountedACLCache {
      * @param acls
      * @return a long that map to the acls
      */
+    // acl集合列表转long
     public synchronized Long convertAcls(List<ACL> acls) {
         if (acls == null)
             return OPEN_UNSAFE_ACL_ID;
 
         // get the value from the map
+        // 查询是否有该acl集合对应的long值
         Long ret = aclKeyMap.get(acls);
+        // 没有
         if (ret == null) {
+            // 根据aclIndex递增生成一个ret
             ret = incrementIndex();
+            // 保存起来
             longKeyMap.put(ret, acls);
             aclKeyMap.put(acls, ret);
         }
-
+        // 修改计数器+1
         addUsage(ret);
 
         return ret;
@@ -82,11 +95,14 @@ public class ReferenceCountedACLCache {
      * @param longVal
      * @return a list of ACLs that map to the long
      */
+    // long类型转acl列表
     public synchronized List<ACL> convertLong(Long longVal) {
         if (longVal == null)
             return null;
+        // -1对应的acl列表集合
         if (longVal == OPEN_UNSAFE_ACL_ID)
             return ZooDefs.Ids.OPEN_ACL_UNSAFE;
+        // 转换long为acl列表集合
         List<ACL> acls = longKeyMap.get(longVal);
         if (acls == null) {
             LOG.error("ERROR: ACL not available for long " + longVal);
@@ -99,6 +115,7 @@ public class ReferenceCountedACLCache {
         return ++aclIndex;
     }
 
+    // 反序列化
     public synchronized void deserialize(InputArchive ia) throws IOException {
         clear();
         int i = ia.readInt("map");
@@ -124,7 +141,7 @@ public class ReferenceCountedACLCache {
             i--;
         }
     }
-
+    // 序列化
     public synchronized void serialize(OutputArchive oa) throws IOException {
         oa.writeInt(longKeyMap.size(), "map");
         Set<Map.Entry<Long, List<ACL>>> set = longKeyMap.entrySet();
@@ -158,15 +175,16 @@ public class ReferenceCountedACLCache {
             LOG.info("Ignoring acl " + acl + " as it does not exist in the cache");
             return;
         }
-
+        // 获取acl对应long值对应的AtomicLong计数器
         AtomicLong count = referenceCounter.get(acl);
+        // 计数器+1,表示有多少个节点引用了该acl列表集合
         if (count == null) {
             referenceCounter.put(acl, new AtomicLongWithEquals(1));
         } else {
             count.incrementAndGet();
         }
     }
-
+    // 删除acl集合
     public synchronized void removeUsage(Long acl) {
         if (acl == OPEN_UNSAFE_ACL_ID) {
             return;
@@ -184,7 +202,7 @@ public class ReferenceCountedACLCache {
             longKeyMap.remove(acl);
         }
     }
-
+    // 清除未使用的acl集合对应的long值
     public synchronized void purgeUnused() {
         Iterator<Map.Entry<Long, AtomicLongWithEquals>> refCountIter = referenceCounter.entrySet().iterator();
         while (refCountIter.hasNext()) {
