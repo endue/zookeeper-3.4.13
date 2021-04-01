@@ -26,7 +26,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /**
- * a class that implements prefix matching for 
+ * a class that implements prefix matching for
  * components of a filesystem path. the trie
  * looks like a tree with edges mapping to 
  * the component of a path.

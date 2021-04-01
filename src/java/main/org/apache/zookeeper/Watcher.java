@@ -38,6 +38,7 @@ public interface Watcher {
     public interface Event {
         /**
          * Enumeration of states the ZooKeeper may be at the event
+         * 通知状态
          */
         @InterfaceAudience.Public
         public enum KeeperState {
@@ -116,6 +117,7 @@ public interface Watcher {
 
         /**
          * Enumeration of types of events that may occur on the ZooKeeper
+         * 事件类型
          */
         @InterfaceAudience.Public
         public enum EventType {
@@ -150,6 +152,6 @@ public interface Watcher {
             }           
         }
     }
-
+    // 回调方法
     abstract public void process(WatchedEvent event);
 }

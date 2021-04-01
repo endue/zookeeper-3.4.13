@@ -41,6 +41,7 @@ public class DataNode implements Record {
     DataNode parent;
 
     /** the data for this datanode */
+    // datanode的数据
     byte data[];
 
     /**

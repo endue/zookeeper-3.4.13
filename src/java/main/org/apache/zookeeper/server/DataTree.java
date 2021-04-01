@@ -78,11 +78,10 @@ public class DataTree {
      * source of truth and is where all the locking occurs
      */
     // 内存目录树,记录了路径path和对应的节点信息
-    private final ConcurrentHashMap<String, DataNode> nodes =
-        new ConcurrentHashMap<String, DataNode>();
-
+    private final ConcurrentHashMap<String, DataNode> nodes = new ConcurrentHashMap<String, DataNode>();
+    // 节点事件管理器
     private final WatchManager dataWatches = new WatchManager();
-
+    // 子节点事件管理器
     private final WatchManager childWatches = new WatchManager();
 
     /** the root of zookeeper tree */
@@ -118,8 +117,7 @@ public class DataTree {
      * This hashtable lists the paths of the ephemeral nodes of a session.
      */
     // 记录临时节点
-    private final Map<Long, HashSet<String>> ephemerals =
-        new ConcurrentHashMap<Long, HashSet<String>>();
+    private final Map<Long, HashSet<String>> ephemerals = new ConcurrentHashMap<Long, HashSet<String>>();
     //
     private final ReferenceCountedACLCache aclCache = new ReferenceCountedACLCache();
 
@@ -221,7 +219,7 @@ public class DataTree {
     // 初始化内存目录树
 
     /**
-     * 最近内存目录树结构如下
+     * 最终内存目录树结构如下
      *  /
      *  ..zookeeper
      *    ..quota
@@ -233,9 +231,13 @@ public class DataTree {
         nodes.put(rootZookeeper, root);
 
         /** add the proc node and quota node */
+        // 1,在root节点下添加一个子路径zookeeper
         root.addChild(procChildZookeeper);
+        // 1-1.设置上一步子路径的节点信息
         nodes.put(procZookeeper, procDataNode);
+        // 2.在procDataNode节点下添加一个子路径quota
         procDataNode.addChild(quotaChildZookeeper);
+        // 2-1.设置上一步子路径的节点信息
         nodes.put(quotaZookeeper, quotaDataNode);
     }
 
@@ -246,7 +248,9 @@ public class DataTree {
      *            the path to be checked
      * @return true if a special path. false if not.
      */
+    // 校验是否为特殊路径
     boolean isSpecialPath(String path) {
+        // 如果是"/" 或 "/zookeeper" 或 "/zookeeper/quota" 则认为是特殊路径
         if (rootZookeeper.equals(path) || procZookeeper.equals(path)
                 || quotaZookeeper.equals(path)) {
             return true;
@@ -254,6 +258,7 @@ public class DataTree {
         return false;
     }
 
+    // 复制StatPersisted
     static public void copyStatPersisted(StatPersisted from, StatPersisted to) {
         to.setAversion(from.getAversion());
         to.setCtime(from.getCtime());
@@ -266,6 +271,7 @@ public class DataTree {
         to.setEphemeralOwner(from.getEphemeralOwner());
     }
 
+    // 复制Stat
     static public void copyStat(Stat from, Stat to) {
         to.setAversion(from.getAversion());
         to.setCtime(from.getCtime());
@@ -369,14 +375,15 @@ public class DataTree {
     }
 
     /**
-     * @param path
-     * @param data
-     * @param acl
-     * @param ephemeralOwner
+     * 创建节点Node
+     * @param path 节点路径 比如:/data/gateway/user/add
+     * @param data 节点数据
+     * @param acl  节点ACL权限
+     * @param ephemeralOwner 如果是临时节点则代表为当前节点的sessionId,否则为0(注释却写个-1,擦)
      *            the session id that owns this node. -1 indicates this is not
      *            an ephemeral node.
-     * @param zxid
-     * @param time
+     * @param zxid 事务ID
+     * @param time 时间戳
      * @return the patch of the created node
      * @throws KeeperException
      */
@@ -384,9 +391,13 @@ public class DataTree {
             long ephemeralOwner, int parentCVersion, long zxid, long time)
             throws KeeperException.NoNodeException,
             KeeperException.NodeExistsException {
+        // 计算最后一个/的位置
         int lastSlash = path.lastIndexOf('/');
+        // 截取出/data/gateway/user
         String parentName = path.substring(0, lastSlash);
+        // 截取出add
         String childName = path.substring(lastSlash + 1);
+        // 封装一个StatPersisted
         StatPersisted stat = new StatPersisted();
         stat.setCtime(time);
         stat.setMtime(time);
@@ -395,27 +406,37 @@ public class DataTree {
         stat.setPzxid(zxid);
         stat.setVersion(0);
         stat.setAversion(0);
+        // 设置当前节点的持有sessionID
         stat.setEphemeralOwner(ephemeralOwner);
+        // 获取父路径对应的节点信息
         DataNode parent = nodes.get(parentName);
+        // 父路径对应的节点不存在抛出异常
         if (parent == null) {
             throw new KeeperException.NoNodeException();
         }
         synchronized (parent) {
+            // 获取父路径对应节点信息中的所有子路径
             Set<String> children = parent.getChildren();
+            // 子路径已存在,抛出异常
             if (children.contains(childName)) {
                 throw new KeeperException.NodeExistsException();
             }
-            
+            // 更新parentCVersion
             if (parentCVersion == -1) {
                 parentCVersion = parent.stat.getCversion();
                 parentCVersion++;
             }    
             parent.stat.setCversion(parentCVersion);
             parent.stat.setPzxid(zxid);
+            // 转换节点acl权限为一个long
             Long longval = aclCache.convertAcls(acl);
+            // 创建子路径对应的节点信息
             DataNode child = new DataNode(parent, data, longval, stat);
+            // 添加子路径到父路径对应的节点信息
             parent.addChild(childName);
+            // 记录子路径和节点信息
             nodes.put(path, child);
+            // 如果是临时节点
             if (ephemeralOwner != 0) {
                 HashSet<String> list = ephemerals.get(ephemeralOwner);
                 if (list == null) {
@@ -447,7 +468,10 @@ public class DataTree {
             updateCount(lastPrefix, 1);
             updateBytes(lastPrefix, data == null ? 0 : data.length);
         }
+        // 触发事件
+        // 1.触发参数path路径下的NodeCreated事件
         dataWatches.triggerWatch(path, Event.EventType.NodeCreated);
+        // 2.触发parentName路径下的NodeChildrenChanged事件
         childWatches.triggerWatch(parentName.equals("") ? "/" : parentName,
                 Event.EventType.NodeChildrenChanged);
         return path;
@@ -714,6 +738,12 @@ public class DataTree {
 
     public volatile long lastProcessedZxid = 0;
 
+    /**
+     * 处理事务请求
+     * @param header
+     * @param txn
+     * @return
+     */
     public ProcessTxnResult processTxn(TxnHeader header, Record txn)
     {
         ProcessTxnResult rc = new ProcessTxnResult();

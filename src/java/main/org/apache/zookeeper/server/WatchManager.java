@@ -35,12 +35,13 @@ import org.apache.zookeeper.Watcher.Event.KeeperState;
  * This class manages watches. It allows watches to be associated with a string
  * and removes watchers and their watches in addition to managing triggers.
  */
+// 监听器管理器
 public class WatchManager {
     private static final Logger LOG = LoggerFactory.getLogger(WatchManager.class);
-
+    // key是路径,value是Watcher集合
     private final HashMap<String, HashSet<Watcher>> watchTable =
         new HashMap<String, HashSet<Watcher>>();
-
+    // key是Watcher,value是路径集合
     private final HashMap<Watcher, HashSet<String>> watch2Paths =
         new HashMap<Watcher, HashSet<String>>();
 
@@ -52,7 +53,13 @@ public class WatchManager {
         return result;
     }
 
+    /**
+     * 添加路径的Watcher
+     * @param path 路径
+     * @param watcher 事件
+     */
     public synchronized void addWatch(String path, Watcher watcher) {
+        // 1.获取路径下的Watcher集合
         HashSet<Watcher> list = watchTable.get(path);
         if (list == null) {
             // don't waste memory if there are few watches on a node
@@ -61,22 +68,30 @@ public class WatchManager {
             list = new HashSet<Watcher>(4);
             watchTable.put(path, list);
         }
+        // 1-1.添加Watcher到集合
         list.add(watcher);
-
+        // 2.获取Watcher下的路径集合
         HashSet<String> paths = watch2Paths.get(watcher);
         if (paths == null) {
             // cnxns typically have many watches, so use default cap here
             paths = new HashSet<String>();
             watch2Paths.put(watcher, paths);
         }
+        // 2-1.添加路径到集合
         paths.add(path);
     }
 
+    /**
+     * 删除Watcher
+     * @param watcher
+     */
     public synchronized void removeWatcher(Watcher watcher) {
+        // 1.删除Watcher同时获取Watcher对应的路径
         HashSet<String> paths = watch2Paths.remove(watcher);
         if (paths == null) {
             return;
         }
+        // 2.删除路径对应的Watcher
         for (String p : paths) {
             HashSet<Watcher> list = watchTable.get(p);
             if (list != null) {
@@ -88,13 +103,28 @@ public class WatchManager {
         }
     }
 
+    /**
+     * 触发Watcher
+     * @param path
+     * @param type
+     * @return
+     */
     public Set<Watcher> triggerWatch(String path, EventType type) {
         return triggerWatch(path, type, null);
     }
 
+    /**
+     * 触发Watcher
+     * @param path
+     * @param type
+     * @param supress
+     * @return
+     */
     public Set<Watcher> triggerWatch(String path, EventType type, Set<Watcher> supress) {
+        // 创建要通知的Watcher事件
         WatchedEvent e = new WatchedEvent(type,
                 KeeperState.SyncConnected, path);
+        // 记录所有要执行的Watcher
         HashSet<Watcher> watchers;
         synchronized (this) {
             watchers = watchTable.remove(path);
@@ -113,6 +143,8 @@ public class WatchManager {
                 }
             }
         }
+        // 遍历所有的Watcher,跳过参数supress中包含的Watcher
+        // 执行Watcher的回调方法
         for (Watcher w : watchers) {
             if (supress != null && supress.contains(w)) {
                 continue;
@@ -146,6 +178,11 @@ public class WatchManager {
      * @param byPath iff true output watches by paths, otw output
      * watches by connection
      * @return string representation of watches
+     */
+    /**
+     * dump出Watcher
+     * @param pwriter
+     * @param byPath
      */
     public synchronized void dumpWatches(PrintWriter pwriter, boolean byPath) {
         if (byPath) {
