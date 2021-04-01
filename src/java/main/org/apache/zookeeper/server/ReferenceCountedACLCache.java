@@ -40,6 +40,9 @@ import java.util.concurrent.atomic.AtomicLong;
  * 1.acl集合对应的long值
  * 2.long值对应的acl集合的关系
  * 3.记录了acl对应的long值的引用次数
+ *
+ * 各节点上的信息，只保存了acl的整形值，这个整形值就是对acl缓存的引用值，而真正的acl集合
+ * 信息缓存在ReferenceCountedACLCache类中，对于datatree整个树形结构来说节省了大量的内存
  */
 public class ReferenceCountedACLCache {
     private static final Logger LOG = LoggerFactory.getLogger(ReferenceCountedACLCache.class);
