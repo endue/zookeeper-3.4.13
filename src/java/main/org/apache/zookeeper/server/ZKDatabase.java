@@ -108,6 +108,7 @@ public class ZKDatabase {
      * the clear method does clear out all the
      * data structures in zkdatabase.
      */
+    // 清空内存数据库
     public void clear() {
         minCommittedLog = 0;
         maxCommittedLog = 0;
@@ -251,26 +252,32 @@ public class ZKDatabase {
      * fast follower synchronization.
      * @param request committed request
      */
+    // 添加已提交的提案到committedLog
     public void addCommittedProposal(Request request) {
         WriteLock wl = logLock.writeLock();
         try {
             wl.lock();
+            // 当前提交的提案集合committedLog已保存数超过允许的最大数量,删除头结点并更新minCommittedLog
             if (committedLog.size() > commitLogCount) {
                 committedLog.removeFirst();
                 minCommittedLog = committedLog.getFirst().packet.getZxid();
             }
+            // 当前提交的提案集合committedLog为0,更新minCommittedLog和maxCommittedLog为当前参数request的zxid
             if (committedLog.size() == 0) {
                 minCommittedLog = request.zxid;
                 maxCommittedLog = request.zxid;
             }
 
-            //
+            // 封装请求到QuorumPacket
             byte[] data = SerializeUtils.serializeRequest(request);
             QuorumPacket pp = new QuorumPacket(Leader.PROPOSAL, request.zxid, data, null);
+            // 封装一个提案
             Proposal p = new Proposal();
             p.packet = pp;
             p.request = request;
+            // 添加到committedLog
             committedLog.add(p);
+            // 更新maxCommittedLog
             maxCommittedLog = p.packet.getZxid();
         } finally {
             wl.unlock();
