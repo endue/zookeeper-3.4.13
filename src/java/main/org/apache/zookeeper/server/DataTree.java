@@ -79,7 +79,7 @@ public class DataTree {
      */
     // 内存目录树,记录了路径path和对应的节点信息
     private final ConcurrentHashMap<String, DataNode> nodes = new ConcurrentHashMap<String, DataNode>();
-    // 节点事件管理器
+    // 当前节点事件管理器
     private final WatchManager dataWatches = new WatchManager();
     // 子节点事件管理器
     private final WatchManager childWatches = new WatchManager();
@@ -116,7 +116,7 @@ public class DataTree {
     /**
      * This hashtable lists the paths of the ephemeral nodes of a session.
      */
-    // 记录临时节点
+    // 记录临时节点,key是客户端sessionID,value是路径
     private final Map<Long, HashSet<String>> ephemerals = new ConcurrentHashMap<Long, HashSet<String>>();
     //
     private final ReferenceCountedACLCache aclCache = new ReferenceCountedACLCache();
@@ -478,6 +478,7 @@ public class DataTree {
     }
 
     /**
+     * 删除路径
      * remove the path from the datatree
      *
      * @param path
@@ -489,32 +490,44 @@ public class DataTree {
     public void deleteNode(String path, long zxid)
             throws KeeperException.NoNodeException {
         int lastSlash = path.lastIndexOf('/');
+        // 获取父路径
         String parentName = path.substring(0, lastSlash);
+        // 获取当前路径
         String childName = path.substring(lastSlash + 1);
+        // 1.校验并删除路径对应的节点信息
         DataNode node = nodes.get(path);
         if (node == null) {
             throw new KeeperException.NoNodeException();
         }
         nodes.remove(path);
+        // 2.
         synchronized (node) {
             aclCache.removeUsage(node.acl);
         }
+        // 3. 校验父节点
         DataNode parent = nodes.get(parentName);
         if (parent == null) {
             throw new KeeperException.NoNodeException();
         }
         synchronized (parent) {
+            // 3-1. 删除父节点下对应的子节点
             parent.removeChild(childName);
+            // 3-3. 更新父节点的pzxid
             parent.stat.setPzxid(zxid);
+            // 3-4. 获取当前节点的所有者
             long eowner = node.stat.getEphemeralOwner();
+            // 如果所有者sessionId不为0表示是一个临时节点
             if (eowner != 0) {
+                // 3-5. 获取临时sessionId对应的所有路径
                 HashSet<String> nodes = ephemerals.get(eowner);
                 if (nodes != null) {
+                    // 3-6. 删除该路径
                     synchronized (nodes) {
                         nodes.remove(path);
                     }
                 }
             }
+            // 4.删除路径对应的父节点置为null
             node.parent = null;
         }
         if (parentName.startsWith(procZookeeper)) {
@@ -543,9 +556,12 @@ public class DataTree {
             ZooTrace.logTraceMessage(LOG, ZooTrace.EVENT_DELIVERY_TRACE_MASK,
                     "childWatches.triggerWatch " + parentName);
         }
+        // 这个触发的是监听path节点的事件
         Set<Watcher> processed = dataWatches.triggerWatch(path,
                 EventType.NodeDeleted);
+        // 这个触发的是path的父节点对应的path节点的监听事件
         childWatches.triggerWatch(path, EventType.NodeDeleted, processed);
+        // 最后触发子节点删除事件
         childWatches.triggerWatch(parentName.equals("") ? "/" : parentName,
                 EventType.NodeChildrenChanged);
     }
@@ -923,6 +939,12 @@ public class DataTree {
         return rc;
     }
 
+    /**
+     * 终止session
+     * @param session 客户端sessionId
+     * @param zxid 终止session的事务id
+     * 注:由于终止了session所以也需要删除对应的临时路径
+     */
     void killSession(long session, long zxid) {
         // the list is already removed from the ephemerals
         // so we do not have to worry about synchronizing on

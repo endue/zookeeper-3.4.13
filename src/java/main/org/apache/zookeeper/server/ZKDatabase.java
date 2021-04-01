@@ -67,14 +67,17 @@ public class ZKDatabase {
      */
     // 内存目录树
     protected DataTree dataTree;
-    // 记录sessionId和对应的过期时间戳
+    // 记录客户端sessionId和对应的过期时间戳
     protected ConcurrentHashMap<Long, Integer> sessionsWithTimeouts;
     // FileTxnSnapLog里面记录了数据日志和事物快照的相关类
     protected FileTxnSnapLog snapLog;
     protected long minCommittedLog, maxCommittedLog;
+    // committedLog集合允许的最大数量
     public static final int commitLogCount = 500;
     protected static int commitLogBuffer = 700;
+    // 记录最近最多commitLogCount个提案
     protected LinkedList<Proposal> committedLog = new LinkedList<Proposal>();
+    // 操作committedLog的锁
     protected ReentrantReadWriteLock logLock = new ReentrantReadWriteLock();
     // 在启动的时候从磁盘加载完数据会初始化为true
     volatile private boolean initialized = false;
@@ -275,7 +278,7 @@ public class ZKDatabase {
             Proposal p = new Proposal();
             p.packet = pp;
             p.request = request;
-            // 添加到committedLog
+            // 添加到committedLog末尾
             committedLog.add(p);
             // 更新maxCommittedLog
             maxCommittedLog = p.packet.getZxid();
