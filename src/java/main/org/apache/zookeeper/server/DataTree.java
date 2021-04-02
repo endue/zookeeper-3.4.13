@@ -118,10 +118,11 @@ public class DataTree {
      */
     // 记录临时节点,key是客户端sessionID,value是路径
     private final Map<Long, HashSet<String>> ephemerals = new ConcurrentHashMap<Long, HashSet<String>>();
-    //
+    // acl与long值对应关系缓存类
     private final ReferenceCountedACLCache aclCache = new ReferenceCountedACLCache();
 
     @SuppressWarnings("unchecked")
+    // 根据sessionId获取其对应的所有临时路径
     public HashSet<String> getEphemerals(long sessionId) {
         HashSet<String> retv = ephemerals.get(sessionId);
         if (retv == null) {
@@ -146,7 +147,7 @@ public class DataTree {
     /**
      * just an accessor method to allow raw creation of datatree's from a bunch
      * of datanodes
-     *
+     * 记录路径和其节点信息
      * @param path
      *            the path of the datanode
      * @param node
@@ -155,7 +156,7 @@ public class DataTree {
     public void addDataNode(String path, DataNode node) {
         nodes.put(path, node);
     }
-
+    // 返回路径对应的节点信息
     public DataNode getNode(String path) {
         return nodes.get(path);
     }
@@ -167,7 +168,7 @@ public class DataTree {
     public int getWatchCount() {
         return dataWatches.size() + childWatches.size();
     }
-
+    // 获取素有的临时路径数量
     public int getEphemeralsCount() {
         Map<Long, HashSet<String>> map = this.getEphemeralsMap();
         int result = 0;
@@ -199,13 +200,14 @@ public class DataTree {
      * This is a pointer to the root of the DataTree. It is the source of truth,
      * but we usually use the nodes hashmap to find nodes in the tree.
      */
-    // 内存目录树的根路径对应的节点
+    // 内存目录树的根路径对应的节点信息
     private DataNode root = new DataNode(null, new byte[0], -1L,
             new StatPersisted());
 
     /**
      * create a /zookeeper filesystem that is the proc filesystem of zookeeper
      */
+    // /zookeeper路径对应的节点信息
     private DataNode procDataNode = new DataNode(root, new byte[0], -1L,
             new StatPersisted());
 
@@ -213,6 +215,7 @@ public class DataTree {
      * create a /zookeeper/quota node for maintaining quota properties for
      * zookeeper
      */
+    // /zookeeper/quota对应的节点信息
     private DataNode quotaDataNode = new DataNode(procDataNode, new byte[0],
             -1L, new StatPersisted());
 
@@ -295,7 +298,9 @@ public class DataTree {
      *            the diff to be added to the count
      */
     public void updateCount(String lastPrefix, int diff) {
+        // 获取统计路径/zookeeper/quota{path}/zookeeper_stats
         String statNode = Quotas.statPath(lastPrefix);
+        // 获取该路径下的节点信息
         DataNode node = nodes.get(statNode);
         StatsTrack updatedStat = null;
         if (node == null) {
@@ -309,6 +314,7 @@ public class DataTree {
             node.data = updatedStat.toString().getBytes();
         }
         // now check if the counts match the quota
+        // 获取统计路径/zookeeper/quota{path}/zookeeper_limits
         String quotaNode = Quotas.quotaPath(lastPrefix);
         node = nodes.get(quotaNode);
         StatsTrack thisStats = null;
@@ -391,13 +397,13 @@ public class DataTree {
             long ephemeralOwner, int parentCVersion, long zxid, long time)
             throws KeeperException.NoNodeException,
             KeeperException.NodeExistsException {
-        // 计算最后一个/的位置
+        // 计算path(假设为/data/gateway/user/add)路径最后一个/的位置
         int lastSlash = path.lastIndexOf('/');
-        // 截取出/data/gateway/user
+        // 截取出父路径/data/gateway/user
         String parentName = path.substring(0, lastSlash);
-        // 截取出add
+        // 截取出子路径add
         String childName = path.substring(lastSlash + 1);
-        // 封装一个StatPersisted
+        // 封装一个节点信息stat
         StatPersisted stat = new StatPersisted();
         stat.setCtime(time);
         stat.setMtime(time);
@@ -406,7 +412,7 @@ public class DataTree {
         stat.setPzxid(zxid);
         stat.setVersion(0);
         stat.setAversion(0);
-        // 设置当前节点的持有sessionID
+        // 设置节点信息stat的持有sessionID
         stat.setEphemeralOwner(ephemeralOwner);
         // 获取父路径对应的节点信息
         DataNode parent = nodes.get(parentName);
@@ -414,8 +420,9 @@ public class DataTree {
         if (parent == null) {
             throw new KeeperException.NoNodeException();
         }
+        // 锁住父路径,反之并发创建节点
         synchronized (parent) {
-            // 获取父路径对应节点信息中的所有子路径
+            // 获取父路径的所有子路径
             Set<String> children = parent.getChildren();
             // 子路径已存在,抛出异常
             if (children.contains(childName)) {
@@ -427,16 +434,17 @@ public class DataTree {
                 parentCVersion++;
             }    
             parent.stat.setCversion(parentCVersion);
+            // 更新pzxid
             parent.stat.setPzxid(zxid);
             // 转换节点acl权限为一个long
             Long longval = aclCache.convertAcls(acl);
             // 创建子路径对应的节点信息
             DataNode child = new DataNode(parent, data, longval, stat);
-            // 添加子路径到父路径对应的节点信息
+            // 添加子路径到父路径的子路径集合中
             parent.addChild(childName);
-            // 记录子路径和节点信息
+            // 记录完整子路径和节点信息
             nodes.put(path, child);
-            // 如果是临时节点
+            // 如果是临时节点,记录完整路径和ephemeralOwner的关系
             if (ephemeralOwner != 0) {
                 HashSet<String> list = ephemerals.get(ephemeralOwner);
                 if (list == null) {
@@ -449,13 +457,17 @@ public class DataTree {
             }
         }
         // now check if its one of the zookeeper node child
+        // 检查添加路径的父路径是否为/zookeeper/quota的子路径
         if (parentName.startsWith(quotaZookeeper)) {
+            // 走到这里说明是
             // now check if its the limit node
+            // 判断添加路径是否为zookeeper_limits
             if (Quotas.limitNode.equals(childName)) {
                 // this is the limit node
                 // get the parent and add it to the trie
                 pTrie.addPath(parentName.substring(quotaZookeeper.length()));
             }
+            // 判断添加路径是否为zookeeper_stats
             if (Quotas.statNode.equals(childName)) {
                 updateQuotaForPath(parentName
                         .substring(quotaZookeeper.length()));
@@ -469,9 +481,9 @@ public class DataTree {
             updateBytes(lastPrefix, data == null ? 0 : data.length);
         }
         // 触发事件
-        // 1.触发参数path路径下的NodeCreated事件
+        // 1.触发监听path路径的NodeCreated事件
         dataWatches.triggerWatch(path, Event.EventType.NodeCreated);
-        // 2.触发parentName路径下的NodeChildrenChanged事件
+        // 2.触发监听parentName路径的NodeChildrenChanged事件
         childWatches.triggerWatch(parentName.equals("") ? "/" : parentName,
                 Event.EventType.NodeChildrenChanged);
         return path;
@@ -556,19 +568,31 @@ public class DataTree {
             ZooTrace.logTraceMessage(LOG, ZooTrace.EVENT_DELIVERY_TRACE_MASK,
                     "childWatches.triggerWatch " + parentName);
         }
-        // 这个触发的是监听path节点的事件
+        // 5.触发监听path路径的NodeDeleted事件
         Set<Watcher> processed = dataWatches.triggerWatch(path,
                 EventType.NodeDeleted);
-        // 这个触发的是path的父节点对应的path节点的监听事件
+        // 6.todo? 这个是什么场景
         childWatches.triggerWatch(path, EventType.NodeDeleted, processed);
-        // 最后触发子节点删除事件
+        // 7.触发监听parentName路径的NodeChildrenChanged事件
         childWatches.triggerWatch(parentName.equals("") ? "/" : parentName,
                 EventType.NodeChildrenChanged);
     }
 
+    /**
+     * 更新路径的节点数据
+     * @param path 路径
+     * @param data 节点只
+     * @param version 版本
+     * @param zxid zxid
+     * @param time 时间戳
+     * @return Stat 要返回的信息对象
+     * @throws KeeperException.NoNodeException
+     */
     public Stat setData(String path, byte data[], int version, long zxid,
             long time) throws KeeperException.NoNodeException {
+        // 记录返回的节点信息
         Stat s = new Stat();
+        // 获取路径对应的节点信息
         DataNode n = nodes.get(path);
         if (n == null) {
             throw new KeeperException.NoNodeException();
@@ -588,6 +612,7 @@ public class DataTree {
           this.updateBytes(lastPrefix, (data == null ? 0 : data.length)
               - (lastdata == null ? 0 : lastdata.length));
         }
+        // 触发监听path路径的NodeDataChanged事件
         dataWatches.triggerWatch(path, EventType.NodeDataChanged);
         return s;
     }
@@ -612,14 +637,25 @@ public class DataTree {
         }
     }
 
+    /**
+     * 获取路径对应的节点数据并添加事件监听器
+     * @param path
+     * @param stat
+     * @param watcher
+     * @return
+     * @throws KeeperException.NoNodeException
+     */
     public byte[] getData(String path, Stat stat, Watcher watcher)
             throws KeeperException.NoNodeException {
+        // 获取路径对应的节点信息
         DataNode n = nodes.get(path);
+        // 校验是否存在
         if (n == null) {
             throw new KeeperException.NoNodeException();
         }
         synchronized (n) {
             n.copyStat(stat);
+            // 事件不为null,则添加对path路径的监听事件
             if (watcher != null) {
                 dataWatches.addWatch(path, watcher);
             }
@@ -627,10 +663,18 @@ public class DataTree {
         }
     }
 
+    /**
+     * 获取路径对应的Stat数据并添加事件监听器
+     * @param path
+     * @param watcher
+     * @return
+     * @throws KeeperException.NoNodeException
+     */
     public Stat statNode(String path, Watcher watcher)
             throws KeeperException.NoNodeException {
         Stat stat = new Stat();
         DataNode n = nodes.get(path);
+        // 事件不为null,添加path路径的监听事件
         if (watcher != null) {
             dataWatches.addWatch(path, watcher);
         }
@@ -643,6 +687,14 @@ public class DataTree {
         }
     }
 
+    /**
+     * 获取路径对应的所有子节点路径并添加事件监听器
+     * @param path
+     * @param stat
+     * @param watcher
+     * @return
+     * @throws KeeperException.NoNodeException
+     */
     public List<String> getChildren(String path, Stat stat, Watcher watcher)
             throws KeeperException.NoNodeException {
         DataNode n = nodes.get(path);
@@ -654,7 +706,7 @@ public class DataTree {
                 n.copyStat(stat);
             }
             List<String> children = new ArrayList<String>(n.getChildren());
-
+            // 事件不为null,添加path路径的监听事件
             if (watcher != null) {
                 childWatches.addWatch(path, watcher);
             }
@@ -662,6 +714,14 @@ public class DataTree {
         }
     }
 
+    /**
+     * 设置路径对应的acl集合
+     * @param path
+     * @param acl
+     * @param version
+     * @return
+     * @throws KeeperException.NoNodeException
+     */
     public Stat setACL(String path, List<ACL> acl, int version)
             throws KeeperException.NoNodeException {
         Stat stat = new Stat();
@@ -678,6 +738,13 @@ public class DataTree {
         }
     }
 
+    /**
+     * 获取路径对应的acl集合
+     * @param path
+     * @param stat
+     * @return
+     * @throws KeeperException.NoNodeException
+     */
     @SuppressWarnings("unchecked")
     public List<ACL> getACL(String path, Stat stat)
             throws KeeperException.NoNodeException {

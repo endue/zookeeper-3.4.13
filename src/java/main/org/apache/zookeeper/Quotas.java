@@ -50,6 +50,7 @@ public class Quotas {
      * @param path the actual path in zookeeper.
      * @return the limit quota path
      */
+    // 返回"/zookeeper/quota{path}/zookeeper_limits"
     public static String quotaPath(String path) {
         return quotaZookeeper + path +
         "/" + limitNode;
@@ -61,7 +62,7 @@ public class Quotas {
      * @param path the actual path in zookeeper
      * @return the stat quota path
      */
-    // 返回统计前缀/zookeeper/quota{path}/zookeeper_stats
+    // 返回"/zookeeper/quota{path}/zookeeper_stats"
     public static String statPath(String path) {
         return quotaZookeeper + path + "/" +
         statNode;

@@ -38,20 +38,23 @@ import org.apache.zookeeper.data.StatPersisted;
  */
 public class DataNode implements Record {
     /** the parent of this datanode */
+    // 父节点的节点信息
     DataNode parent;
 
     /** the data for this datanode */
-    // datanode的数据
+    // 当前datanode记录的数据
     byte data[];
 
     /**
      * the acl map long for this datanode. the datatree has the map
      */
+    // 权限列表
     Long acl;
 
     /**
      * the stat for this node that is persisted to disk.
      */
+    // 统计信息
     public StatPersisted stat;
 
     /**
