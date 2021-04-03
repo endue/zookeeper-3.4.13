@@ -456,7 +456,9 @@ public class ClientCnxn {
     private Object eventOfDeath = new Object();
 
     private static class WatcherSetEventPair {
+        // 需要被通知的Watcher
         private final Set<Watcher> watchers;
+        // 事件
         private final WatchedEvent event;
 
         public WatcherSetEventPair(Set<Watcher> watchers, WatchedEvent event) {
@@ -478,7 +480,7 @@ public class ClientCnxn {
 
     // 负责事件
     class EventThread extends ZooKeeperThread {
-        // 事件队列
+        // 事件或响应队列
         private final LinkedBlockingQueue<Object> waitingEvents =
             new LinkedBlockingQueue<Object>();
 
@@ -497,7 +499,7 @@ public class ClientCnxn {
         }
 
         /**
-         * 事件入队列
+         * Watcher事件入队列
          * @param event
          */
         public void queueEvent(WatchedEvent event) {
@@ -508,16 +510,18 @@ public class ClientCnxn {
             sessionState = event.getState();
 
             // materialize the watchers based on the event
+            // 根据Watcher事件中的相关信息,获取需要触发的Watcher并封装到一个WatcherSetEventPair对象中
             WatcherSetEventPair pair = new WatcherSetEventPair(
                     watcher.materialize(event.getState(), event.getType(),// 这里可能会清空所有的事件监听器
                             event.getPath()),
                             event);
             // queue the pair (watch set & event) for later processing
+            // 添加到待处理集合
             waitingEvents.add(pair);
         }
 
         /**
-         * 响应队列
+         * 响应入队列
          * @param packet
          */
        public void queuePacket(Packet packet) {
@@ -567,10 +571,16 @@ public class ClientCnxn {
                      Long.toHexString(getSessionId()));
         }
 
+        /**
+         * 处理事件
+         * @param event
+         */
        private void processEvent(Object event) {
           try {
+              // 如果event类型为WatcherSetEventPair说明是事件相关
               if (event instanceof WatcherSetEventPair) {
                   // each watcher will process the event
+                  // 获取所有需要回到的Watcher,执行其process()方法并传入WatchedEvent
                   WatcherSetEventPair pair = (WatcherSetEventPair) event;
                   for (Watcher watcher : pair.watchers) {
                       try {
@@ -579,6 +589,7 @@ public class ClientCnxn {
                           LOG.error("Error while calling watcher ", t);
                       }
                   }
+              // 走该分支说明是操作相关
               } else {
                   Packet p = (Packet) event;
                   int rc = 0;
@@ -586,8 +597,10 @@ public class ClientCnxn {
                   if (p.replyHeader.getErr() != 0) {
                       rc = p.replyHeader.getErr();
                   }
+                  // 没有回调
                   if (p.cb == null) {
                       LOG.warn("Somehow a null cb got to EventThread!");
+                  // 有回调以下就是触发各种回调
                   } else if (p.response instanceof ExistsResponse
                           || p.response instanceof SetDataResponse
                           || p.response instanceof SetACLResponse) {
@@ -1014,7 +1027,7 @@ public class ClientCnxn {
                             OpCode.auth), null, new AuthPacket(0, id.scheme,
                             id.data), null, null));
                 }
-                // 最好将ConnectRequest添加到队列头部
+                // 最后将ConnectRequest添加到队列头部
                 outgoingQueue.addFirst(new Packet(null, null, conReq,
                             null, null, readOnly));
             }

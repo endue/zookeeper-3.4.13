@@ -70,7 +70,7 @@ public class Request {
         this.cnxn = null;
         this.authInfo = null;
     }
-    // sessionID
+    // 客户端的sessionID
     public final long sessionId;
     //
     public final int cxid;
@@ -78,13 +78,13 @@ public class Request {
      *  Request类型,{@link org.apache.zookeeper.ZooDefs.OpCode }
      */
     public final int type;
-
+    // 如果是createSession请求,记录了session超时时间
     public final ByteBuffer request;
-
+    // 当前请求所属客户端在服务端对应的ServerCnxn
     public final ServerCnxn cnxn;
 
     public TxnHeader hdr;
-
+    // 如果是createSession请求,记录了CreateSessionTxn
     public Record txn;
 
     public long zxid = -1;

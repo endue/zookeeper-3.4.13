@@ -22,11 +22,17 @@ package org.apache.zookeeper.txn;
 import org.apache.jute.*;
 import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Public
+// 事务请求头
 public class TxnHeader implements Record {
+  // 客户端id其实就是sessionId
   private long clientId;
+  // 客户端发送的数据包中的cxid
   private int cxid;
+  // 服务端处理该数据包对应的zxid
   private long zxid;
+  // 时间戳
   private long time;
+  // 请求类型
   private int type;
   public TxnHeader() {
   }

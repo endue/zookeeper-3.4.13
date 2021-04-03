@@ -30,9 +30,9 @@ public interface ClientWatchManager {
      * that the callee is now responsible for notifying the watchers of the 
      * event, possibly at some later time.
      * 
-     * @param state event state
-     * @param type event type
-     * @param path event path
+     * @param state event state 事件状态
+     * @param type event type 事件类型
+     * @param path event path 路径
      * @return may be empty set but must not be null
      */
     public Set<Watcher> materialize(Watcher.Event.KeeperState state,

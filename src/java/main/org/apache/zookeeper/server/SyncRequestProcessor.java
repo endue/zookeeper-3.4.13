@@ -142,7 +142,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
                 } else {
                     // 获取请求队列中的一个请求，这个方法在queuedRequests队列为空时会返回null
                     si = queuedRequests.poll();
-                    if (si == null) {// queuedRequests队列已经空了没有请求要处理了，将toFlush队列中的请求刷入磁盘
+                    if (si == null) {// queuedRequests队列已经空了没有请求要处理了，将toFlush队列中的请求刷入磁盘,注:flush()操作会将请求交给下一个processor处理
                         flush(toFlush);
                         continue;
                     }
@@ -211,7 +211,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
         LOG.info("SyncRequestProcessor exited!");
     }
 
-    // 刷磁盘
+    // 刷磁盘,这里也会将请求交给下一个processor处理
     private void flush(LinkedList<Request> toFlush)
         throws IOException, RequestProcessorException
     {

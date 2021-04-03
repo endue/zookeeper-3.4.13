@@ -120,7 +120,7 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
         // 如果是OP_WRITE事件
         if (sockKey.isWritable()) {
             synchronized(outgoingQueue) {
-                // 1.查找ConnectRequest的数据包
+                // 1.查找可发送的数据包
                 Packet p = findSendablePacket(outgoingQueue,
                         cnxn.sendThread.clientTunneledAuthenticationInProgress());
 
@@ -423,7 +423,7 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
                     // 更新一下最后发送数据和心跳的时间戳
                     updateLastSendAndHeard();
                     // 把watches和authData等数据发过去，并更新SelectionKey为读写
-                    // 注意内部会创建ConnectRequest
+                    // 注:内部会创建ConnectRequest
                     sendThread.primeConnection();
                 }
             // 如果是OP_READ或OP_WRITE事件

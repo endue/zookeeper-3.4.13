@@ -132,14 +132,23 @@ public class ZooKeeper {
      */
     // 事件监听管理器
     private static class ZKWatchManager implements ClientWatchManager {
+        // 路径对应节点数据变更的Watcher
         private final Map<String, Set<Watcher>> dataWatches =
             new HashMap<String, Set<Watcher>>();
+        // 路径存在与否的Watcher
         private final Map<String, Set<Watcher>> existWatches =
             new HashMap<String, Set<Watcher>>();
+        // 路径子节点变化的Watcher
         private final Map<String, Set<Watcher>> childWatches =
             new HashMap<String, Set<Watcher>>();
+        // 默认Watcher,在构造Zookeeper是没有指定则使用这个
         private volatile Watcher defaultWatcher;
 
+        /**
+         * 将from中Watcher添加到to中
+         * @param from
+         * @param to
+         */
         final private void addTo(Set<Watcher> from, Set<Watcher> to) {
             if (from != null) {
                 to.addAll(from);
@@ -149,63 +158,76 @@ public class ZooKeeper {
         /* (non-Javadoc)
          * @see org.apache.zookeeper.ClientWatchManager#materialize(Event.KeeperState, 
          *                                                        Event.EventType, java.lang.String)
+         *  在事件发生后，返回需要被通知的Watcher集合
          */
         @Override
-        public Set<Watcher> materialize(Watcher.Event.KeeperState state,
-                                        Watcher.Event.EventType type,
-                                        String clientPath)
+        public Set<Watcher> materialize(Watcher.Event.KeeperState state,// 事件状态
+                                        Watcher.Event.EventType type,// 事件类型
+                                        String clientPath)// 路径
         {
+            // 结果集合
             Set<Watcher> result = new HashSet<Watcher>();
 
             switch (type) {
-            case None:
+            case None:// 无事件类型
+                //  添加默认的事件到结果集合
                 result.add(defaultWatcher);
                 boolean clear = ClientCnxn.getDisableAutoResetWatch() &&
                         state != Watcher.Event.KeeperState.SyncConnected;
 
+                // 将dataWatches事件集合添加到结果集
                 synchronized(dataWatches) {
                     for(Set<Watcher> ws: dataWatches.values()) {
                         result.addAll(ws);
                     }
+                    // 是否清空dataWatches事件集合
                     if (clear) {
                         dataWatches.clear();
                     }
                 }
 
+                // 将existWatches事件集合添加到结果集
                 synchronized(existWatches) {
                     for(Set<Watcher> ws: existWatches.values()) {
                         result.addAll(ws);
                     }
+                    // 是否清空existWatches事件集合
                     if (clear) {
                         existWatches.clear();
                     }
                 }
 
+                // 将childWatches事件集合添加到结果集
                 synchronized(childWatches) {
                     for(Set<Watcher> ws: childWatches.values()) {
                         result.addAll(ws);
                     }
+                    // 是否清空childWatches事件集合
                     if (clear) {
                         childWatches.clear();
                     }
                 }
-
+                // 返回事件集合
                 return result;
-            case NodeDataChanged:
-            case NodeCreated:
+            case NodeDataChanged:// 节点数据发生变化事件
+            case NodeCreated:// 创建节点事件
+                // 将dataWatches事件集合中clientPath关联的事件全部移除到结果集
                 synchronized (dataWatches) {
                     addTo(dataWatches.remove(clientPath), result);
                 }
+                // 将existWatches事件集合中clientPath关联的事件全部移除到结果集
                 synchronized (existWatches) {
                     addTo(existWatches.remove(clientPath), result);
                 }
                 break;
-            case NodeChildrenChanged:
+            case NodeChildrenChanged:// 子节点发生变化事件
+                // 将childWatches事件集合中clientPath关联的事件全部移除到结果集
                 synchronized (childWatches) {
                     addTo(childWatches.remove(clientPath), result);
                 }
                 break;
-            case NodeDeleted:
+            case NodeDeleted:// 删除节点事件
+                // 将dataWatches事件集合中clientPath关联的事件全部移除到结果集
                 synchronized (dataWatches) {
                     addTo(dataWatches.remove(clientPath), result);
                 }
@@ -217,6 +239,7 @@ public class ZooKeeper {
                         LOG.warn("We are triggering an exists watch for delete! Shouldn't happen!");
                     }
                 }
+                // 将childWatches事件集合中clientPath关联的事件全部移除到结果集
                 synchronized (childWatches) {
                     addTo(childWatches.remove(clientPath), result);
                 }
@@ -227,7 +250,7 @@ public class ZooKeeper {
                 LOG.error(msg);
                 throw new RuntimeException(msg);
             }
-
+            // 返回结果集
             return result;
         }
     }

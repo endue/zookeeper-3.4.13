@@ -260,7 +260,7 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
         return nextSessionId++;
     }
 
-    // 添加sesionid以及对应的超时时间
+    // 添加sesionid对应的超时时间以及对应的SessionImpl
     synchronized public void addSession(long id, int sessionTimeout) {
         // 保存session
         sessionsWithTimeout.put(id, sessionTimeout);

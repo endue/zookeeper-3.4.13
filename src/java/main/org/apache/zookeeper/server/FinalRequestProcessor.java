@@ -151,6 +151,7 @@ public class FinalRequestProcessor implements RequestProcessor {
         ServerCnxn cnxn = request.cnxn;
 
         String lastOp = "NA";
+        // 请求处理完毕,递减一个
         zks.decInProcess();
         Code err = Code.OK;
         Record rsp = null;
@@ -187,7 +188,7 @@ public class FinalRequestProcessor implements RequestProcessor {
                 lastOp = "SESS";
                 cnxn.updateStatsForResponse(request.cxid, request.zxid, lastOp,
                         request.createTime, Time.currentElapsedTime());
-
+                // session初始化完毕,创建响应返回给客户端
                 zks.finishSessionInit(request.cnxn, true);
                 return;
             }

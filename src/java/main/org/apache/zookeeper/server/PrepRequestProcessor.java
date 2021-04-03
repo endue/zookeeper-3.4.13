@@ -332,7 +332,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
      * singleton, so there will be a single thread calling this code.
      *
      * @param type 请求类型
-     * @param zxid zxid
+     * @param zxid zk服务的下一个zxid
      * @param request 请求
      * @param record
      */
@@ -340,7 +340,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
     protected void pRequest2Txn(int type, long zxid, Request request, Record record, boolean deserialize)
         throws KeeperException, IOException, RequestProcessorException
     {
-        // 设置事务头
+        // 设置请求中的事务头
         request.hdr = new TxnHeader(request.sessionId, request.cxid, zxid,
                                     Time.currentWallTime(), type);
 
@@ -494,6 +494,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 break;
             case OpCode.createSession:
                 request.request.rewind();
+                // 读取session超时时间
                 int to = request.request.getInt();
                 request.txn = new CreateSessionTxn(to);
                 request.request.rewind();

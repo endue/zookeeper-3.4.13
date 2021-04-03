@@ -657,7 +657,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
     // 创建session
     // cnxn是针对当前客户端的NIOServerCnxn
     long createSession(ServerCnxn cnxn, byte passwd[], int timeout) {
-        // 创建sessionId
+        // 创建sessionId,以及对应的SessionImpl
         long sessionId = sessionTracker.createSession(timeout);
         // 生成随机密码
         Random r = new Random(sessionId ^ superSecret);
@@ -777,10 +777,12 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
 
     /**
      * 提交请求
-     * @param cnxn
-     * @param sessionId
-     * @param xid
-     * @param bb
+     * @param cnxn 对应当前客户端的ServerCnxn
+     * @param sessionId 客户端的sessionId
+     * @param xid 0
+     * @param bb 4个字节记录了session的超时时间
+     * @param type 提交的请求类型
+     * @param authInfo
      */
     private void submitRequest(ServerCnxn cnxn, long sessionId, int type,
             int xid, ByteBuffer bb, List<Id> authInfo) {
