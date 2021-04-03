@@ -774,6 +774,7 @@ public class DataTree {
         return aclCache.size();
     }
 
+    // 处理完事务之后的返回结果
     static public class ProcessTxnResult {
         public long clientId;
 
@@ -829,6 +830,7 @@ public class DataTree {
      */
     public ProcessTxnResult processTxn(TxnHeader header, Record txn)
     {
+        // 返回的处理事务请求结果
         ProcessTxnResult rc = new ProcessTxnResult();
 
         try {
@@ -839,6 +841,7 @@ public class DataTree {
             rc.err = 0;
             rc.multiResult = null;
             switch (header.getType()) {
+                // 创建节点
                 case OpCode.create:
                     CreateTxn createTxn = (CreateTxn) txn;
                     rc.path = createTxn.getPath();
@@ -850,11 +853,13 @@ public class DataTree {
                             createTxn.getParentCVersion(),
                             header.getZxid(), header.getTime());
                     break;
+                    // 删除节点
                 case OpCode.delete:
                     DeleteTxn deleteTxn = (DeleteTxn) txn;
                     rc.path = deleteTxn.getPath();
                     deleteNode(deleteTxn.getPath(), header.getZxid());
                     break;
+                    // 更新节点数据
                 case OpCode.setData:
                     SetDataTxn setDataTxn = (SetDataTxn) txn;
                     rc.path = setDataTxn.getPath();
@@ -862,12 +867,14 @@ public class DataTree {
                             .getData(), setDataTxn.getVersion(), header
                             .getZxid(), header.getTime());
                     break;
+                    // 更新节点ACL
                 case OpCode.setACL:
                     SetACLTxn setACLTxn = (SetACLTxn) txn;
                     rc.path = setACLTxn.getPath();
                     rc.stat = setACL(setACLTxn.getPath(), setACLTxn.getAcl(),
                             setACLTxn.getVersion());
                     break;
+                    // 关闭客户端session,这里最终是批量执行了deleteNode()操作
                 case OpCode.closeSession:
                     killSession(header.getClientId(), header.getZxid());
                     break;
@@ -1019,8 +1026,10 @@ public class DataTree {
         // so there is no need for synchronization. The list is not
         // changed here. Only create and delete change the list which
         // are again called from FinalRequestProcessor in sequence.
+        // 获取所有关于该sessionId的路径
         HashSet<String> list = ephemerals.remove(session);
         if (list != null) {
+            // 遍历删除路径
             for (String path : list) {
                 try {
                     deleteNode(path, zxid);
