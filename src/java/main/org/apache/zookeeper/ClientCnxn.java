@@ -279,9 +279,12 @@ public class ClientCnxn {
         boolean finished;
         // 回调
         AsyncCallback cb;
-        // 客户端进行相关操作时携带的东西,具体是什么?
+        // 客户端进行相关操作时携带的东西,算是上下文
+        // 在回调的时候将该值传递给回调函数
         Object ctx;
-        //
+        // 在getData,exists,getChildren等操作时,如果设置了Watcher
+        // 就会封装一个WatchRegistration对象,用来绑定path和Watcher的对应关系
+        // 当收到响应后会在该path上注册设置的Watcher
         WatchRegistration watchRegistration;
         // 是否只读
         public boolean readOnly;
