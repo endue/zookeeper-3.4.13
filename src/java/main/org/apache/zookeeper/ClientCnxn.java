@@ -279,7 +279,7 @@ public class ClientCnxn {
         boolean finished;
         // 回调
         AsyncCallback cb;
-        //
+        // 客户端进行相关操作时携带的东西,具体是什么?
         Object ctx;
         //
         WatchRegistration watchRegistration;
@@ -926,7 +926,7 @@ public class ClientCnxn {
                             + Long.toHexString(sessionId) + ", packet:: " + packet);
                 }
             } finally {
-                // 完成
+                // 完成请求的处理
                 finishPacket(packet);
             }
         }

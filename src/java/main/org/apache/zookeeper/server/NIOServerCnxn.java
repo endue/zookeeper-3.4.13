@@ -80,6 +80,7 @@ public class NIOServerCnxn extends ServerCnxn {
     /**
      * The number of requests that have been submitted but not yet responded to.
      */
+    // 记录已提交当时还未收到回复的请求
     int outstandingRequests;
 
     /**
@@ -1195,11 +1196,13 @@ public class NIOServerCnxn extends ServerCnxn {
             bb.putInt(b.length - 4).rewind();
             sendBuffer(bb);
             if (h.getXid() > 0) {
+                // 请求收到了响应,记录数递减1
                 synchronized(this){
                     outstandingRequests--;
                 }
                 // check throttling
-                synchronized (this.factory) {        
+                synchronized (this.factory) {
+                    // 判断是否订阅对应客户端的OP_READ事件
                     if (zkServer.getInProcess() < outstandingLimit
                             || outstandingRequests < 1) {
                         sk.selector().wakeup();

@@ -85,6 +85,7 @@ public class Request {
 
     public TxnHeader hdr;
     // 如果是createSession请求,记录了CreateSessionTxn
+    // 如果是create请求,集了CreateTxn
     public Record txn;
 
     public long zxid = -1;

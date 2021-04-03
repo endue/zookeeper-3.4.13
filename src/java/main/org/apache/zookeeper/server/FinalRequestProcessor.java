@@ -148,6 +148,7 @@ public class FinalRequestProcessor implements RequestProcessor {
         if (request.cnxn == null) {
             return;
         }
+        // 获取对应发送当前请求的客户端的ServerCnxn
         ServerCnxn cnxn = request.cnxn;
 
         String lastOp = "NA";
@@ -399,6 +400,7 @@ public class FinalRequestProcessor implements RequestProcessor {
                     request.createTime, Time.currentElapsedTime());
 
         try {
+            // 发送响应
             cnxn.sendResponse(hdr, rsp, "response");
             if (closeSession) {
                 cnxn.sendCloseSession();

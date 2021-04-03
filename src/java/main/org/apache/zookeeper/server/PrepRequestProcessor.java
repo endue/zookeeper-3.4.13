@@ -395,7 +395,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 }
                 // 更新父节点的子节点版本号，也就是cversion
                 int newCversion = parentRecord.stat.getCversion()+1;
-                // 生成新的事务
+                // 生成txn
                 request.txn = new CreateTxn(path, createRequest.getData(),
                         listACL,
                         createMode.isEphemeral(), newCversion);
@@ -572,6 +572,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
     protected void pRequest(Request request) throws RequestProcessorException {
         // LOG.info("Prep>>> cxid = " + request.cxid + " type = " +
         // request.type + " id = 0x" + Long.toHexString(request.sessionId));
+        // 注:这里清空了request中的hdr和txn
         request.hdr = null;
         request.txn = null;
         
