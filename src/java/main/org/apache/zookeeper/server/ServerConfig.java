@@ -65,16 +65,18 @@ public class ServerConfig {
         if (args.length < 2 || args.length > 4) {
             throw new IllegalArgumentException("Invalid number of arguments:" + Arrays.toString(args));
         }
-        // 数组第1个值为端口号
+        // 1.数组第1个值为端口号
         clientPortAddress = new InetSocketAddress(Integer.parseInt(args[0]));
-        // 数组第2个值为内存数据库快照路径
+        // 2.数组第2个值为内存数据库快照路径
         dataDir = args[1];
-        // 事务日志的路径
+        // 3.事务日志的路径
         dataLogDir = dataDir;
         if (args.length >= 3) {
+            // 4.解析tickTime
             tickTime = Integer.parseInt(args[2]);
         }
         if (args.length == 4) {
+            // 5.解析maxClientCnxns
             maxClientCnxns = Integer.parseInt(args[3]);
         }
     }

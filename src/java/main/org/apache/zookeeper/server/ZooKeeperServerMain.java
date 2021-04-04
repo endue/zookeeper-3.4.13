@@ -99,6 +99,7 @@ public class ZooKeeperServerMain {
     // 根据配置启动zk
     public void runFromConfig(ServerConfig config) throws IOException {
         LOG.info("Starting server");
+        // 数据快照和事物日志文件类
         FileTxnSnapLog txnLog = null;
         try {
             // Note that this thread isn't going to be doing anything else,

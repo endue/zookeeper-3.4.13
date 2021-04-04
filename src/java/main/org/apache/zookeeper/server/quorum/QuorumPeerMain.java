@@ -100,7 +100,7 @@ public class QuorumPeerMain {
     protected void initializeAndRun(String[] args)
         throws ConfigException, IOException
     {
-        // 创建全局配置类
+        // 创建集群配置类
         QuorumPeerConfig config = new QuorumPeerConfig();
         if (args.length == 1) {
             // 解析args中的参数
