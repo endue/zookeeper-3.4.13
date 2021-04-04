@@ -118,6 +118,7 @@ public class ZooKeeperServerMain {
             txnLog = new FileTxnSnapLog(new File(config.dataLogDir), new File(
                     config.dataDir));
             txnLog.setServerStats(zkServer.serverStats());
+            // 这里初始化了ZooKeeperServer的txnLogFactory等其他属性
             zkServer.setTxnLogFactory(txnLog);
             zkServer.setTickTime(config.tickTime);
             zkServer.setMinSessionTimeout(config.minSessionTimeout);

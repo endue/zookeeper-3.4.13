@@ -63,6 +63,7 @@ import org.apache.zookeeper.server.auth.AuthenticationProvider;
 import org.apache.zookeeper.server.auth.ProviderRegistry;
 import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
 import org.apache.zookeeper.server.quorum.ReadOnlyZooKeeperServer;
+import org.apache.zookeeper.server.util.ZxidUtils;
 import org.apache.zookeeper.txn.CreateSessionTxn;
 import org.apache.zookeeper.txn.TxnHeader;
 import org.slf4j.Logger;
@@ -111,12 +112,18 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
     protected int maxSessionTimeout = -1;
     // 会话Session跟踪器
     protected SessionTracker sessionTracker;
-    // FileTxnSnapLog里面记录了数据日志和事物快照的相关类
+    /**
+     * FileTxnSnapLog里面记录了数据日志和事物快照的相关类
+     * 单机模式初始化在{@link org.apache.zookeeper.server.ZooKeeperServerMain.runFromConfig}
+     */
     private FileTxnSnapLog txnLogFactory = null;
     // zk内存数据库
     private ZKDatabase zkDb;
-    // zxid生成器,zxid分为两部分高32位用来存储每次选举的时代epoch，低32位用来存储事务请求的自增序列
-    // 可参考ZxidUtils
+    /**
+     * zxid生成器初始值为0
+     * zxid分为两部分高32位用来存储每次选举的时代epoch，低32位用来存储事务请求的自增序列
+     *可参考{@link ZxidUtils}
+     */
     private final AtomicLong hzxid = new AtomicLong(0);
     public final static Exception ok = new Exception("No prob");
     // 首个处理器
@@ -294,15 +301,20 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
          *  
          * See ZOOKEEPER-1642 for more detail.
          */
-        // 设置zxid
+        // zkDb内存数据库未初始化
         if(zkDb.isInitialized()){
+            // 第一次启动zk服务
+            //  lastProcessedZxid初始值为0,所以这里更新自己的hzxid也为0
             setZxid(zkDb.getDataTreeLastProcessedZxid());
         }
+        // zkDb内存数据库已初始化
         else {
+            // 内部操作会设置zkDb的initialized属性为true
             setZxid(zkDb.loadDataBase());
         }
         
         // Clean up dead sessions
+        // 第一次启动zk服务时为空,跳过处理
         // 遍历获取过期的会话Session
         LinkedList<Long> deadSessions = new LinkedList<Long>();
         for (Long session : zkDb.getSessions()) {
@@ -310,6 +322,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
                 deadSessions.add(session);
             }
         }
+        // 更新dataTree中的initialized为true
         zkDb.setDataTreeInit(true);
         // 清除过期的Session
         for (long session : deadSessions) {
@@ -422,13 +435,19 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             jmxServerBean = null;
         }
     }
-    
+
+    /**
+     * 初始化ZKDatabase
+     * @throws IOException
+     * @throws InterruptedException
+     */
     public void startdata() throws IOException, InterruptedException {
         //check to see if zkDb is not null
-        // 初始化内存数据库
+        // 初始化内存数据库ZKDatabase
         if (zkDb == null) {
             zkDb = new ZKDatabase(this.txnLogFactory);
-        }  
+        }
+        // ZKDatabase首次初始化
         if (!zkDb.isInitialized()) {
             loadData();
         }
@@ -436,19 +455,25 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
 
     // 启动zk服务器
     public synchronized void startup() {
-        // 创建会话Session跟踪器,默认SessionTrackerImpl
+        // 创建会话Session管理器,默认SessionTrackerImpl
         if (sessionTracker == null) {
             createSessionTracker();
         }
-        // 启动会话Session跟踪器
+        // 启动会话Session管理器
+        // 其实就是将过去的session关闭
         startSessionTracker();
         // 初始化请求处理链
         setupRequestProcessors();
 
         registerJMX();
         // 设置当前zk服务状态为RUNNING
+        // 默认状态为INITIAL
         setState(State.RUNNING);
         // todo 这里是通知哪里?
+        // 通知的是org.apache.zookeeper.server.ZooKeeperServer.submitRequest()方法
+        // 在启动的过程中由于NIOServerCnxnFactory先创建并启动,那么如果此时客户端发来相关事件
+        // 由于ZooKeeperServer还未启动完毕,所以在将请求提交给请求处理链时会被阻塞wait(1000)住,
+        // 这里就是初始化完毕防止这种情况,直接唤醒等待
         notifyAll();
     }
     // 默认处理链条

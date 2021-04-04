@@ -106,8 +106,9 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
         // 注意在Socket还没有绑定到一个本地端口之前调用
         ss.socket().setReuseAddress(true);
         LOG.info("binding to port " + addr);
-        // 设置非阻塞并绑定断开
+        // 设置非阻塞并绑定ip+port
         ss.socket().bind(addr);
+        // 非阻塞
         ss.configureBlocking(false);
         // 注册OP_ACCEPT事件
         ss.register(selector, SelectionKey.OP_ACCEPT);
@@ -140,9 +141,9 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
             InterruptedException {
         // 启动当前类,来接收客户端的相关请求
         start();
-        // zks就是ZooKeeperServer
+        // 设置父类zkServer属性为ZooKeeperServer
         setZooKeeperServer(zks);
-        // 初始化ZKDatabase
+        // 初始化ZooKeeperServer的ZKDatabase
         zks.startdata();
         // 启动ZooKeeperServer,来处理客户端的相关请求
         zks.startup();
@@ -254,7 +255,7 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
                                      + " - max is " + maxClientCnxns );
                             // 关闭当前连接
                             sc.close();
-                        // 未超过
+                        // 未超过最大连接数
                         } else {
                             LOG.info("Accepted socket connection from "
                                      + sc.socket().getRemoteSocketAddress());
@@ -290,6 +291,7 @@ public class NIOServerCnxnFactory extends ServerCnxnFactory implements Runnable 
                 LOG.warn("Ignoring exception", e);
             }
         }
+        // 退出循环后,关闭所有的连接
         closeAll();
         LOG.info("NIOServerCnxn factory exited run method");
     }

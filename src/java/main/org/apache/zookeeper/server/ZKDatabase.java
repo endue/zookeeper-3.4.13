@@ -65,11 +65,12 @@ public class ZKDatabase {
      * make sure on a clear you take care of 
      * all these members.
      */
-    // 内存目录树
+    // 内存文件目录树
     protected DataTree dataTree;
     // 记录客户端sessionId和对应的过期时间戳
     protected ConcurrentHashMap<Long, Integer> sessionsWithTimeouts;
     // FileTxnSnapLog里面记录了数据日志和事物快照的相关类
+    // 单机模式在org.apache.zookeeper.server.ZooKeeperServer.startdata中被初始化
     protected FileTxnSnapLog snapLog;
     protected long minCommittedLog, maxCommittedLog;
     // committedLog集合允许的最大数量
