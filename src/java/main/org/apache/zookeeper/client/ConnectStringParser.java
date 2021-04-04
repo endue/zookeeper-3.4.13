@@ -39,11 +39,11 @@ public final class ConnectStringParser {
     private static final int DEFAULT_PORT = 2181;
     // 客户端所有操作的根路径
     private final String chrootPath;
-    // 客户端连接的服务地址
+    // 配置的所有zk服务地址
     private final ArrayList<InetSocketAddress> serverAddresses = new ArrayList<InetSocketAddress>();
 
     /**
-     * 
+     * 解析connectString中记录的所有的zk服务ip+port
      * @throws IllegalArgumentException
      *             for an invalid chroot path.
      */

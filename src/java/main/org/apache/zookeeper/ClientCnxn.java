@@ -1156,7 +1156,7 @@ public class ClientCnxn {
                             serverAddress = rwServerAddress;
                             rwServerAddress = null;
                         } else {
-                            // 从服务器列表中选择一个
+                            // 从服务器列表中选择一个zk服务
                             serverAddress = hostProvider.next(1000);
                         }
                         // 建立socket连接,更新状态为CONNECTING
