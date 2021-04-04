@@ -1888,6 +1888,11 @@ public class ZooKeeper {
         return cnxn.sendThread.getClientCnxnSocket().getLocalSocketAddress();
     }
 
+    /**
+     * 获取ClientCnxnSocket默认ClientCnxnSocketNIO
+     * @return
+     * @throws IOException
+     */
     private static ClientCnxnSocket getClientCnxnSocket() throws IOException {
         String clientCnxnSocketName = System
                 .getProperty(ZOOKEEPER_CLIENT_CNXN_SOCKET);

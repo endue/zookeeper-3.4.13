@@ -36,12 +36,14 @@ import org.apache.zookeeper.ZooDefs.OpCode;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+// 负责与zk服务端进行数据的发送
 public class ClientCnxnSocketNIO extends ClientCnxnSocket {
     private static final Logger LOG = LoggerFactory
             .getLogger(ClientCnxnSocketNIO.class);
 
     private final Selector selector = Selector.open();
     // 在cleanup()方法中会被置为null
+    // 默认初始化时为null
     // 初始化连接后会被赋值,参考registerAndConnect()方法
     private SelectionKey sockKey;
 
@@ -325,7 +327,7 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
         sockKey = sock.register(selector, SelectionKey.OP_CONNECT);
         // 2. 发起连接
         boolean immediateConnect = sock.connect(addr);
-        // 3. todo 立即连接成功又如何?
+        // 3. 如果是立即建立成功,那么重新注册一些时间,然后关注OP_READ和OP_WRITE事件
         if (immediateConnect) {
             sendThread.primeConnection();
         }

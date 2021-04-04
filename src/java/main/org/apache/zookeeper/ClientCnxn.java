@@ -792,7 +792,7 @@ public class ClientCnxn {
     class SendThread extends ZooKeeperThread {
         // 上一次ping的纳秒时间戳
         private long lastPingSentNs;
-        // 与zk服务端连接的socket
+        // 与zk服务端连接的socket,在构造方法中被初始化
         private final ClientCnxnSocket clientCnxnSocket;
 
         private Random r = new Random(System.nanoTime());
@@ -974,7 +974,9 @@ public class ClientCnxn {
                 // Only send if there's a pending watch
                 // TODO: here we have the only remaining use of zooKeeper in
                 // this class. It's to be eliminated!
+                // 是否重新注册Watcher
                 if (!disableAutoWatchReset) {
+                    // 下面操作就是获取事件
                     List<String> dataWatches = zooKeeper.getDataWatches();
                     List<String> existWatches = zooKeeper.getExistWatches();
                     List<String> childWatches = zooKeeper.getChildWatches();
@@ -1011,11 +1013,11 @@ public class ClientCnxn {
                                 }
                                 batchLength += watch.length();
                             }
-
                             SetWatches sw = new SetWatches(setWatchesLastZxid,
                                     dataWatchesBatch,
                                     existWatchesBatch,
                                     childWatchesBatch);
+                            // 封装事件到一个Packet中并添加到待发送队列
                             RequestHeader h = new RequestHeader();
                             h.setType(ZooDefs.OpCode.setWatches);
                             h.setXid(-8);
@@ -1024,7 +1026,7 @@ public class ClientCnxn {
                         }
                     }
                 }
-
+                // 封装验证信息为一个Packet并添加到请求队列中
                 for (AuthData id : authInfo) {
                     outgoingQueue.addFirst(new Packet(new RequestHeader(-4,
                             OpCode.auth), null, new AuthPacket(0, id.scheme,
@@ -1123,6 +1125,8 @@ public class ClientCnxn {
         @Override
         public void run() {
             // 1.初始化clientCnxnSocket,默认为ClientCnxnSocketNIO
+            // 更新clientCnxnSocket时间戳
+            // 更新发送时间和心跳时间戳
             clientCnxnSocket.introduce(this,sessionId);
             clientCnxnSocket.updateNow();
             clientCnxnSocket.updateLastSendAndHeard();
@@ -1131,13 +1135,14 @@ public class ClientCnxn {
             final int MAX_SEND_PING_INTERVAL = 10000; //10 seconds
             InetSocketAddress serverAddress = null;
             // 2.while不断循环检测clientCnxnSocket是否和服务器处于连接状态,没有连接则进行连接
+            // 在构造SendThread时初始化为CONNECTING
             while (state.isAlive()) {
                 try {
                     // 2.1连接不存在,初始化连接
-                    // 判断依据就是SelectionKey是否存在
+                    // 判断依据就是SelectionKey是否存在,默认为null
                     if (!clientCnxnSocket.isConnected()) {
                         // 走到这里说明连接不存在,那么需要判断是首次连接还是由于某种原因导致的重新连接
-                        // 不是第一次建立连接,todo 什么情况出现不是首次重连?
+                        // 不是第一次建立连接
                         if(!isFirstConnect){
                             try {
                                 // 随机休眠一段时间
