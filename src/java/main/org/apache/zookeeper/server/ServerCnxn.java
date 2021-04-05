@@ -53,7 +53,11 @@ public abstract class ServerCnxn implements Stats, Watcher {
     // This is just an arbitrary object to represent requests issued by
     // (aka owned by) this class
     final public static Object me = new Object();
-    
+    /**
+     * 当客户端连接时,会为其建立一个对应的ServerCnxn
+     * 同时也会自动加入一个默认的scheme为ip的authInfo:authInfo.add(new Id("ip", addr.getHostAddress()));
+     * 该属性记录了当前客户端所拥有的权限
+     */
     protected ArrayList<Id> authInfo = new ArrayList<Id>();
 
     /**

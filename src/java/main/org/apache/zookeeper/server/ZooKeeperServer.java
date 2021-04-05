@@ -38,6 +38,7 @@ import javax.security.sasl.SaslException;
 import org.apache.jute.BinaryInputArchive;
 import org.apache.jute.BinaryOutputArchive;
 import org.apache.jute.Record;
+import org.apache.zookeeper.ClientCnxn;
 import org.apache.zookeeper.Environment;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.KeeperException.Code;
@@ -616,7 +617,10 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         jmxDataTreeBean = null;
     }
 
-    // 新增正在处理的请求数
+    /**
+     * 新增正在处理的请求数
+     * 参考{@link ZooKeeperServer#submitRequest(org.apache.zookeeper.server.Request)}
+     */
     public void incInProcess() {
         requestsInProcess.incrementAndGet();
     }
@@ -1087,22 +1091,31 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         // pointing
         // to the start of the txn
         incomingBuffer = incomingBuffer.slice();
+        /**
+         * 参考{@link ClientCnxn#addAuthInfo(java.lang.String, byte[])}
+         * 这里判断成功那么可以肯定客户端的操作是addAuthInfo()
+         */
         if (h.getType() == OpCode.auth) {
             LOG.info("got auth packet " + cnxn.getRemoteSocketAddress());
+            // 读取客户端数据到AuthPacket
             AuthPacket authPacket = new AuthPacket();
             ByteBufferInputStream.byteBuffer2Record(incomingBuffer, authPacket);
+            // 获取授权模式world,auth,digest,ip或自定义
             String scheme = authPacket.getScheme();
+            // 获取对应的插件类
             AuthenticationProvider ap = ProviderRegistry.getProvider(scheme);
             Code authReturn = KeeperException.Code.AUTHFAILED;
+            // 插件类不为空
             if(ap != null) {
                 try {
+                    // 将新增的授权模式添加到ServerCnxn的authInfo集合中
                     authReturn = ap.handleAuthentication(cnxn, authPacket.getAuth());
                 } catch(RuntimeException e) {
                     LOG.warn("Caught runtime exception from AuthenticationProvider: " + scheme + " due to " + e);
                     authReturn = KeeperException.Code.AUTHFAILED;                   
                 }
             }
-            // 权限处理失败
+            // 添加权限失败
             if (authReturn!= KeeperException.Code.OK) {
                 if (ap == null) {
                     LOG.warn("No authentication provider for scheme: "
@@ -1121,12 +1134,14 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
                 // ... and close connection
                 cnxn.sendBuffer(ServerCnxnFactory.closeConn);
                 cnxn.disableRecv();
+            // 添加权限成功
             } else {
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Authentication succeeded for scheme: "
                               + scheme);
                 }
                 LOG.info("auth success " + cnxn.getRemoteSocketAddress());
+                // 封装响应
                 ReplyHeader rh = new ReplyHeader(h.getXid(), 0,
                         KeeperException.Code.OK.intValue());
                 cnxn.sendResponse(rh, null, null);
@@ -1143,9 +1158,12 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
                 Request si = new Request(cnxn, cnxn.getSessionId(), h.getXid(),
                   h.getType(), incomingBuffer, cnxn.getAuthInfo());
                 si.setOwner(ServerCnxn.me);
+                // 提交请求
                 submitRequest(si);
             }
         }
+        // 递增接受到的事务请求数(还未处理的,处理后会递减)
+        // 如果超过阈值就取消OP_READ事件
         cnxn.incrOutstandingRequests(h);
     }
 

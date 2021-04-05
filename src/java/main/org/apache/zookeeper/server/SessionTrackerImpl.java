@@ -289,6 +289,13 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
         touchSession(id, sessionTimeout);
     }
 
+    /**
+     * 检查sessionId是否合法
+     * @param sessionId sessionId
+     * @param owner 这里其实就是谁处理的请求,也就是ServerCnxn
+     * @throws KeeperException.SessionExpiredException
+     * @throws KeeperException.SessionMovedException
+     */
     synchronized public void checkSession(long sessionId, Object owner) throws KeeperException.SessionExpiredException, KeeperException.SessionMovedException {
         SessionImpl session = sessionsById.get(sessionId);
         if (session == null || session.isClosing()) {

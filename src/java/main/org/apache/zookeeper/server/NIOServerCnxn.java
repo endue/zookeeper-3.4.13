@@ -111,6 +111,7 @@ public class NIOServerCnxn extends ServerCnxn {
         sock.socket().setSoLinger(false, -1);
         InetAddress addr = ((InetSocketAddress) sock.socket()
                 .getRemoteSocketAddress()).getAddress();
+        // 注意这里默认的authInfo
         authInfo.add(new Id("ip", addr.getHostAddress()));
         // 监听OP_READ事件
         sk.interestOps(SelectionKey.OP_READ);
@@ -451,7 +452,8 @@ public class NIOServerCnxn extends ServerCnxn {
     private void readRequest() throws IOException {
         zkServer.processPacket(this, incomingBuffer);
     }
-    
+
+    // 增加接收到的事务请求数(此时还未处理)
     protected void incrOutstandingRequests(RequestHeader h) {
         if (h.getXid() >= 0) {
             synchronized (this) {
@@ -459,6 +461,7 @@ public class NIOServerCnxn extends ServerCnxn {
             }
             synchronized (this.factory) {        
                 // check throttling
+                // 提交的request已超过阈值,停止OP_READ事件的处理
                 if (zkServer.getInProcess() > outstandingLimit) {
                     if (LOG.isDebugEnabled()) {
                         LOG.debug("Throttling recv " + zkServer.getInProcess());

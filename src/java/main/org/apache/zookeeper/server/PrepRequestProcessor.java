@@ -297,22 +297,26 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
      * @param zks zk服务实例
      * @param acl 操作路径父节点的ACL
      * @param perm 当前的操作,参考{@link org.apache.zookeeper.ZooDefs.Perms}
-     * @param ids 当前客户端携带的权限信息
+     * @param ids 当前客户端ServerCnxn携带的权限信息
      * @throws KeeperException.NoAuthException
      */
     static void checkACL(ZooKeeperServer zks, List<ACL> acl, int perm,
             List<Id> ids) throws KeeperException.NoAuthException {
+        // 读取配置zookeeper.skipACL跳过权限验证,默认true
         if (skipACL) {
             return;
         }
+        // acl不存在
         if (acl == null || acl.size() == 0) {
             return;
         }
+        // 客户端是超级管理员则直接返回运行操作
         for (Id authId : ids) {
             if (authId.getScheme().equals("super")) {
                 return;
             }
         }
+        // 遍历操作节点需要的权限并验证是否有对应的权限,没有则抛出异常
         for (ACL a : acl) {
             Id id = a.getId();
             if ((a.getPerms() & perm) != 0) {
@@ -320,10 +324,13 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                         && id.getId().equals("anyone")) {
                     return;
                 }
+                // 更新授权模式获取对应的插件对象
                 AuthenticationProvider ap = ProviderRegistry.getProvider(id
                         .getScheme());
                 if (ap != null) {
-                    for (Id authId : ids) {                        
+                    // 获取客户端ServerCnxn所拥有的权限
+                    for (Id authId : ids) {
+                        // 校验是否有对应的权限,如果有就直接返回
                         if (authId.getScheme().equals(id.getScheme())
                                 && ap.matches(authId.getId(), id.getId())) {
                             return;
@@ -332,6 +339,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 }
             }
         }
+        // 没授权抛出异常
         throw new KeeperException.NoAuthException();
     }
 
@@ -359,7 +367,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 if(deserialize)
                     // 反序列化request.request数据到createRequest
                     ByteBufferInputStream.byteBuffer2Record(request.request, createRequest);
-                // 获取创建的路径
+                // 1.获取创建的路径
                 String path = createRequest.getPath();
                 int lastSlash = path.lastIndexOf('/');
                 if (lastSlash == -1 || path.indexOf('\0') != -1 || failCreate) {
@@ -367,37 +375,38 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                             Long.toHexString(request.sessionId));
                     throw new KeeperException.BadArgumentsException(path);
                 }
-                // 获取请求中的ACL
+                // 2.将请求中携带的ACL去重
                 List<ACL> listACL = removeDuplicates(createRequest.getAcl());
-                // 修正ACL
+                // 3.修正ACL
                 if (!fixupACL(request.authInfo, listACL)) {
                     throw new KeeperException.InvalidACLException(path);
                 }
-                // 获取父节点路径
+                // 4.获取父节点路径
                 String parentPath = path.substring(0, lastSlash);
-                // 获取父节点的ChangeRecord
+                // 5.获取父节点的ChangeRecord
                 ChangeRecord parentRecord = getRecordForPath(parentPath);
-                // 校验ACL权限
+                // 6.校验ACL权限
                 checkACL(zks, parentRecord.acl, ZooDefs.Perms.CREATE,
                         request.authInfo);
                 int parentCVersion = parentRecord.stat.getCversion();
-                // 获取创建的模式
+                // 7获取创建的模式
                 CreateMode createMode =
                     CreateMode.fromFlag(createRequest.getFlags());
-                // 如果是顺序节点
+                // 7-1.如果是顺序节点重新定义path
                 if (createMode.isSequential()) {
                     path = path + String.format(Locale.ENGLISH, "%010d", parentCVersion);
                 }
+                // 8.检查path路径是否包含特殊符号
                 validatePath(path, request.sessionId);
                 try {
-                    // 路径已存在
+                    // 9.路径已存在
                     if (getRecordForPath(path) != null) {
                         throw new KeeperException.NodeExistsException(path);
                     }
                 } catch (KeeperException.NoNodeException e) {
                     // ignore this one
                 }
-                // 父节点是否为临时节点，这里可以看出临时节点下不可创建子节点
+                // 10.父节点是否为临时节点，这里可以看出临时节点下不可创建子节点
                 boolean ephemeralParent = parentRecord.stat.getEphemeralOwner() != 0;
                 if (ephemeralParent) {
                     throw new KeeperException.NoChildrenForEphemeralsException(path);
@@ -419,6 +428,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 parentRecord.childCount++;
                 // 更新cversion
                 parentRecord.stat.setCversion(newCversion);
+                // 此时修改了父节点数据,所以父节点待更新
                 // 将parentRecord添加到zk服务的outstandingChanges和outstandingChangesForPath中
                 addChangeRecord(parentRecord);
                 // 将新生成的ChangeRecord添加到zk服务的outstandingChanges和outstandingChangesForPath中
@@ -760,28 +770,38 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
      * it has valid schemes and ids, and expanding any relative ids that
      * depend on the requestor's authentication information.
      *
-     * @param authInfo list of ACL IDs associated with the client connection 客户端建立连接时候的ACL
-     * @param acl list of ACLs being assigned to the node (create or setACL operation) 分别到节点的ACL权限
+     * @param authInfo list of ACL IDs associated with the client connection 客户端对应的ServerCnxn所拥有的ACL
+     * @param acl list of ACLs being assigned to the node (create or setACL operation) 分配给节点的ACL
      * @return
      */
+    // 修改ACL权限
     private boolean fixupACL(List<Id> authInfo, List<ACL> acl) {
+        // 读取配置zookeeper.skipACL跳过权限验证,默认true
         if (skipACL) {
             return true;
         }
+        // acl不存在
         if (acl == null || acl.size() == 0) {
             return false;
         }
-
+        // 遍历分配给节点的ACL
         Iterator<ACL> it = acl.iterator();
         LinkedList<ACL> toAdd = null;
         while (it.hasNext()) {
+            // 获取分配的权限
             ACL a = it.next();
+            // 获取授权模式和授权对象
             Id id = a.getId();
+            // 1.授权模式是world并且授权对象是anyone
+            // 也就是是一种开发的权限控制模式
             if (id.getScheme().equals("world") && id.getId().equals("anyone")) {
                 // wide open
+            // 2.授权模式是auth
+            // 更加当前客户端ServerCnxn所拥有的ACL进行遍历获取符合要求的autoInfo生成ACL加入到所操作znode的acl列表中
             } else if (id.getScheme().equals("auth")) {
                 // This is the "auth" id, so we have to expand it to the
                 // authenticated ids of the requestor
+                // 注意这里删除了该ACL
                 it.remove();
                 if (toAdd == null) {
                     toAdd = new LinkedList<ACL>();
@@ -801,12 +821,14 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 if (!authIdValid) {
                     return false;
                 }
+                // 3.授权模式是ip或digest
             } else {
                 AuthenticationProvider ap = ProviderRegistry.getProvider(id
                         .getScheme());
                 if (ap == null) {
                     return false;
                 }
+                // 验证授权对象是否有效
                 if (!ap.isValid(id.getId())) {
                     return false;
                 }

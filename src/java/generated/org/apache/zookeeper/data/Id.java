@@ -23,18 +23,17 @@ import org.apache.jute.*;
 import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Public
 public class Id implements Record {
-  // world：只有一个id即anyone，为所有Client端开放权限。
-  // auth：不需要任何id，只要是通过auth的用户都有权限。
-  // digest：Client端使用用户和密码的方式验证，采用username:BASE64(SHA1(password))的字符串作为节点ACL的id（如：digest:dyb:xxxxx）.
-  // ip：使用客户端的IP地址作为ACL的id，可以设置为一个ip段（如：ip:192.168.0.1/24）。Client端由IP地址验证.
-  // sasl：设置为用户的uid，通过sasl Authentication用户的id，sasl是通过Kerberos或DIGEST-MD5机制实现，使用sasl:uid:cdwra字符串作为节点ACL的.
-  // 其中digest方式：常用于依赖zk的自研系统，sasl方式：kafka使用此方式进行到zk的sasl认证配置并结合acl设置实现对kafka相关的znode保护.
+
   /**
-   * 权限模式
+   * 授权模式
+   * world 只有一个唯一的id：anyone；表示任何人都可以做对应的操作。这个scheme没有对应的鉴权实现。只要一个znode的ACL list中包含有这个scheme的Id，其对应的操作就运行执行
+   * auth 没有对应的id，或者只有一个空串””id。这个scheme没有对应的鉴权实现。语义是当前连接绑定的适合做创建者鉴权的autoInfo (通过调用autoInfo的scheme对应的AP的isAuthenticated()得知)都拥有对应的权限。遇到这个auth后，Server会根据当前连接绑定的符合要求的autoInfo生成ACL加入到所操作znode的acl列表中。
+   * digest 使用username:password格式的字符串生成MD5 hash 作为ACL ID。 具体格式为：username:base64 encoded SHA1 password digest.对应内置的鉴权插件：DigestAuthenticationProvider
+   * ip 用IP通配符匹配客户端ip。对应内置鉴权插件IPAuthenticationProvider
    */
   private String scheme;
   /**
-   * 验证规则
+   * 授权对象
    */
   private String id;
   public Id() {
@@ -73,7 +72,7 @@ public class Id implements Record {
     try {
       java.io.ByteArrayOutputStream s =
         new java.io.ByteArrayOutputStream();
-      CsvOutputArchive a_ = 
+      CsvOutputArchive a_ =
         new CsvOutputArchive(s);
       a_.startRecord(this,"");
     a_.writeString(scheme,"scheme");

@@ -37,41 +37,51 @@ public class PathUtils {
 	
     /**
      * Validate the provided znode path string
+     * 验证提供的znode路径字符串
      * @param path znode path string
      * @throws IllegalArgumentException if the path is invalid
      */
     public static void validatePath(String path) throws IllegalArgumentException {
+        // 首先检查整个字符串path
+        // 1.非null
         if (path == null) {
             throw new IllegalArgumentException("Path cannot be null");
         }
+        // 2.非空
         if (path.length() == 0) {
             throw new IllegalArgumentException("Path length must be > 0");
         }
+        // 3.必须/开头
         if (path.charAt(0) != '/') {
             throw new IllegalArgumentException(
                          "Path must start with / character");
         }
+        // 4.根路径,直接返回检查完毕
         if (path.length() == 1) { // done checking - it's the root
             return;
         }
+        // 5.不以/结尾
         if (path.charAt(path.length() - 1) == '/') {
             throw new IllegalArgumentException(
                          "Path must not end with / character");
         }
-
+        // 最后检查字符串中的每个字符
         String reason = null;
         char lastc = '/';
         char chars[] = path.toCharArray();
         char c;
+
         for (int i = 1; i < chars.length; lastc = chars[i], i++) {
             c = chars[i];
-
+            // 6.不能为null
             if (c == 0) {
                 reason = "null character not allowed @" + i;
                 break;
+            // 7.
             } else if (c == '/' && lastc == '/') {
                 reason = "empty node name specified @" + i;
                 break;
+            // 8.不允许相对路径
             } else if (c == '.' && lastc == '.') {
                 if (chars[i-2] == '/' &&
                         ((i + 1 == chars.length)
@@ -79,6 +89,7 @@ public class PathUtils {
                     reason = "relative paths not allowed @" + i;
                     break;
                 }
+            // 9.不允许相对路径
             } else if (c == '.') {
                 if (chars[i-1] == '/' &&
                         ((i + 1 == chars.length)
@@ -86,6 +97,7 @@ public class PathUtils {
                     reason = "relative paths not allowed @" + i;
                     break;
                 }
+                // 10.特殊符号
             } else if (c > '\u0000' && c < '\u001f'
                     || c > '\u007f' && c < '\u009F'
                     || c > '\ud800' && c < '\uf8ff'

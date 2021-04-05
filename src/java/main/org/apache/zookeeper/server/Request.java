@@ -72,24 +72,24 @@ public class Request {
     }
     // 客户端的sessionID
     public final long sessionId;
-    //
+    // 客户端发送该请求时分配的xid
     public final int cxid;
     /**
      *  Request类型,{@link org.apache.zookeeper.ZooDefs.OpCode }
      */
     public final int type;
     // 如果是createSession请求,记录了session超时时间
+    // 如果是
     public final ByteBuffer request;
     // 当前请求所属客户端在服务端对应的ServerCnxn
     public final ServerCnxn cnxn;
 
     public TxnHeader hdr;
     // 如果是createSession请求,记录了CreateSessionTxn
-    // 如果是create请求,集了CreateTxn
     public Record txn;
 
     public long zxid = -1;
-
+    // 当前请求所属客户端在服务端对应的ServerCnxn的authInfo
     public final List<Id> authInfo;
 
     public final long createTime = Time.currentElapsedTime();

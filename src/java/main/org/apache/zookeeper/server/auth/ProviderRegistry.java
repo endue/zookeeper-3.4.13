@@ -28,8 +28,9 @@ import org.apache.zookeeper.server.ZooKeeperServer;
 
 public class ProviderRegistry {
     private static final Logger LOG = LoggerFactory.getLogger(ProviderRegistry.class);
-
+    // 是否初始化标识符
     private static boolean initialized = false;
+    // 保存系统默认的身份验证插件,key是名称,valeu是插件
     private static HashMap<String, AuthenticationProvider> authenticationProviders =
         new HashMap<String, AuthenticationProvider>();
 
@@ -37,10 +38,15 @@ public class ProviderRegistry {
         synchronized (ProviderRegistry.class) {
             if (initialized)
                 return;
+            // 默认只有两个分别是IP和Digest
             IPAuthenticationProvider ipp = new IPAuthenticationProvider();
             DigestAuthenticationProvider digp = new DigestAuthenticationProvider();
             authenticationProviders.put(ipp.getScheme(), ipp);
             authenticationProviders.put(digp.getScheme(), digp);
+            // 这里可以读取系统配置
+            // ZooKeeper服务器启动时会查找以zookeeper.authProvider.开头的系统属性，
+            // 将这些属性的值解释为身份验证插件的类名。
+            // 可使用-Dzookeeper.authProvider.X=com.simon.xx.MyAuth来设置这些属性或者在系统配置文件中添加
             Enumeration<Object> en = System.getProperties().keys();
             while (en.hasMoreElements()) {
                 String k = (String) en.nextElement();

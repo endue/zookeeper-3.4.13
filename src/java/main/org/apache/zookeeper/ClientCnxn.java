@@ -960,6 +960,11 @@ public class ClientCnxn {
             return clientCnxnSocket;
         }
 
+        /**
+         * Client发送完ConnectRequest包，会紧接着发送authInfo包(OpCode.auth)和setWatches包(OpCode.setWatches)
+         * authInfo列表由ZooKeeper的addAuthInfo()方法添加，用来进行自定义的认证和授权
+         * @throws IOException
+         */
         void primeConnection() throws IOException {
             LOG.info("Socket connection established to "
                      + clientCnxnSocket.getRemoteSocketAddress()
@@ -976,6 +981,7 @@ public class ClientCnxn {
                 // this class. It's to be eliminated!
                 // 是否重新注册Watcher
                 if (!disableAutoWatchReset) {
+                    // setWatches包
                     // 下面操作就是获取事件
                     List<String> dataWatches = zooKeeper.getDataWatches();
                     List<String> existWatches = zooKeeper.getExistWatches();
@@ -1026,6 +1032,7 @@ public class ClientCnxn {
                         }
                     }
                 }
+                // authInfo包
                 // 封装验证信息为一个Packet并添加到请求队列中
                 for (AuthData id : authInfo) {
                     outgoingQueue.addFirst(new Packet(new RequestHeader(-4,
@@ -1629,7 +1636,7 @@ public class ClientCnxn {
             }
         }
         /**
-         * 理解唤醒bio,在org.apache.zookeeper.ClientCnxnSocketNIO#doTransport方法中有个阻塞等待事件
+         * 立即唤醒bio,在{@link org.apache.zookeeper.ClientCnxnSocketNIO#doTransport}方法中有个阻塞等待事件
          */
         sendThread.getClientCnxnSocket().wakeupCnxn();
         return packet;

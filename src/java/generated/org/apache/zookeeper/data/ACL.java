@@ -28,7 +28,7 @@ import org.apache.zookeeper.ZooDefs;
 public class ACL implements Record {
   /**
    * 参考{@link ZooDefs.Perms}
-   * 许可的操作
+   * 分配的权限
    */
   private int perms;
   /**
