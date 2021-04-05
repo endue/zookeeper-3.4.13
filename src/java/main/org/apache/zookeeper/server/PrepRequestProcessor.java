@@ -496,8 +496,11 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 request.request.rewind();
                 // 读取session超时时间
                 int to = request.request.getInt();
+                // 设置事务记录
                 request.txn = new CreateSessionTxn(to);
                 request.request.rewind();
+                // 记录sessionId和对应的超时时间
+                // 并生成SessionImpl(如果不存在的话)
                 zks.sessionTracker.addSession(request.sessionId, to);
                 zks.setOwner(request.sessionId, request.getOwner());
                 break;

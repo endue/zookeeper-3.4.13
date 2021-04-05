@@ -71,7 +71,7 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
         long tickTime;
         // 是否关闭
         boolean isClosing;
-        //
+        // 当前会话的处理者,也就是ServerCnxn
         Object owner;
 
         public long getSessionId() { return sessionId; }
@@ -192,21 +192,25 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
         if (s == null || s.isClosing()) {
             return false;
         }
-        // 计算过期时间
+        // 重新计算过期时间
         long expireTime = roundToInterval(Time.currentElapsedTime() + timeout);
-        // 没有过期不处理
+        // session自己的过期时间 >= 重新计算的过期时间
+        // 不处理
         if (s.tickTime >= expireTime) {
             // Nothing needs to be done
             return true;
         }
-        // 从旧的过期时间"桶"中移除当前session
+        // 执行到这里说明session过期时间 < 重新计算的过期时间
+
+        // 从旧的过期时间"桶"中获取这一批同时间段过期的sesion
         SessionSet set = sessionSets.get(s.tickTime);
+        // 移除掉当前session
         if (set != null) {
             set.sessions.remove(s);
         }
-        // 更新会话超时时间点
+        // 更新当前session会话超时时间
         s.tickTime = expireTime;
-        // 获取新的分桶并转移到新的分桶集合中
+        // 获取新的时间"桶"并转移到新的分桶集合中
         set = sessionSets.get(s.tickTime);
         if (set == null) {
             set = new SessionSet();

@@ -187,6 +187,7 @@ public class FinalRequestProcessor implements RequestProcessor {
                 zks.serverStats().updateLatency(request.createTime);
 
                 lastOp = "SESS";
+                // 更新ServerCnxn中的一些统计信息
                 cnxn.updateStatsForResponse(request.cxid, request.zxid, lastOp,
                         request.createTime, Time.currentElapsedTime());
                 // session初始化完毕,创建响应返回给客户端

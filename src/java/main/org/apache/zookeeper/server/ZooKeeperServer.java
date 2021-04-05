@@ -471,7 +471,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         setState(State.RUNNING);
         // todo 这里是通知哪里?
         // 通知的是org.apache.zookeeper.server.ZooKeeperServer.submitRequest()方法
-        // 在启动的过程中由于NIOServerCnxnFactory先创建并启动,那么如果此时客户端发来相关事件
+        // 在启动的过程中由于NIOServerCnxnFactory先创建并启动,那么如果此时客户端发来相关事件请求
         // 由于ZooKeeperServer还未启动完毕,所以在将请求提交给请求处理链时会被阻塞wait(1000)住,
         // 这里就是初始化完毕防止这种情况,直接唤醒等待
         notifyAll();
@@ -820,6 +820,9 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
     // 如果是FollowerZookeeperServer,执行顺序为FollowerRequestProcessor -> CommitProcessor -> FinalRequestProcessor
     // 如果是LeaderZookeeperServer,执行顺序为PrepRequestProcessor -> ProposalRequestProcessor -> CommitProcessor -> ToBeAppliedRequestProcessor -> FinalRequestProcessor
     public void submitRequest(Request si) {
+        // 由于NIOServerCnxnFactory先启动,那么如果此时有客户端请求,就一定处理,由于ZookeeperServer还未完成责任链的初始化
+        // 所有此时firstProcessor可能为null,那么就需要等待责任链的初始化
+        // 这也是为什么在org.apache.zookeeper.server.ZooKeeperServer#startup最后一行代码需要notifyAll()的原因
         if (firstProcessor == null) {
             synchronized (this) {
                 try {
@@ -1193,6 +1196,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         int opCode = hdr.getType();
         long sessionId = hdr.getClientId();
         rc = getZKDatabase().processTxn(hdr, txn);
+        // 如果是创建session请求
         if (opCode == OpCode.createSession) {
             if (txn instanceof CreateSessionTxn) {
                 CreateSessionTxn cst = (CreateSessionTxn) txn;
