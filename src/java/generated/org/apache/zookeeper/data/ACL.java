@@ -28,10 +28,12 @@ import org.apache.zookeeper.ZooDefs;
 public class ACL implements Record {
   /**
    * 参考{@link ZooDefs.Perms}
+   * 许可的操作
    */
   private int perms;
   /**
-   * 参考 {@link }
+   * 参考 {@link Id}
+   *
    */
   private org.apache.zookeeper.data.Id id;
   public ACL() {

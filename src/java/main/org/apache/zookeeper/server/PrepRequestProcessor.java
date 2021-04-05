@@ -292,6 +292,14 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
         }
     }
 
+    /**
+     * 在进行操作前检查ACL是否有这个权限
+     * @param zks zk服务实例
+     * @param acl 操作路径父节点的ACL
+     * @param perm 当前的操作,参考{@link org.apache.zookeeper.ZooDefs.Perms}
+     * @param ids 当前客户端携带的权限信息
+     * @throws KeeperException.NoAuthException
+     */
     static void checkACL(ZooKeeperServer zks, List<ACL> acl, int perm,
             List<Id> ids) throws KeeperException.NoAuthException {
         if (skipACL) {
@@ -361,6 +369,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 }
                 // 获取请求中的ACL
                 List<ACL> listACL = removeDuplicates(createRequest.getAcl());
+                // 修正ACL
                 if (!fixupACL(request.authInfo, listACL)) {
                     throw new KeeperException.InvalidACLException(path);
                 }
@@ -751,8 +760,8 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
      * it has valid schemes and ids, and expanding any relative ids that
      * depend on the requestor's authentication information.
      *
-     * @param authInfo list of ACL IDs associated with the client connection
-     * @param acl list of ACLs being assigned to the node (create or setACL operation)
+     * @param authInfo list of ACL IDs associated with the client connection 客户端建立连接时候的ACL
+     * @param acl list of ACLs being assigned to the node (create or setACL operation) 分别到节点的ACL权限
      * @return
      */
     private boolean fixupACL(List<Id> authInfo, List<ACL> acl) {

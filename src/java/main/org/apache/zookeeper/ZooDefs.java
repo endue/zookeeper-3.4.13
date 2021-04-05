@@ -71,18 +71,22 @@ public class ZooDefs {
         public final int error = -1;
     }
 
+    /**
+     * 许可的操作
+     */
     @InterfaceAudience.Public
     public interface Perms {
+        // 1
         int READ = 1 << 0;
-
+        // 2
         int WRITE = 1 << 1;
-
+        // 4
         int CREATE = 1 << 2;
-
+        // 8
         int DELETE = 1 << 3;
-
+        // 16
         int ADMIN = 1 << 4;
-
+        // 31
         int ALL = READ | WRITE | CREATE | DELETE | ADMIN;
     }
 
@@ -90,6 +94,7 @@ public class ZooDefs {
     public interface Ids {
         /**
          * This Id represents anyone.
+         * 任何人都可以访问
          */
         public final Id ANYONE_ID_UNSAFE = new Id("world", "anyone");
 

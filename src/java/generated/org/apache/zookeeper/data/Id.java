@@ -29,7 +29,13 @@ public class Id implements Record {
   // ip：使用客户端的IP地址作为ACL的id，可以设置为一个ip段（如：ip:192.168.0.1/24）。Client端由IP地址验证.
   // sasl：设置为用户的uid，通过sasl Authentication用户的id，sasl是通过Kerberos或DIGEST-MD5机制实现，使用sasl:uid:cdwra字符串作为节点ACL的.
   // 其中digest方式：常用于依赖zk的自研系统，sasl方式：kafka使用此方式进行到zk的sasl认证配置并结合acl设置实现对kafka相关的znode保护.
+  /**
+   * 权限模式
+   */
   private String scheme;
+  /**
+   * 验证规则
+   */
   private String id;
   public Id() {
   }
