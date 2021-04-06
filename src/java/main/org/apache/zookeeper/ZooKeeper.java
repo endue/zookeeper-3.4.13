@@ -903,6 +903,7 @@ public class ZooKeeper {
      *   return code.
      * @throws IllegalArgumentException if an invalid path is specified
      */
+    // 删除节点
     public void delete(final String path, int version)
         throws InterruptedException, KeeperException
     {
@@ -1088,6 +1089,7 @@ public class ZooKeeper {
      *
      * @see #delete(String, int)
      */
+    // 异步删除节点
     public void delete(final String path, int version, VoidCallback cb,
             Object ctx)
     {

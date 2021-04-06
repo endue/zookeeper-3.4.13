@@ -533,7 +533,7 @@ public class DataTree {
                 // 3-5. 获取临时sessionId对应的所有路径
                 HashSet<String> nodes = ephemerals.get(eowner);
                 if (nodes != null) {
-                    // 3-6. 删除该路径
+                    // 3-6. 从当前sessionId对应的所有临时路径中删除当前路径
                     synchronized (nodes) {
                         nodes.remove(path);
                     }
@@ -844,7 +844,9 @@ public class DataTree {
                 // 创建节点
                 case OpCode.create:
                     CreateTxn createTxn = (CreateTxn) txn;
+                    // 获取要添加的路径
                     rc.path = createTxn.getPath();
+                    // 创建路径以及路径对应的节点
                     createNode(
                             createTxn.getPath(),
                             createTxn.getData(),
@@ -856,7 +858,9 @@ public class DataTree {
                     // 删除节点
                 case OpCode.delete:
                     DeleteTxn deleteTxn = (DeleteTxn) txn;
+                    // 获取删除的路径
                     rc.path = deleteTxn.getPath();
+                    // 删除路径以及对应的节点
                     deleteNode(deleteTxn.getPath(), header.getZxid());
                     break;
                     // 更新节点数据

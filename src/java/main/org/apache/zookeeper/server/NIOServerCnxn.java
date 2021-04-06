@@ -1220,7 +1220,7 @@ public class NIOServerCnxn extends ServerCnxn {
 
     /*
      * (non-Javadoc)
-     *
+     * 触发事件
      * @see org.apache.zookeeper.server.ServerCnxnIface#process(org.apache.zookeeper.proto.WatcherEvent)
      */
     @Override
@@ -1232,7 +1232,7 @@ public class NIOServerCnxn extends ServerCnxn {
                                      + Long.toHexString(this.sessionId)
                                      + " through " + this);
         }
-
+        // 封装事件响应并发送
         // Convert WatchedEvent to a type that can be sent over the wire
         WatcherEvent e = event.getWrapper();
 

@@ -836,18 +836,21 @@ public class ClientCnxn {
                 }
                 return;
             }
-            // 如果响应中的xid为-4表示,表示一个事件通知
+            // 如果响应中的xid为-1表示,表示一个事件通知
+            // 参考 org.apache.zookeeper.server.NIOServerCnxn.process()
             if (replyHdr.getXid() == -1) {
                 // -1 means notification
                 if (LOG.isDebugEnabled()) {
                     LOG.debug("Got notification sessionid:0x"
                         + Long.toHexString(sessionId));
                 }
-                // 去读事件
+                // 读取事件
                 WatcherEvent event = new WatcherEvent();
                 event.deserialize(bbia, "response");
 
                 // convert from a server path to a client path
+                // 转换事件中的路径为客户端的路径
+                // 因为客户端有可能根路径不是/
                 if (chrootPath != null) {
                     String serverPath = event.getPath();
                     if(serverPath.compareTo(chrootPath)==0)
@@ -1550,7 +1553,7 @@ public class ClientCnxn {
      * @param h 请求头
      * @param request 请求
      * @param response 响应
-     * @param watchRegistration 创建节点时为null
+     * @param watchRegistration watcher注册其,exists()操作是如果设置Watcher,那么其是ExistsWatchRegistration
      * @return
      * @throws InterruptedException
      */
@@ -1601,8 +1604,8 @@ public class ClientCnxn {
      * @param cb 异步回调
      * @param clientPath  客户端操作的路径(比如:/test1)
      * @param serverPath  服务端实际的路径(比如:/stu/test1,因为客户端可以设置{@link ClientCnxn#chrootPath} )
-     * @param ctx
-     * @param watchRegistration
+     * @param ctx 请求携带的上下文
+     * @param watchRegistration 事件
      * @return
      */
     Packet queuePacket(RequestHeader h, ReplyHeader r, Record request,
@@ -1642,6 +1645,11 @@ public class ClientCnxn {
         return packet;
     }
 
+    /**
+     * 添加客户端权限
+     * @param scheme
+     * @param auth
+     */
     public void addAuthInfo(String scheme, byte auth[]) {
         if (!state.isAlive()) {
             return;

@@ -145,6 +145,8 @@ public class FinalRequestProcessor implements RequestProcessor {
             }
         }
 
+        /*------准备发送响应给客户端--------*/
+
         if (request.cnxn == null) {
             return;
         }

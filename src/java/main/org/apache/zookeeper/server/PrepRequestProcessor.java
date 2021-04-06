@@ -162,7 +162,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
         LOG.info("PrepRequestProcessor exited loop!");
     }
 
-    // 根据path获取对应的父节点ChangeRecord
+    // 根据path获取对应节点ChangeRecord
     ChangeRecord getRecordForPath(String path) throws KeeperException.NoNodeException {
         ChangeRecord lastChange = null;
         synchronized (zks.outstandingChanges) {
@@ -435,30 +435,43 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 addChangeRecord(new ChangeRecord(request.hdr.getZxid(), path, s,
                         0, listACL));
                 break;
-            case OpCode.delete:
+            case OpCode.delete:// 比如:  /com/simon/stu/zhangsan
+                // 校验请求
                 zks.sessionTracker.checkSession(request.sessionId, request.getOwner());
+                // 将客户端请求添加到DeleteRequest中
                 DeleteRequest deleteRequest = (DeleteRequest)record;
                 if(deserialize)
                     ByteBufferInputStream.byteBuffer2Record(request.request, deleteRequest);
+                // 获取要删除的路径
                 path = deleteRequest.getPath();
                 lastSlash = path.lastIndexOf('/');
+                // 校验路径
                 if (lastSlash == -1 || path.indexOf('\0') != -1
                         || zks.getZKDatabase().isSpecialPath(path)) {
                     throw new KeeperException.BadArgumentsException(path);
                 }
+                // 获取父路径:/com/simon/stu
                 parentPath = path.substring(0, lastSlash);
+                // 获取父路径对应的节点信息
                 parentRecord = getRecordForPath(parentPath);
+                // 获取路径对应的节点信息
                 ChangeRecord nodeRecord = getRecordForPath(path);
+                // 校验ACL
                 checkACL(zks, parentRecord.acl, ZooDefs.Perms.DELETE,
                         request.authInfo);
+                // 获取请求中版本号
                 int version = deleteRequest.getVersion();
+                // 校验请求中的版本号是否正确(类似于乐观锁)
                 if (version != -1 && nodeRecord.stat.getVersion() != version) {
                     throw new KeeperException.BadVersionException(path);
                 }
+                // 要删除的path路径存在子节点,不允许删除
                 if (nodeRecord.childCount > 0) {
                     throw new KeeperException.NotEmptyException(path);
                 }
+                // 创建txn
                 request.txn = new DeleteTxn(path);
+                // 更新父节点中子节点的数量
                 parentRecord = parentRecord.duplicate(request.hdr.getZxid());
                 parentRecord.childCount--;
                 addChangeRecord(parentRecord);
@@ -608,6 +621,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 pRequest2Txn(request.type, zks.getNextZxid(), request, createRequest, true);
                 break;
             case OpCode.delete:
+                // 创建删除节点请求
                 DeleteRequest deleteRequest = new DeleteRequest();               
                 pRequest2Txn(request.type, zks.getNextZxid(), request, deleteRequest, true);
                 break;

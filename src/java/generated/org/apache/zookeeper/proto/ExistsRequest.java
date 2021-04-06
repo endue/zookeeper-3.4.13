@@ -23,7 +23,13 @@ import org.apache.jute.*;
 import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Public
 public class ExistsRequest implements Record {
+  /**
+   * 查询的路径
+   */
   private String path;
+  /**
+   * 是否设置了Watcher
+   */
   private boolean watch;
   public ExistsRequest() {
   }

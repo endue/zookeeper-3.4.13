@@ -23,7 +23,13 @@ import org.apache.jute.*;
 import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Public
 public class DeleteRequest implements Record {
+  /**
+   * 删除的路径
+   */
   private String path;
+  /**
+   * 删除节点的版本号
+   */
   private int version;
   public DeleteRequest() {
   }

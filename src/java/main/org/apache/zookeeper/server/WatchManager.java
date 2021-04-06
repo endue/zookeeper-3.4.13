@@ -149,6 +149,7 @@ public class WatchManager {
             if (supress != null && supress.contains(w)) {
                 continue;
             }
+            // w是ServerCnxn,在添加事件时如果事件不为false,那么会添加cnxn
             w.process(e);
         }
         // 返回要执行的Watcher事件
