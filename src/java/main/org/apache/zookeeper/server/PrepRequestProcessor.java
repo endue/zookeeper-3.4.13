@@ -162,7 +162,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
         LOG.info("PrepRequestProcessor exited loop!");
     }
 
-    // 根据path获取对应节点ChangeRecord
+    // 根据path获取对应节点的ChangeRecord
     ChangeRecord getRecordForPath(String path) throws KeeperException.NoNodeException {
         ChangeRecord lastChange = null;
         synchronized (zks.outstandingChanges) {
@@ -356,7 +356,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
     protected void pRequest2Txn(int type, long zxid, Request request, Record record, boolean deserialize)
         throws KeeperException, IOException, RequestProcessorException
     {
-        // 设置请求中的事务头
+        // 设置请求的hdr
         request.hdr = new TxnHeader(request.sessionId, request.cxid, zxid,
                                     Time.currentWallTime(), type);
 
@@ -479,24 +479,38 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                         null, -1, null));
                 break;
             case OpCode.setData:
+                // 1.检查会话
                 zks.sessionTracker.checkSession(request.sessionId, request.getOwner());
+                // 2.将客户端中的数据序列化到setDataRequest中
                 SetDataRequest setDataRequest = (SetDataRequest)record;
                 if(deserialize)
                     ByteBufferInputStream.byteBuffer2Record(request.request, setDataRequest);
+                // 3.获取操作的路径,在客户端设置的就是serverPath
                 path = setDataRequest.getPath();
+                // 4.验证path路径是否有效
                 validatePath(path, request.sessionId);
+                // 5.获取path路径的ChangeRecord
                 nodeRecord = getRecordForPath(path);
+                // 6.校验客户端是否有ACL权限操作该节点
                 checkACL(zks, nodeRecord.acl, ZooDefs.Perms.WRITE,
                         request.authInfo);
+                // 7.获取客户端传入的version(类似行锁)
                 version = setDataRequest.getVersion();
+                // 8.获取服务端节点的实际version
                 int currentVersion = nodeRecord.stat.getVersion();
+                // 9.版本不匹配,抛出异常.这里可以看出客户端版本不能设置为-1
                 if (version != -1 && version != currentVersion) {
                     throw new KeeperException.BadVersionException(path);
                 }
+                // 10.准备更新服务端节点的版本+1
                 version = currentVersion + 1;
+                // 11.设置请求的txn
                 request.txn = new SetDataTxn(path, setDataRequest.getData(), version);
+                // 12.复制nodeRecord并更新zxid
                 nodeRecord = nodeRecord.duplicate(request.hdr.getZxid());
+                // 13.更新赋值后nodeRecord的版本为最新的
                 nodeRecord.stat.setVersion(version);
+                // 14.路径节点发生变更,设置到outstandingChanges等队列中
                 addChangeRecord(nodeRecord);
                 break;
             case OpCode.setACL:
@@ -607,7 +621,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
     protected void pRequest(Request request) throws RequestProcessorException {
         // LOG.info("Prep>>> cxid = " + request.cxid + " type = " +
         // request.type + " id = 0x" + Long.toHexString(request.sessionId));
-        // 注:这里清空了request中的hdr和txn
+        // 注:这里清空request中的hdr和txn
         request.hdr = null;
         request.txn = null;
         
@@ -622,10 +636,12 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 break;
             case OpCode.delete:
                 // 创建删除节点请求
-                DeleteRequest deleteRequest = new DeleteRequest();               
+                DeleteRequest deleteRequest = new DeleteRequest();
+                // 做一些前期的准备操作
                 pRequest2Txn(request.type, zks.getNextZxid(), request, deleteRequest, true);
                 break;
             case OpCode.setData:
+                // 更新节点数据请求
                 SetDataRequest setDataRequest = new SetDataRequest();                
                 pRequest2Txn(request.type, zks.getNextZxid(), request, setDataRequest, true);
                 break;
@@ -706,12 +722,14 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 break;
 
             //create/close session don't require request record
+            // 创建/关闭会话不需要请求记录也就是xxxRequest
             case OpCode.createSession:
             case OpCode.closeSession:
                 pRequest2Txn(request.type, zks.getNextZxid(), request, null, true);
                 break;
  
             //All the rest don't need to create a Txn - just verify session
+            // 以下请求都不需要创建Txn,只需要验证会话.所有以下请求都没有Txn和hdr
             case OpCode.sync:
             case OpCode.exists:
             case OpCode.getData:

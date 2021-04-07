@@ -317,13 +317,17 @@ public class FileTxnSnapLog {
      * serialized onto disk
      * @throws IOException
      */
+    // 将内存目录树和会话对应的超时时间记录到数据快照文件
     public void save(DataTree dataTree,
             ConcurrentHashMap<Long, Integer> sessionsWithTimeouts)
         throws IOException {
+        // 获取最后处理的zxid
         long lastZxid = dataTree.lastProcessedZxid;
+        // 基于最后的zxid创建一个新的数据快照文件
         File snapshotFile = new File(snapDir, Util.makeSnapshotName(lastZxid));
         LOG.info("Snapshotting: 0x{} to {}", Long.toHexString(lastZxid),
                 snapshotFile);
+        // 序列化到数据快照文件
         snapLog.serialize(dataTree, sessionsWithTimeouts, snapshotFile);
         
     }

@@ -49,7 +49,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
     private static final Logger LOG = LoggerFactory.getLogger(SyncRequestProcessor.class);
     // zk服务器
     private final ZooKeeperServer zks;
-    // 请求队列
+    // 记录提交并等待处理的请求
     private final LinkedBlockingQueue<Request> queuedRequests =
         new LinkedBlockingQueue<Request>();
     // 下一个处理器
@@ -78,6 +78,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
      * The number of log entries before rolling the log, number
      * is chosen randomly
      */
+    // 这里用来随机计算刷入磁盘所需的快照数
     private static int randRoll;
     // 关闭当前处理器时，会设置该请求标识到queuedRequests队列中
     private final Request requestOfDeath = Request.requestOfDeath;
@@ -159,9 +160,11 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
                         logCount++;// 记录写入到内存目录树的日志数
                         // 确定是否需要刷内存目录树到磁盘(这里就和上面计算随机randRoll关联上了)
                         if (logCount > (snapCount / 2 + randRoll)) {
+                            // 重新计算randRoll
                             setRandRoll(r.nextInt(snapCount/2));
                             // roll the log
-                            // 更新一个新的事务文件
+                            // 进入到这里已经满足刷磁盘的要求
+                            // 所以这里刷磁盘并更新一个新的事务文件
                             zks.getZKDatabase().rollLog();
                             // take a snapshot
                             if (snapInProcess != null && snapInProcess.isAlive()) {
@@ -220,7 +223,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
             return;
         // 提交事务日志
         zks.getZKDatabase().commit();
-        // 遍历待刷入磁盘的请求，并交给下一个请求处理
+        // 遍历待刷入磁盘的请求，并交给下一个请求处理,直到toFlush为空
         while (!toFlush.isEmpty()) {
             // 从toFlush队列中移除一个请求,交给下一个processor来处理
             Request i = toFlush.remove();

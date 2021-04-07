@@ -1157,6 +1157,8 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             }
 
             else {
+                // 一个客户端对应一个NioServerCnxn
+                // 这里会将客户端的sessionId/客户端的xid/当前客户端的权限信息封装到一个Request中
                 Request si = new Request(cnxn, cnxn.getSessionId(), h.getXid(),
                   h.getType(), incomingBuffer, cnxn.getAuthInfo());
                 si.setOwner(ServerCnxn.me);
@@ -1164,6 +1166,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
                 submitRequest(si);
             }
         }
+        // 注意这里
         // 递增接受到的事务请求数(还未处理的,处理后会递减)
         // 如果超过阈值就取消OP_READ事件
         cnxn.incrOutstandingRequests(h);

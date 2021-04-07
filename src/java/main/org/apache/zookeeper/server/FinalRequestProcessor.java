@@ -100,11 +100,12 @@ public class FinalRequestProcessor implements RequestProcessor {
         if (LOG.isTraceEnabled()) {
             ZooTrace.logRequest(LOG, traceMask, 'E', request, "");
         }
+        // 记录处理结果
         ProcessTxnResult rc = null;
+        // outstandingChanges队列中记录了被修改但是还未刷入内存目录树的数据
         // 锁住zk服务器中的outstandingChanges队列
         synchronized (zks.outstandingChanges) {
-            // 当outstandingChanges队列不为空且首元素的zxid <= 请求的zxid
-            // 1.从outstandingChanges队列中取出首元素 2.剔除outstandingChangesForPath队列中对应的请求
+            // while循环不断从outstandingChanges队列获取 <= 当前请求zxid的被修改路径对应的ChangeRecord
             while (!zks.outstandingChanges.isEmpty()
                     && zks.outstandingChanges.get(0).zxid <= request.zxid) {
                 ChangeRecord cr = zks.outstandingChanges.remove(0);
@@ -130,7 +131,7 @@ public class FinalRequestProcessor implements RequestProcessor {
                 zks.getZKDatabase().addCommittedProposal(request);
             }
         }
-
+        // 关闭session请求
         if (request.hdr != null && request.hdr.getType() == OpCode.closeSession) {
             ServerCnxnFactory scxn = zks.getServerCnxnFactory();
             // this might be possible since
@@ -152,11 +153,13 @@ public class FinalRequestProcessor implements RequestProcessor {
         }
         // 获取对应发送当前请求的客户端的ServerCnxn
         ServerCnxn cnxn = request.cnxn;
-
+        // 返回操作类型
         String lastOp = "NA";
         // 请求处理完毕,递减一个
         zks.decInProcess();
+        // 返回操作的异常
         Code err = Code.OK;
+        // 返回操作的数据
         Record rsp = null;
         boolean closeSession = false;
         try {
@@ -393,8 +396,9 @@ public class FinalRequestProcessor implements RequestProcessor {
             LOG.error("Dumping request buffer: 0x" + sb.toString());
             err = Code.MARSHALLINGERROR;
         }
-
+        // 获取最后处理的zxid
         long lastZxid = zks.getZKDatabase().getDataTreeLastProcessedZxid();
+        // 设置响应头
         ReplyHeader hdr =
             new ReplyHeader(request.cxid, lastZxid, err.intValue());
 

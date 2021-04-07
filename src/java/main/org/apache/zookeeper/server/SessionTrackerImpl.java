@@ -308,6 +308,12 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
         }
     }
 
+    /**
+     * 设置当前session的持有者,也就是ServerCnxn
+     * @param id
+     * @param owner
+     * @throws SessionExpiredException
+     */
     synchronized public void setOwner(long id, Object owner) throws SessionExpiredException {
         SessionImpl session = sessionsById.get(id);
         if (session == null || session.isClosing()) {

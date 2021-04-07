@@ -79,13 +79,14 @@ public class Request {
      */
     public final int type;
     // 如果是createSession请求,记录了session超时时间
-    // 如果是
+    // 客户端发送请求时携带的请求体(针对不同操作携带不同数据)
     public final ByteBuffer request;
     // 当前请求所属客户端在服务端对应的ServerCnxn
     public final ServerCnxn cnxn;
-
+    // 请求头
     public TxnHeader hdr;
     // 如果是createSession请求,记录了CreateSessionTxn
+    // 感觉可以理解为请求体
     public Record txn;
 
     public long zxid = -1;
@@ -93,7 +94,10 @@ public class Request {
     public final List<Id> authInfo;
 
     public final long createTime = Time.currentElapsedTime();
-    
+    /**
+     *  当前请求处理者,其实就是ServerCnxn,默认为NioServerCnxn
+     * 参考{@link ZooKeeperServer#processPacket(org.apache.zookeeper.server.ServerCnxn, java.nio.ByteBuffer)}
+     */
     private Object owner;
     
     private KeeperException e;

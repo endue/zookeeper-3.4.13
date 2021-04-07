@@ -141,7 +141,7 @@ public class ZooKeeper {
         // 路径子节点变化的Watcher
         private final Map<String, Set<Watcher>> childWatches =
             new HashMap<String, Set<Watcher>>();
-        // 默认Watcher,在构造Zookeeper是没有指定则使用这个
+        // 默认Watcher,在构造Zookeeper时如果参数传入一个Watcher则就是传入的默认Watcher
         private volatile Watcher defaultWatcher;
 
         /**
@@ -1368,21 +1368,26 @@ public class ZooKeeper {
      * @throws KeeperException If the server signals an error with a non-zero error code.
      * @throws IllegalArgumentException if an invalid path is specified
      */
+    // 更新路径节点数据
     public Stat setData(final String path, byte data[], int version)
         throws KeeperException, InterruptedException
     {
+        // 1.解析客户端操作的路径为服务端的路径
         final String clientPath = path;
         PathUtils.validatePath(clientPath);
 
         final String serverPath = prependChroot(clientPath);
-
+        // 2.设置请求头
         RequestHeader h = new RequestHeader();
         h.setType(ZooDefs.OpCode.setData);
+        // 3.设置请求体
         SetDataRequest request = new SetDataRequest();
         request.setPath(serverPath);
         request.setData(data);
         request.setVersion(version);
+        // 4.封装响应
         SetDataResponse response = new SetDataResponse();
+        // 5.发送请求并等待响应
         ReplyHeader r = cnxn.submitRequest(h, request, response, null);
         if (r.getErr() != 0) {
             throw KeeperException.create(KeeperException.Code.get(r.getErr()),
@@ -1396,6 +1401,7 @@ public class ZooKeeper {
      *
      * @see #setData(String, byte[], int)
      */
+    // 异步更新路径节点数据
     public void setData(final String path, byte data[], int version,
             StatCallback cb, Object ctx)
     {

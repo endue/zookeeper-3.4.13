@@ -703,8 +703,13 @@ public class ClientCnxn {
        }
     }
 
-    // 完成数据包的处理
+    /**
+     * 完成数据包的处理
+     * 在收到响应后获取客户端发送的Packet,里面记录了回调/事件等信息
+     * @param p
+     */
     private void finishPacket(Packet p) {
+        // 事件不为空,注册事件
         if (p.watchRegistration != null) {
             p.watchRegistration.register(p.replyHeader.getErr());
         }
@@ -1578,6 +1583,14 @@ public class ClientCnxn {
         sendThread.getClientCnxnSocket().enableWrite();
     }
 
+    /**
+     * 发送数据包
+     * @param request
+     * @param response
+     * @param cb
+     * @param opCode
+     * @throws IOException
+     */
     public void sendPacket(Record request, Record response, AsyncCallback cb, int opCode)
     throws IOException {
         // Generate Xid now because it will be sent immediately,
