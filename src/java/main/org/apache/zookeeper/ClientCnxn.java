@@ -990,7 +990,7 @@ public class ClientCnxn {
                 // 是否重新注册Watcher
                 if (!disableAutoWatchReset) {
                     // setWatches包
-                    // 下面操作就是获取事件
+                    // 下面操作就是获取Watcher
                     List<String> dataWatches = zooKeeper.getDataWatches();
                     List<String> existWatches = zooKeeper.getExistWatches();
                     List<String> childWatches = zooKeeper.getChildWatches();

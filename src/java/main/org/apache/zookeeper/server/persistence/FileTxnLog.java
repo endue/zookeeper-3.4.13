@@ -406,6 +406,7 @@ public class FileTxnLog implements TxnLog {
      * @param zxid the zxid to truncate the logs to
      * @return true if successful false if not
      */
+    // 截断当前事务日志到指定的zxid
     public boolean truncate(long zxid) throws IOException {
         FileTxnIterator itr = null;
         try {
@@ -416,11 +417,13 @@ public class FileTxnLog implements TxnLog {
                         "happen if you still have snapshots from an old setup or " +
                         "log files were deleted accidentally or dataLogDir was changed in zoo.cfg.");
             }
+            // 获取当前文件已输入的位置,然后截断到该位置
             long pos = input.getPosition();
             // now, truncate at the current position
             RandomAccessFile raf = new RandomAccessFile(itr.logFile, "rw");
             raf.setLength(pos);
             raf.close();
+            // 递归删除文件
             while (itr.goToNextLog()) {
                 if (!itr.logFile.delete()) {
                     LOG.warn("Unable to truncate {}", itr.logFile);
@@ -552,17 +555,22 @@ public class FileTxnLog implements TxnLog {
      * which is used for reading the transaction logs
      */
     public static class FileTxnIterator implements TxnLog.TxnIterator {
+        // 日志文件目录
         File logDir;
+        // 指定的zxid
         long zxid;
         TxnHeader hdr;
         Record record;
+        // 当前待处理日志文件
         File logFile;
+        // 当前待处理日志文件的InputArchive
         InputArchive ia;
         static final String CRC_ERROR="CRC check failed";
        
         PositionInputStream inputStream=null;
         //stored files is the list of files greater than
         //the zxid we are looking for.
+        // 存储大于正在寻找的zxid的文件列表
         private ArrayList<File> storedFiles;
 
         /**
@@ -582,22 +590,33 @@ public class FileTxnLog implements TxnLog {
          * this is inclusive of the zxid
          * @throws IOException
          */
+        // 初始化
         void init() throws IOException {
             storedFiles = new ArrayList<File>();
+            // 1.logDir.listFiles() 获取logDir目录下的所以日志文件(日志文件名包含当前日志记录的最小zxid)
+            // 2.FileTxnLog.getLogFiles(logDir.listFiles(), 0)获取zxid >= 0 的所有日志文件
+            // 3.之后过滤出所有的.log结尾的文件并降序排列
             List<File> files = Util.sortDataDir(FileTxnLog.getLogFiles(logDir.listFiles(), 0), LOG_FILE_PREFIX, false);
+            // 遍历过滤出来的所有文件
             for (File f: files) {
+                // 如果文件的最小zxid >= 指定的zxid,记录下来该日志文件
                 if (Util.getZxidFromName(f.getName(), LOG_FILE_PREFIX) >= zxid) {
                     storedFiles.add(f);
                 }
                 // add the last logfile that is less than the zxid
+                // 添加最后一个小于zxid的日志文件,由于文件是降序排列,所以当找到第一个小于指定zxid的文件时跳出循环即可
                 else if (Util.getZxidFromName(f.getName(), LOG_FILE_PREFIX) < zxid) {
                     storedFiles.add(f);
                     break;
                 }
             }
+            // 获取下一个日志文件
             goToNextLog();
+            // 不存在直接退出当前方法
+            // 存在则序列化一条记录
             if (!next())
                 return;
+            // 初始化 >= zxid的那条记录
             while (hdr.getZxid() < zxid) {
                 if (!next())
                     return;
@@ -610,8 +629,11 @@ public class FileTxnLog implements TxnLog {
          * new file to be read
          * @throws IOException
          */
+        // 转到下一个日志文件,如果有返回true,否则返回false
         private boolean goToNextLog() throws IOException {
+            // 有待处理的文件
             if (storedFiles.size() > 0) {
+                // 获取一个待处理的文件
                 this.logFile = storedFiles.remove(storedFiles.size()-1);
                 ia = createInputArchive(this.logFile);
                 return true;
@@ -625,6 +647,7 @@ public class FileTxnLog implements TxnLog {
          * @param is the inputstream
          * @throws IOException
          */
+        // 从inputarchive中读取头文件并校验
         protected void inStreamCreated(InputArchive ia, InputStream is)
             throws IOException{
             FileHeader header= new FileHeader();
@@ -642,11 +665,13 @@ public class FileTxnLog implements TxnLog {
          * @param is file input stream associated with the input archive.
          * @throws IOException
          **/
+        // 创建InputArchive
         protected InputArchive createInputArchive(File logFile) throws IOException {
             if(inputStream==null){
                 inputStream= new PositionInputStream(new BufferedInputStream(new FileInputStream(logFile)));
                 LOG.debug("Created new input stream " + logFile);
                 ia  = BinaryInputArchive.getArchive(inputStream);
+                // 读取文件头并校验
                 inStreamCreated(ia,inputStream);
                 LOG.debug("Created new input archive " + logFile);
             }
@@ -666,12 +691,15 @@ public class FileTxnLog implements TxnLog {
          * @return true if there is more transactions to be read
          * false if not.
          */
+        // 解析下一个日志文件
         public boolean next() throws IOException {
             if (ia == null) {
                 return false;
             }
             try {
+                // 获取crc的值
                 long crcValue = ia.readLong("crcvalue");
+                // 读取数据
                 byte[] bytes = Util.readTxnBytes(ia);
                 // Since we preallocate, we define EOF to be an
                 if (bytes == null || bytes.length==0) {
@@ -679,10 +707,12 @@ public class FileTxnLog implements TxnLog {
                 }
                 // EOF or corrupted record
                 // validate CRC
+                // 校验crc
                 Checksum crc = makeChecksumAlgorithm();
                 crc.update(bytes, 0, bytes.length);
                 if (crcValue != crc.getValue())
                     throw new IOException(CRC_ERROR);
+                // 解析数据中的请求头然后序列化数据记录到record
                 hdr = new TxnHeader();
                 record = SerializeUtils.deserializeTxn(bytes, hdr);
             } catch (EOFException e) {

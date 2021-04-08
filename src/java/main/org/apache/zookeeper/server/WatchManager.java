@@ -182,7 +182,7 @@ public class WatchManager {
      * @return string representation of watches
      */
     /**
-     * dump出Watcher
+     * dump出指定路径的Watcher
      * @param pwriter
      * @param byPath
      */

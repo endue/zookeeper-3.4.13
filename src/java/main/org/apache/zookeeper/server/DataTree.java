@@ -294,9 +294,12 @@ public class DataTree {
      *
      * @param lastPrefix
      *            the path of the node that is quotaed.
+     *            被引用的节点的路径
      * @param diff
      *            the diff to be added to the count
+     *            要添加到计数中的差值
      */
+    // 更新路径节点的count
     public void updateCount(String lastPrefix, int diff) {
         // 获取统计路径/zookeeper/quota{path}/zookeeper_stats
         String statNode = Quotas.statPath(lastPrefix);
@@ -1068,6 +1071,7 @@ public class DataTree {
      * @param counts
      *            the int count
      */
+    // 获取path路径下的子节点数(包括它自身)和字节数
     private void getCounts(String path, Counts counts) {
         DataNode node = getNode(path);
         if (node == null) {
@@ -1075,6 +1079,7 @@ public class DataTree {
         }
         String[] children = null;
         int len = 0;
+        // 获取node节点对应的字节数以及子节点
         synchronized (node) {
             Set<String> childs = node.getChildren();
             children = childs.toArray(new String[childs.size()]);
@@ -1083,6 +1088,7 @@ public class DataTree {
         // add itself
         counts.count += 1;
         counts.bytes += len;
+        // 递归
         for (String child : children) {
             getCounts(path + "/" + child, counts);
         }
@@ -1204,6 +1210,12 @@ public class DataTree {
 
     public boolean initialized = false;
 
+    /**
+     * 序列化
+     * @param oa
+     * @param tag
+     * @throws IOException
+     */
     public void serialize(OutputArchive oa, String tag) throws IOException {
         scount = 0;
         aclCache.serialize(oa);
@@ -1215,6 +1227,12 @@ public class DataTree {
         }
     }
 
+    /**
+     * 反序列化
+     * @param ia
+     * @param tag
+     * @throws IOException
+     */
     public void deserialize(InputArchive ia, String tag) throws IOException {
         aclCache.deserialize(ia);
         nodes.clear();
@@ -1273,6 +1291,7 @@ public class DataTree {
      * Warning, this is expensive, use sparingly!
      * @param pwriter the output to write to
      */
+    // dump出指定路径下的Watche
     public synchronized void dumpWatches(PrintWriter pwriter, boolean byPath) {
         dataWatches.dumpWatches(pwriter, byPath);
     }
@@ -1281,6 +1300,7 @@ public class DataTree {
      * Write a text dump of all the ephemerals in the datatree.
      * @param pwriter the output to write to
      */
+    // 将内存目录树中所有的临时节点导出到dump文件中
     public void dumpEphemerals(PrintWriter pwriter) {
         Set<Map.Entry<Long, HashSet<String>>> entrySet = ephemerals.entrySet();
         pwriter.println("Sessions with Ephemerals ("
@@ -1299,6 +1319,10 @@ public class DataTree {
         }
     }
 
+    /**
+     * 删除Watcher(也就是ServerCnxn)
+     * @param watcher
+     */
     public void removeCnxn(Watcher watcher) {
         dataWatches.removeWatcher(watcher);
         childWatches.removeWatcher(watcher);
@@ -1310,22 +1334,37 @@ public class DataTree {
         ephemerals.clear();
     }
 
+    /**
+     * 重新设置Watcher
+     * @param relativeZxid 客户端记录最新的zxid
+     * @param dataWatches
+     * @param existWatches
+     * @param childWatches
+     * @param watcher 客户的ServerCxnx
+     */
     public void setWatches(long relativeZxid, List<String> dataWatches,
             List<String> existWatches, List<String> childWatches,
             Watcher watcher) {
+        // 遍历监听节点数据的dataWatches
         for (String path : dataWatches) {
+            // 获取路径对应的DadaNode
             DataNode node = getNode(path);
+            // 路径节点已不存在,触发NodeDeleted事件
             if (node == null) {
                 watcher.process(new WatchedEvent(EventType.NodeDeleted,
                             KeeperState.SyncConnected, path));
+            // 路径节点已发生更新,触发NodeDataChanged事件
             } else if (node.stat.getMzxid() > relativeZxid) {
                 watcher.process(new WatchedEvent(EventType.NodeDataChanged,
                             KeeperState.SyncConnected, path));
+            // 其他情况增加对path的dataWatcher
             } else {
                 this.dataWatches.addWatch(path, watcher);
             }
         }
+        // 遍历监听节点数据的existWatches
         for (String path : existWatches) {
+            // 节点路径已存在触发NodeCreated事件否则加入dataWatches
             DataNode node = getNode(path);
             if (node != null) {
                 watcher.process(new WatchedEvent(EventType.NodeCreated,
@@ -1336,9 +1375,11 @@ public class DataTree {
         }
         for (String path : childWatches) {
             DataNode node = getNode(path);
+            // 节点路径已不存在,触发NodeDeleted
             if (node == null) {
                 watcher.process(new WatchedEvent(EventType.NodeDeleted,
                             KeeperState.SyncConnected, path));
+            // 节点路径发生变更,触发NodeChildrenChanged
             } else if (node.stat.getPzxid() > relativeZxid) {
                 watcher.process(new WatchedEvent(EventType.NodeChildrenChanged,
                             KeeperState.SyncConnected, path));
@@ -1353,26 +1394,34 @@ public class DataTree {
       * values passed as arguments. The values are modified only if newCversion
       * is greater than the current Cversion. A NoNodeException is thrown if
       * a znode for the specified path is not found.
+      * 修改path路径指定的znode的Cversion和Pzxid的值,如果新的Cversion > 当前Cversion才会运行修改
       *
       * @param path
       *     Full path to the znode whose Cversion needs to be modified.
       *     A "/" at the end of the path is ignored.
+      *     需要修改Cversion的znode的完整路径,路径末尾的"/"会被忽略
       * @param newCversion
       *     Value to be assigned to Cversion
+      *     要分配给Cversion的值
       * @param zxid
       *     Value to be assigned to Pzxid
+      *     要分配给Pzxid的值
       * @throws KeeperException.NoNodeException
       *     If znode not found.
       **/
     public void setCversionPzxid(String path, int newCversion, long zxid)
         throws KeeperException.NoNodeException {
+        // 节点传入进来path末尾的"/"
         if (path.endsWith("/")) {
            path = path.substring(0, path.length() - 1);
         }
+        // 获取path路径对应的DataNode节点,不存在会抛出NoNodeException异常
         DataNode node = nodes.get(path);
         if (node == null) {
             throw new KeeperException.NoNodeException(path);
         }
+        // 如果新的Cversion为-1则设置Cversion为当前版本+1
+        // 否则直接设置Cversion为指定的值
         synchronized (node) {
             if(newCversion == -1) {
                 newCversion = node.stat.getCversion() + 1;

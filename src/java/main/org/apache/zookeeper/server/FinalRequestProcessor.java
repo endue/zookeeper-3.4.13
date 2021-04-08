@@ -308,7 +308,13 @@ public class FinalRequestProcessor implements RequestProcessor {
                 rsp = new GetDataResponse(b, stat);
                 break;
             }
-            case OpCode.setWatches: {
+            /**
+             * 客户端在重新连接时会注册其本地保存的Watcher
+             * {@link org.apache.zookeeper.ClientCnxn.SendThread#primeConnection()}
+             * 发送的数据包为:new Packet(h, new ReplyHeader(), sw, null, null)
+             * 其中sw为:SetWatches(setWatchesLastZxid, dataWatchesBatch, existWatchesBatch, childWatchesBatch);
+             */
+                case OpCode.setWatches: {
                 lastOp = "SETW";
                 SetWatches setWatches = new SetWatches();
                 // XXX We really should NOT need this!!!!
