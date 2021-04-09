@@ -95,7 +95,7 @@ public class ObserverZooKeeperServer extends LearnerZooKeeperServer {
      * Set up the request processors for an Observer:
      * firstProcesor->commitProcessor->finalProcessor
      */
-    // 设置请求处理链firstProcesor->commitProcessor->finalProcessor
+    // 设置请求处理链ObserverRequestProcessor->CommitProcessor->FinalRequestProcessor
     @Override
     protected void setupRequestProcessors() {      
         // We might consider changing the processor behaviour of 

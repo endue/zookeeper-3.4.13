@@ -302,14 +302,14 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
          *  
          * See ZOOKEEPER-1642 for more detail.
          */
-        // zkDb内存数据库未初始化
+        // zkDb内存数据库已初始化
         if(zkDb.isInitialized()){
-            // 第一次启动zk服务
             //  lastProcessedZxid初始值为0,所以这里更新自己的hzxid也为0
             setZxid(zkDb.getDataTreeLastProcessedZxid());
         }
-        // zkDb内存数据库已初始化
+        // zkDb内存数据库未初始化
         else {
+            // 第一次启动zk服务或者重启
             // 内部操作会设置zkDb的initialized属性为true
             setZxid(zkDb.loadDataBase());
         }
@@ -474,7 +474,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         // 通知的是org.apache.zookeeper.server.ZooKeeperServer.submitRequest()方法
         // 在启动的过程中由于NIOServerCnxnFactory先创建并启动,那么如果此时客户端发来相关事件请求
         // 由于ZooKeeperServer还未启动完毕,所以在将请求提交给请求处理链时会被阻塞wait(1000)住,
-        // 这里就是初始化完毕防止这种情况,直接唤醒等待
+        // 这里就是初始化完毕防止这种情况,唤醒等待
         notifyAll();
     }
     // 默认处理链条
@@ -853,6 +853,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             if (validpacket) {
                 // 子类会覆盖firstProcessor的初始化
                 // 如果是ZooKeeperServer,执行顺序为PrepRequestProcessor -> SyncRequestProcessor -> finalProcessor
+                // 如果是ObserverZooKeeperServer,执行顺序为ObserverRequestProcessor->CommitProcessor->FinalRequestProcessor
                 // 如果是FollowerZookeeperServer,执行顺序为FollowerRequestProcessor -> CommitProcessor -> FinalRequestProcessor
                 // 如果是LeaderZookeeperServer,执行顺序为PrepRequestProcessor -> ProposalRequestProcessor -> CommitProcessor -> ToBeAppliedRequestProcessor -> FinalRequestProcessor
                 firstProcessor.processRequest(si);

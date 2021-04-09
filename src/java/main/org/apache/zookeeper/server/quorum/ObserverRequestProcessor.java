@@ -65,18 +65,21 @@ public class ObserverRequestProcessor extends ZooKeeperCriticalThread implements
     @Override
     public void run() {
         try {
+            // 当前processor是否关闭
             while (!finished) {
                 Request request = queuedRequests.take();
                 if (LOG.isTraceEnabled()) {
                     ZooTrace.logRequest(LOG, ZooTrace.CLIENT_REQUEST_TRACE_MASK,
                             'F', request, "");
                 }
+                // 走到这里才发现服务关闭退出循环
                 if (request == Request.requestOfDeath) {
                     break;
                 }
                 // We want to queue the request to be processed before we submit
                 // the request to the leader so that we are ready to receive
                 // the response
+                // 将请求交给下一个处理器
                 nextProcessor.processRequest(request);
                 
                 // We now ship the request to the leader. As with all
