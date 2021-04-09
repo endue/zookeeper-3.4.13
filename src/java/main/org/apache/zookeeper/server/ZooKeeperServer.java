@@ -63,6 +63,7 @@ import org.apache.zookeeper.server.SessionTracker.SessionExpirer;
 import org.apache.zookeeper.server.auth.AuthenticationProvider;
 import org.apache.zookeeper.server.auth.ProviderRegistry;
 import org.apache.zookeeper.server.persistence.FileTxnSnapLog;
+import org.apache.zookeeper.server.quorum.Leader;
 import org.apache.zookeeper.server.quorum.ReadOnlyZooKeeperServer;
 import org.apache.zookeeper.server.util.ZxidUtils;
 import org.apache.zookeeper.txn.CreateSessionTxn;
@@ -282,6 +283,9 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
     
     /**
      *  Restore sessions and data
+     *  该方法别两个地方调用
+     *  1.ZookeeperServer启动 {@link ZooKeeperServer#startdata()}
+     *  2.集群模式下当前zk服务成为leader节点{@link Leader#lead()}
      */
     public void loadData() throws IOException, InterruptedException {
         /*
@@ -302,20 +306,19 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
          *  
          * See ZOOKEEPER-1642 for more detail.
          */
-        // zkDb内存数据库已初始化
+        // zkDb内存数据库已初始化(说明此事当前zk服务成为了leader节点)
         if(zkDb.isInitialized()){
-            //  lastProcessedZxid初始值为0,所以这里更新自己的hzxid也为0
+            // 加载内存中最后处理的zxid,然后赋值给属性hzxid
             setZxid(zkDb.getDataTreeLastProcessedZxid());
         }
-        // zkDb内存数据库未初始化
+        // zkDb内存数据库未初始化,说明当前zk服务是启动(包括重启)
         else {
-            // 第一次启动zk服务或者重启
-            // 内部操作会设置zkDb的initialized属性为true
+            // 加载磁盘上的数据,然后返回zxid赋值给属性hzxid
+            // 同时内部操作会设置zkDb的initialized属性为true
             setZxid(zkDb.loadDataBase());
         }
         
         // Clean up dead sessions
-        // 第一次启动zk服务时为空,跳过处理
         // 遍历获取过期的会话Session
         LinkedList<Long> deadSessions = new LinkedList<Long>();
         for (Long session : zkDb.getSessions()) {
@@ -328,6 +331,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         // 清除过期的Session
         for (long session : deadSessions) {
             // XXX: Is lastProcessedZxid really the best thing to use?
+            // 终止session后,对应关联到该session的临时节点触发事件以及删除
             killSession(session, zkDb.getDataTreeLastProcessedZxid());
         }
     }

@@ -213,6 +213,7 @@ public class ZKDatabase {
         return sessionsWithTimeouts;
     }
 
+    // 回放监听器
     private final PlayBackListener commitProposalPlaybackListener = new PlayBackListener() {
         public void onTxnLoaded(TxnHeader hdr, Record txn){
             addCommittedProposal(hdr, txn);
