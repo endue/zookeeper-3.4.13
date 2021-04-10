@@ -49,8 +49,11 @@ public final class ConnectStringParser {
      */
     public ConnectStringParser(String connectString) {
         // parse out chroot, if any
+        // 获取客户端服务列表第一个/的位置,如127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002/app/a/
+        // 例子中返回的off为44
         int off = connectString.indexOf('/');
         if (off >= 0) {
+            // 然后截取字符串,例子中返回的是/app/a/
             String chrootPath = connectString.substring(off);
             // ignore "/" chroot spec, same as null
             if (chrootPath.length() == 1) {
@@ -59,15 +62,17 @@ public final class ConnectStringParser {
                 PathUtils.validatePath(chrootPath);
                 this.chrootPath = chrootPath;
             }
+            // 去掉用户操作的根路径,例子中返回的是127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002
             connectString = connectString.substring(0, off);
         } else {
             this.chrootPath = null;
         }
-
+        // 都会分割127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002
         String hostsList[] = connectString.split(",");
         for (String host : hostsList) {
             int port = DEFAULT_PORT;
             int pidx = host.lastIndexOf(':');
+            // 解析端口
             if (pidx >= 0) {
                 // otherwise : is at the end of the string, ignore
                 if (pidx < host.length() - 1) {
@@ -75,6 +80,7 @@ public final class ConnectStringParser {
                 }
                 host = host.substring(0, pidx);
             }
+            // 生成InetSocketAddress
             serverAddresses.add(InetSocketAddress.createUnresolved(host, port));
         }
     }

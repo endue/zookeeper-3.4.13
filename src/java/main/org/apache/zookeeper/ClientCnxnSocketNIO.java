@@ -328,6 +328,9 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
         // 2. 发起连接
         boolean immediateConnect = sock.connect(addr);
         // 3. 如果是立即建立成功,那么重新注册一些时间,然后关注OP_READ和OP_WRITE事件
+        // 主要是客户端重新建立连接时,由于服务端已经把旧的连接关闭了,会删除事件等相关内存
+        // 所以这里需要将数据理解在注册到zk服务,参考
+        //{@Link org.apache.zookeeper.server.NIOServerCnxn.close}
         if (immediateConnect) {
             sendThread.primeConnection();
         }

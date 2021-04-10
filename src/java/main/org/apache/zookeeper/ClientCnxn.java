@@ -134,7 +134,7 @@ public class ClientCnxn {
 
         byte data[];
     }
-
+    // 客户端权限信息
     private final CopyOnWriteArraySet<AuthData> authInfo = new CopyOnWriteArraySet<AuthData>();
 
     /**
@@ -199,7 +199,7 @@ public class ClientCnxn {
     /**
      * A set of ZooKeeper hosts this client could connect to.
      */
-    // 内部记录的zkServer列表
+    // 内部记录的zkServer列表,实现类StaticHostProvider
     private final HostProvider hostProvider;
 
     /**

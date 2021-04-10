@@ -467,7 +467,7 @@ public class ZooKeeper {
 
         watchManager.defaultWatcher = watcher;
         // 解析connectString,是逗号分隔开的host:port格式的
-        // 比如:127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002/app/a
+        // 比如:127.0.0.1:3000,127.0.0.1:3001,127.0.0.1:3002/app/a/
         // 如果指定了根路径,那么后续操作都在该路径下
         ConnectStringParser connectStringParser = new ConnectStringParser(
                 connectString);
