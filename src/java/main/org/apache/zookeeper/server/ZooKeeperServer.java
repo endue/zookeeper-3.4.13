@@ -1061,6 +1061,11 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
                     + Long.toHexString(clientSessionId)
                     + " at " + cnxn.getRemoteSocketAddress());
             // 关闭旧的cnxn
+            // 1.删除sessionMap中记录的sessionId和NIOServerCnxn的对应关系
+            // 2.调用NIOServerCnxn.close()方法关闭旧的NIOServerCnxn
+            //      删除NIOServerCnxnFactory中记录的关于当前客户端的session和NIOServerCnxn
+            //      删除当前客户端对应的事件
+            //      关闭socket
             serverCnxnFactory.closeSession(sessionId);
             // 设置cnxn的sesionId，这里底层涉及两个步骤：
             // 1.设置sessionId到serverCnxn
@@ -1107,13 +1112,15 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             ByteBufferInputStream.byteBuffer2Record(incomingBuffer, authPacket);
             // 获取授权模式world,auth,digest,ip或自定义
             String scheme = authPacket.getScheme();
-            // 获取对应的插件类
+            // 获取对应的权限认证插件类
             AuthenticationProvider ap = ProviderRegistry.getProvider(scheme);
+            // 返回响应code,默认权限认证失败
             Code authReturn = KeeperException.Code.AUTHFAILED;
             // 插件类不为空
             if(ap != null) {
                 try {
                     // 将新增的授权模式添加到ServerCnxn的authInfo集合中
+                    // 并重新复制权限响应Code
                     authReturn = ap.handleAuthentication(cnxn, authPacket.getAuth());
                 } catch(RuntimeException e) {
                     LOG.warn("Caught runtime exception from AuthenticationProvider: " + scheme + " due to " + e);

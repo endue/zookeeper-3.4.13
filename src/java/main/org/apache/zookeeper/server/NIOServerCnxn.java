@@ -91,6 +91,7 @@ public class NIOServerCnxn extends ServerCnxn {
     long sessionId;
 
     static long nextSessionId = 1;
+    // 允许的outstandingRequests的大小,超过该值后,取消对OP_READ的监听
     int outstandingLimit = 1;
 
     public NIOServerCnxn(ZooKeeperServer zk, SocketChannel sock,
@@ -196,12 +197,7 @@ public class NIOServerCnxn extends ServerCnxn {
     }
 
     /** Read the request payload (everything following the length prefix) */
-    // 读取数据
-    // 这里有两种情况
-    // 1.根据lenBuffer重新初始化incomingBuffer后，
-    //  1.1第一次从SocketChannel读取数据到incomingBuffer
-    //  1.2由于数据拆包，后续数据发送过来继续读取到incomingBuffer
-    // 2.数据已经全部读取完毕
+    // 数据已经全部读取完毕,准备处理
     private void readPayload() throws IOException, InterruptedException {
         // 从SocketChannel读取数据到incomingBuffer
         // 有可能是第一次读取，也有可能是拆包后，处理后续发送过来的数据
@@ -1094,14 +1090,14 @@ public class NIOServerCnxn extends ServerCnxn {
      */
     @Override
     public void close() {
+        // 删除NIOServerCnxnFactory中记录的关于当前客户端的session和NIOServerCnxn
         factory.removeCnxn(this);
-
+        // 删除当前客户端的事件
         if (zkServer != null) {
             zkServer.removeCnxn(this);
         }
-
+        // 关闭socket
         closeSock();
-
         if (sk != null) {
             try {
                 // need to cancel this selection key from the selector
