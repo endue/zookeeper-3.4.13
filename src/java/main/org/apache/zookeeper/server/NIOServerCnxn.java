@@ -91,7 +91,7 @@ public class NIOServerCnxn extends ServerCnxn {
     long sessionId;
 
     static long nextSessionId = 1;
-    // 允许的outstandingRequests的大小,超过该值后,取消对OP_READ的监听
+    // 允许 的outstandingRequests的大小,超过该值后,取消对OP_READ的监听
     int outstandingLimit = 1;
 
     public NIOServerCnxn(ZooKeeperServer zk, SocketChannel sock,
