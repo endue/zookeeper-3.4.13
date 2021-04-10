@@ -155,7 +155,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
                 // 请求不为null，处理请求
                 if (si != null) {
                     // track the number of records written to the log
-                    // 将请求添加到事务日志文件FileTxnSnapLog中
+                    // 将请求添加到事务日志文件FileTxnLog中
                     if (zks.getZKDatabase().append(si)) {
                         logCount++;// 记录写入到内存目录树的日志数
                         // 确定是否需要刷内存目录树到磁盘(这里就和上面计算随机randRoll关联上了)
@@ -164,7 +164,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
                             setRandRoll(r.nextInt(snapCount/2));
                             // roll the log
                             // 进入到这里已经满足刷磁盘的要求
-                            // 所以这里刷磁盘并更新一个新的事务文件
+                            // 所以这里刷磁盘并更新一个新的事务文件FileTxnLog
                             zks.getZKDatabase().rollLog();
                             // take a snapshot
                             if (snapInProcess != null && snapInProcess.isAlive()) {
@@ -221,7 +221,7 @@ public class SyncRequestProcessor extends ZooKeeperCriticalThread implements Req
         // 等待刷入磁盘的数据为空
         if (toFlush.isEmpty())
             return;
-        // 提交事务日志
+        // 提交事务日志文件FileTxnLog到磁盘
         zks.getZKDatabase().commit();
         // 遍历待刷入磁盘的请求，并交给下一个请求处理,直到toFlush为空
         while (!toFlush.isEmpty()) {

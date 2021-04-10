@@ -450,6 +450,7 @@ public class NIOServerCnxn extends ServerCnxn {
     }
 
     // 增加接收到的事务请求数(此时还未处理)
+    // 并限制当前NIOServerCnxn中的SelectionKey是否继续监听OP_READ事件
     protected void incrOutstandingRequests(RequestHeader h) {
         if (h.getXid() >= 0) {
             synchronized (this) {

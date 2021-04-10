@@ -122,7 +122,9 @@ public class FinalRequestProcessor implements RequestProcessor {
             if (request.hdr != null) {
                TxnHeader hdr = request.hdr;
                Record txn = request.txn;
-               // 处理事务请求并写入内存文件目录树
+               // 处理事务请求写入内存文件目录树
+                // 创建节点/删除节点...操作
+                // 其中也包含了处理createSession和closeSession
                rc = zks.processTxn(hdr, txn);
             }
             // do not add non quorum packets to the queue.
