@@ -24,6 +24,7 @@ import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Public
 // 创建节点响应
 public class CreateResponse implements Record {
+  // 路径,服务端处理成功后将当前操作的路径返回回去
   private String path;
   public CreateResponse() {
   }

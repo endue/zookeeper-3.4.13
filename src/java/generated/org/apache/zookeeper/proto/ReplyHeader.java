@@ -24,10 +24,12 @@ import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Public
 // 响应头实体
 public class ReplyHeader implements Record {
-  // 响应中的xid
+  // 响应头中的xid
+  // 其实就是客户端发送请求时的xid
   private int xid;
-  //
+  // 服务端处理该事务请求所分配的zxid
   private long zxid;
+  // 服务端处理请求后的异常
   private int err;
   public ReplyHeader() {
   }

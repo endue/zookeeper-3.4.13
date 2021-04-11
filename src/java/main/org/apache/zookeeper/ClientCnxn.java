@@ -266,7 +266,7 @@ public class ClientCnxn {
         Record request;
         // 响应实体
         Record response;
-        // 数据
+        // 数据,详见自身的createBB()方法
         ByteBuffer bb;
 
         /** Client's view of the path (may differ due to chroot) **/
@@ -326,11 +326,13 @@ public class ClientCnxn {
             try {
                 ByteArrayOutputStream baos = new ByteArrayOutputStream();
                 BinaryOutputArchive boa = BinaryOutputArchive.getArchive(baos);
+                // 写入数据包的字节数,占位
                 boa.writeInt(-1, "len"); // We'll fill this in later
+                // 请求头不为null,添加请求头
                 if (requestHeader != null) {
                     requestHeader.serialize(boa, "header");
                 }
-                // 更新不同的请求,调用不同的序列化方法
+                // 更新不同的请求,调用不同request的序列化方法
                 if (request instanceof ConnectRequest) {
                     request.serialize(boa, "connect");
                     // append "am-I-allowed-to-be-readonly" flag
@@ -340,7 +342,9 @@ public class ClientCnxn {
                 }
                 baos.close();
                 this.bb = ByteBuffer.wrap(baos.toByteArray());
+                // 写入数据包的字节数
                 this.bb.putInt(this.bb.capacity() - 4);
+                // 转换写改为读
                 this.bb.rewind();
             } catch (IOException e) {
                 LOG.warn("Ignoring unexpected exception", e);
@@ -711,9 +715,10 @@ public class ClientCnxn {
     private void finishPacket(Packet p) {
         // 事件不为空,注册事件
         if (p.watchRegistration != null) {
+            // 将响应头中的err传递进去,内部判断err是否为OK如果不OK,就不注册事件
             p.watchRegistration.register(p.replyHeader.getErr());
         }
-        // 没有回调,同步发送消息,唤醒等待并设置Packet完成了处理流程
+        // 没有回调,同步发送消息,设置Packet的finished属性为true并唤醒等待完成处理流程
         if (p.cb == null) {
             synchronized (p) {
                 p.finished = true;
@@ -726,17 +731,23 @@ public class ClientCnxn {
         }
     }
 
+    // 发送数据包时遇到了当前客户端关闭
     private void conLossPacket(Packet p) {
+        // 不需要响应,直接返回不处理
         if (p.replyHeader == null) {
             return;
         }
+        // 获取当前客户端的状态
         switch (state) {
+            // 认证失败
         case AUTH_FAILED:
             p.replyHeader.setErr(KeeperException.Code.AUTHFAILED.intValue());
             break;
+            // 关闭
         case CLOSED:
             p.replyHeader.setErr(KeeperException.Code.SESSIONEXPIRED.intValue());
             break;
+            // 其他
         default:
             p.replyHeader.setErr(KeeperException.Code.CONNECTIONLOSS.intValue());
         }
@@ -1618,7 +1629,7 @@ public class ClientCnxn {
      * @param clientPath  客户端操作的路径(比如:/test1)
      * @param serverPath  服务端实际的路径(比如:/stu/test1,因为客户端可以设置{@link ClientCnxn#chrootPath} )
      * @param ctx 请求携带的上下文
-     * @param watchRegistration 事件
+     * @param watchRegistration 事件注册器
      * @return
      */
     Packet queuePacket(RequestHeader h, ReplyHeader r, Record request,

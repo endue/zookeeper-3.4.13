@@ -275,6 +275,7 @@ public class ZooKeeper {
          * add the watch on the path.
          */
         public void register(int rc) {
+            // rc为ok才注册事件,异常了就不注册了
             if (shouldAddWatch(rc)) {
                 Map<String, Set<Watcher>> watches = getWatches(rc);
                 synchronized(watches) {
