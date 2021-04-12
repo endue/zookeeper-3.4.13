@@ -1173,6 +1173,9 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
                 // 这里会将客户端的sessionId/客户端的xid/当前客户端的权限信息封装到一个Request中
                 Request si = new Request(cnxn, cnxn.getSessionId(), h.getXid(),
                   h.getType(), incomingBuffer, cnxn.getAuthInfo());
+                /**
+                 * 详见{@link SessionTrackerImpl#checkSession(long, java.lang.Object)}
+                 */
                 si.setOwner(ServerCnxn.me);
                 // 提交请求
                 submitRequest(si);

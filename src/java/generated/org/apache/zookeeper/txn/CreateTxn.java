@@ -23,10 +23,15 @@ import org.apache.jute.*;
 import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Public
 public class CreateTxn implements Record {
+  // 客户端创建的路径
   private String path;
+  // 客户端携带的数据
   private byte[] data;
+  // 当前节点访问时需要携带的权限
   private java.util.List<org.apache.zookeeper.data.ACL> acl;
+  // 是否为顺序临时节点
   private boolean ephemeral;
+  // 父节点的最新版本号
   private int parentCVersion;
   public CreateTxn() {
   }

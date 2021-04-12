@@ -247,7 +247,7 @@ public class FileTxnLog implements TxnLog {
            logStream.flush();
            // 3-5.根据当前事务日志文件的FileChannel初始化filePadding中的currentSize
            filePadding.setCurrentSize(fos.getChannel().position());
-           // 3-6.记录新生成的事务日志文件对应的fos到streamsToFlush中
+           // 3-6.记录新生成的事务日志文件对应的fos到streamsToFlush中表示待输入磁盘
            streamsToFlush.add(fos);
         }
         // 4.获取当前事务日志文件的FileChannel传入filePadding中
@@ -361,11 +361,14 @@ public class FileTxnLog implements TxnLog {
      */
     // 提交事务日志
     public synchronized void commit() throws IOException {
+        // logStream不为空时,logStream刷磁盘
         if (logStream != null) {
             logStream.flush();
         }
+        // 遍历streamsToFlush,也刷磁盘
         for (FileOutputStream log : streamsToFlush) {
             log.flush();
+            // 如果强制刷磁盘,则判断是否超时,超时报警
             if (forceSync) {
                 long startSyncNS = System.nanoTime();
 

@@ -75,7 +75,7 @@ public class Request {
     // 客户端发送该请求时分配的xid
     public final int cxid;
     /**
-     *  Request类型,{@link org.apache.zookeeper.ZooDefs.OpCode }
+     *  客户端发送的Request类型,{@link org.apache.zookeeper.ZooDefs.OpCode }
      */
     public final int type;
     // 如果是createSession请求,记录了session超时时间
@@ -90,12 +90,12 @@ public class Request {
     public Record txn;
 
     public long zxid = -1;
-    // 当前请求所属客户端在服务端对应的ServerCnxn的authInfo
+    // 当前请求所属客户端在服务端对应的ServerCnxn中记录的authInfo
     public final List<Id> authInfo;
 
     public final long createTime = Time.currentElapsedTime();
     /**
-     *  当前请求处理者,其实就是ServerCnxn,默认为NioServerCnxn
+     *  当前请求的所有者类型
      * 参考{@link ZooKeeperServer#processPacket(org.apache.zookeeper.server.ServerCnxn, java.nio.ByteBuffer)}
      */
     private Object owner;

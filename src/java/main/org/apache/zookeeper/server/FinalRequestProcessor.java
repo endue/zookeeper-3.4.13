@@ -407,6 +407,9 @@ public class FinalRequestProcessor implements RequestProcessor {
         // 获取最后处理的zxid
         long lastZxid = zks.getZKDatabase().getDataTreeLastProcessedZxid();
         // 设置响应头
+        // 设置客户端发送请求时分配的xid
+        // 设置服务端处理当前请求分配的zxid
+        // 设置以及处理该请求对应的异常
         ReplyHeader hdr =
             new ReplyHeader(request.cxid, lastZxid, err.intValue());
 
