@@ -22,7 +22,9 @@ package org.apache.zookeeper.txn;
 import org.apache.jute.*;
 import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Public
+// Delete事务请求
 public class DeleteTxn implements Record {
+  // 要删除的路径
   private String path;
   public DeleteTxn() {
   }

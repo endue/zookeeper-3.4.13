@@ -280,15 +280,20 @@ public class FinalRequestProcessor implements RequestProcessor {
             case OpCode.exists: {
                 lastOp = "EXIS";
                 // TODO we need to figure out the security requirement for this!
+                // 序列化Request中的ExistsRequest
                 ExistsRequest existsRequest = new ExistsRequest();
                 ByteBufferInputStream.byteBuffer2Record(request.request,
                         existsRequest);
+                // 获取ExistsRequest中的路径path
                 String path = existsRequest.getPath();
                 if (path.indexOf('\0') != -1) {
                     throw new KeeperException.BadArgumentsException();
                 }
+                // 获取path路径对应的节点信息,然后内部还会注册针对path路径的事件
+                // 也就是根据请求中的watch属性
                 Stat stat = zks.getZKDatabase().statNode(path, existsRequest
                         .getWatch() ? cnxn : null);
+                // 将节点信息添加到ExistsResponse中
                 rsp = new ExistsResponse(stat);
                 break;
             }

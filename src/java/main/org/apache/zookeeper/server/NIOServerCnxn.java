@@ -1183,8 +1183,10 @@ public class NIOServerCnxn extends ServerCnxn {
             BinaryOutputArchive bos = BinaryOutputArchive.getArchive(baos);
             try {
                 baos.write(fourBytes);
+                // 设置响应头
                 bos.writeRecord(h, "header");
                 if (r != null) {
+                    // 设置响应体
                     bos.writeRecord(r, tag);
                 }
                 baos.close();

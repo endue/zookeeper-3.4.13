@@ -258,6 +258,7 @@ public class ZooKeeper {
     /**
      * Register a watcher for a particular path.
      */
+    // Watcher注册器
     abstract class WatchRegistration {
         private Watcher watcher;
         private String clientPath;
@@ -1144,19 +1145,25 @@ public class ZooKeeper {
 
         // the watch contains the un-chroot path
         WatchRegistration wcb = null;
+        // watcher不为空,生成一个ExistsWatchRegistration
+        // 后续注册使用
         if (watcher != null) {
             wcb = new ExistsWatchRegistration(watcher, clientPath);
         }
-
+        // 拼接对应于服务端的路径
         final String serverPath = prependChroot(clientPath);
-
+        // 设置请求头,类型为OpCode.exists
         RequestHeader h = new RequestHeader();
         h.setType(ZooDefs.OpCode.exists);
+        // 封装请求
         ExistsRequest request = new ExistsRequest();
         request.setPath(serverPath);
         request.setWatch(watcher != null);
+        // 设置响应
         SetDataResponse response = new SetDataResponse();
+        // 提交请求并等待响应
         ReplyHeader r = cnxn.submitRequest(h, request, response, wcb);
+        // 处理响应
         if (r.getErr() != 0) {
             if (r.getErr() == KeeperException.Code.NONODE.intValue()) {
                 return null;
@@ -1164,7 +1171,7 @@ public class ZooKeeper {
             throw KeeperException.create(KeeperException.Code.get(r.getErr()),
                     clientPath);
         }
-
+        // 获取响应数据
         return response.getStat().getCzxid() == -1 ? null : response.getStat();
     }
 

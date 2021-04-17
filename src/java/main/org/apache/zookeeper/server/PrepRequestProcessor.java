@@ -440,6 +440,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 zks.sessionTracker.checkSession(request.sessionId, request.getOwner());
                 // 将客户端请求添加到DeleteRequest中
                 DeleteRequest deleteRequest = (DeleteRequest)record;
+                // 反序列化出客户端的DeleteRequest
                 if(deserialize)
                     ByteBufferInputStream.byteBuffer2Record(request.request, deleteRequest);
                 // 获取要删除的路径
@@ -474,6 +475,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 // 更新父节点中子节点的数量
                 parentRecord = parentRecord.duplicate(request.hdr.getZxid());
                 parentRecord.childCount--;
+                // 将变更后的节点添加到outstandingChanges和outstandingChangesForPath集合中
                 addChangeRecord(parentRecord);
                 addChangeRecord(new ChangeRecord(request.hdr.getZxid(), path,
                         null, -1, null));

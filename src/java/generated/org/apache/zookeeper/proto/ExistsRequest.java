@@ -21,7 +21,10 @@ package org.apache.zookeeper.proto;
 
 import org.apache.jute.*;
 import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.zookeeper.server.FinalRequestProcessor;
+
 @InterfaceAudience.Public
+// exists命令对应的请求
 public class ExistsRequest implements Record {
   /**
    * 查询的路径
@@ -29,6 +32,8 @@ public class ExistsRequest implements Record {
   private String path;
   /**
    * 是否设置了Watcher
+   * 这里可以看出Watcher并没有传递给服务器而是传递过去了一个布尔值
+   * 使用地点参考:{@link FinalRequestProcessor#processRequest(org.apache.zookeeper.server.Request)}
    */
   private boolean watch;
   public ExistsRequest() {
