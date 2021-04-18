@@ -483,7 +483,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
             case OpCode.setData:
                 // 1.检查会话
                 zks.sessionTracker.checkSession(request.sessionId, request.getOwner());
-                // 2.将客户端中的数据序列化到setDataRequest中
+                // 2.解析客户端的SetDataRequest
                 SetDataRequest setDataRequest = (SetDataRequest)record;
                 if(deserialize)
                     ByteBufferInputStream.byteBuffer2Record(request.request, setDataRequest);

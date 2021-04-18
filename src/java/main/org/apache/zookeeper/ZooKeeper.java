@@ -1397,6 +1397,7 @@ public class ZooKeeper {
         SetDataResponse response = new SetDataResponse();
         // 5.发送请求并等待响应
         ReplyHeader r = cnxn.submitRequest(h, request, response, null);
+        // 6.处理响应
         if (r.getErr() != 0) {
             throw KeeperException.create(KeeperException.Code.get(r.getErr()),
                     clientPath);

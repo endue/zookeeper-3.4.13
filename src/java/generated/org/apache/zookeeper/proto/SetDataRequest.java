@@ -22,9 +22,13 @@ package org.apache.zookeeper.proto;
 import org.apache.jute.*;
 import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Public
+// setData命令请求
 public class SetDataRequest implements Record {
+  // 操作路径
   private String path;
+  // 要赋值的数据
   private byte[] data;
+  // 操作路径节点的版本
   private int version;
   public SetDataRequest() {
   }

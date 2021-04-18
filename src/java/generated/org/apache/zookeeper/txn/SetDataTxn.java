@@ -23,8 +23,11 @@ import org.apache.jute.*;
 import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Public
 public class SetDataTxn implements Record {
+  // 操作路径
   private String path;
+  // 要设置的数据
   private byte[] data;
+  // 操作路径节点的版本
   private int version;
   public SetDataTxn() {
   }

@@ -177,12 +177,14 @@ public class NIOServerCnxn extends ServerCnxn {
                 }
             }
             // if there is nothing left to send, we are done
+            // bb发送完毕,则统计一下然后直接返回
             if (bb.remaining() == 0) {
                 packetSent();
                 return;
             }
         }
-
+        // 走到这里说明参数bb发送了拆包,那么将bb暂存到outgoingBuffers队列中
+        // 等待后续doIO()方法的处理
         synchronized(this.factory){
             sk.selector().wakeup();
             if (LOG.isTraceEnabled()) {
