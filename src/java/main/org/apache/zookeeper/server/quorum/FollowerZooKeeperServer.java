@@ -83,10 +83,10 @@ public class FollowerZooKeeperServer extends LearnerZooKeeperServer {
                 Long.toString(getServerId()), true,
                 getZooKeeperServerListener());
         commitProcessor.start();
-        // 链条1：firstProcessor -->commitProcessor -->finalProcessor
+        // 链条1：FollowerRequestProcessor -->CommitProcessor -->FinalRequestProcessor
         firstProcessor = new FollowerRequestProcessor(this, commitProcessor);
         ((FollowerRequestProcessor) firstProcessor).start();
-        // 链条2：用于将propose写入磁盘 syncProcessor-->SendAckRequestProcessor
+        // 链条2：用于将propose写入磁盘 SyncRequestProcessor-->SendAckRequestProcessor
         syncProcessor = new SyncRequestProcessor(this,
                 new SendAckRequestProcessor((Learner)getFollower()));
         syncProcessor.start();

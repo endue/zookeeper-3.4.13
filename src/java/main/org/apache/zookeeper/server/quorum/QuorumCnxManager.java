@@ -99,14 +99,15 @@ public class QuorumCnxManager {
     /*
      * Connection time out value in milliseconds 
      */
-    
+    // socket连接超时时间
     private int cnxTO = 5000;
     
     /*
      * Local IP address
      */
-    // myid文件中配置的值
+    // myid文件中配置当前zk服务的id
     final long mySid;
+    // socket建立连接超时时间
     final int socketTimeout;
     // 关联配置server
     // 记录zk服务，key是zk服务ID
@@ -132,9 +133,9 @@ public class QuorumCnxManager {
      * Mapping from Peer to Thread number
      */
     // 记录zk服务和对应的SendWorker，SendWorker采用BIO
-    // key是zk服务id
+    // key是zk服务的sid
     final ConcurrentHashMap<Long, SendWorker> senderWorkerMap;
-    // 记录zk服务和对应的队列，key是zk服务id
+    // 记录zk服务和对应的队列，key是zk服务的sid
     // 该队列用来存储要发送到zk服务的数据
     final ConcurrentHashMap<Long, ArrayBlockingQueue<ByteBuffer>> queueSendMap;
     // 记录发送到zk服务最近的一条数据
@@ -344,10 +345,12 @@ public class QuorumCnxManager {
         DataInputStream din = null;
         try {
             // Sending id and challenge
+            // 获取socket输出流,然后将当前zk服务的sid写进去并发送给要连接的zk服务
+            // 当被连接的zk服务收到socket连接后会读取该值,然后判断如果比自己的sid大则断开此连接
             dout = new DataOutputStream(sock.getOutputStream());
             dout.writeLong(this.mySid);
             dout.flush();
-
+            // 构建socket输入流
             din = new DataInputStream(
                     new BufferedInputStream(sock.getInputStream()));
         } catch (IOException e) {
@@ -360,12 +363,13 @@ public class QuorumCnxManager {
         authLearner.authenticate(sock, view.get(sid).hostname);
 
         // If lost the challenge, then drop the new connection
-        // 这里可以避免重复建立连接
+        //如果要连接的sid比自己的大,那么立即关闭上面刚刚创建的socket连接
         if (sid > this.mySid) {
             LOG.info("Have smaller server identifier, so dropping the " +
                      "connection: (" + sid + ", " + this.mySid + ")");
             closeSocket(sock);
             // Otherwise proceed with the connection
+         //  建立完socket连接,那么创建Send/Recv Worker并启动
         } else {
             SendWorker sw = new SendWorker(sock, sid);
             RecvWorker rw = new RecvWorker(sock, din, sid, sw);
@@ -441,12 +445,13 @@ public class QuorumCnxManager {
             receiveConnection(sock);
         }
     }
-    // 处理连接
+    // 处理其他zk服务的socket连接
     private void handleConnection(Socket sock, DataInputStream din)
             throws IOException {
         Long sid = null;
         try {
             // Read server id
+            // 读取请求建立socket连接的zk服务发送过来的消息中的sid
             sid = din.readLong();
             if (sid < 0) { // this is not a server id but a protocol version (see ZOOKEEPER-1633)
                 sid = din.readLong();
@@ -486,7 +491,7 @@ public class QuorumCnxManager {
         authServer.authenticate(sock, din);
 
         //If wins the challenge, then close the new connection.
-        // 如果发送连接请求的服务id小于当前机器的服务id
+        // 请求建立socket连接的zk服务的id小于当前机器的服务id
         // 关闭这个连接请求，这里只允许大的sid向小的sid发送连接请求
         if (sid < this.mySid) {
             /*
@@ -507,8 +512,9 @@ public class QuorumCnxManager {
             connectOne(sid);
 
             // Otherwise start worker threads to receive data.
-            // 为每个新的连接建立一套对应的SendWorker、RecvWorker并启动
+            // 为zk服务的socket连接建立一套对应的SendWorker、RecvWorker并启动
         } else {
+            // 为socket连接建立对应的SendWorker和RecvWorker
             SendWorker sw = new SendWorker(sock, sid);
             RecvWorker rw = new RecvWorker(sock, din, sid, sw);
             sw.setRecv(rw);
@@ -517,10 +523,11 @@ public class QuorumCnxManager {
             
             if(vsw != null)
                 vsw.finish();
-            
+            // 记录客户端(其他zk服务器)和对应SendWorker的关系
             senderWorkerMap.put(sid, sw);
+            // 记录客户端(其他zk服务器)和对应的消息队列的关系
             queueSendMap.putIfAbsent(sid, new ArrayBlockingQueue<ByteBuffer>(SEND_CAPACITY));
-            
+            // 启动Send/Recv Worker
             sw.start();
             rw.start();
             
@@ -537,6 +544,7 @@ public class QuorumCnxManager {
         /*
          * If sending message to myself, then simply enqueue it (loopback).
          */
+        // 如果消息是发送给自己的,只需将其加入队列
         if (this.mySid == sid) {
              b.position(0);
              addToRecvQueue(new Message(b.duplicate(), sid));
@@ -564,10 +572,14 @@ public class QuorumCnxManager {
      * 
      *  @param sid  server id
      */
-    // 尝试与sid服务建立连接
+    // 尝试与zk服务(通过sid)建立socket连接
     synchronized public void connectOne(long sid){
+        // 判断是否建立连接
         if (!connectedToPeer(sid)){
+            // 当前zk服务要连接的其他zk服务
             InetSocketAddress electionAddr;
+            // 判断读取的集群配置中是否包含当前sid
+            // 然后获取对应的InetSocketAddress
             if (view.containsKey(sid)) {
                 electionAddr = view.get(sid).electionAddr;
             } else {
@@ -575,7 +587,7 @@ public class QuorumCnxManager {
                 return;
             }
             try {
-
+                // 下面开启建立socket连接
                 LOG.debug("Opening channel to server " + sid);
                 Socket sock = new Socket();
                 setSockOpts(sock);
@@ -731,7 +743,8 @@ public class QuorumCnxManager {
      */
     // 负责与其他zkServer建立连接并初始化好对应的SendWorker和RecvWorker
     public class Listener extends ZooKeeperThread {
-
+        // 当前机器自身的ServerSocket
+        // 负责与其他zk服务器建立socket连接
         volatile ServerSocket ss = null;
 
         public Listener() {
@@ -744,10 +757,10 @@ public class QuorumCnxManager {
          * Sleeps on accept().
          */
         // 不断地监听到来自其他zk服务的创建连接请求，
-        // 为了避免两台机器之间重复地创建TCP连接，Zookeeper只允许SID大的服务器主动和其他机器建立连接，否则断开连接
-        //
+        // 为了避免两台机器之间重复地创建TCP连接，Zookeeper只允许sid大的服务器主动和其他机器建立连接，否则断开连接
         @Override
         public void run() {
+            // 当前已重试次数
             int numRetries = 0;
             InetSocketAddress addr;
             while((!shutdown) && (numRetries < 3)){
@@ -772,9 +785,9 @@ public class QuorumCnxManager {
                     ss.bind(addr);
                     // 不断轮询获取连接
                     while (!shutdown) {
-                        // 获取新的连接
+                        // 阻塞等待其他zk服务器的socket连接
                         Socket client = ss.accept();
-
+                        // 处理接收到的连接
                         setSockOpts(client);
                         LOG.info("Received connection request "
                                 + client.getRemoteSocketAddress());
@@ -859,12 +872,14 @@ public class QuorumCnxManager {
         // 负责根据Listener保存的连接信息 向对应的server发送（投票）信息
         SendWorker(Socket sock, Long sid) {
             super("SendWorker:" + sid);
-            // 客户端的sid
+            // 客户端的sid(其他zk服务器)
             this.sid = sid;
-            // 客户端的socket
+            // 客户端的socket(其他zk服务器)
             this.sock = sock;
+            // 默认为null,会通过set()方法设置进来
             recvWorker = null;
             try {
+                // 建立socket输出流
                 dout = new DataOutputStream(sock.getOutputStream());
             } catch (IOException e) {
                 LOG.error("Unable to access socket output stream", e);
@@ -1020,6 +1035,7 @@ public class QuorumCnxManager {
         volatile boolean running = true;
         // 对应客户端的输入流
         final DataInputStream din;
+
         final SendWorker sw;
 
         RecvWorker(Socket sock, DataInputStream din, Long sid, SendWorker sw) {

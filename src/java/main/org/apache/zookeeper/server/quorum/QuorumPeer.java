@@ -565,7 +565,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     }
 
     DatagramSocket udpSocket;
-
+    // 记录当前zk服务自己的ip+port
     private InetSocketAddress myQuorumAddr;
 
     public InetSocketAddress getQuorumAddress(){
@@ -746,13 +746,16 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     // 假设三台机器myid：0,1,2  启动顺序：0,1,2
     synchronized public void startLeaderElection() {
     	try {
-    	    // 创建选票(myid,zkid,eopch)
+            /**
+             * 创建选票(myid,zkid,eopch),初始时都是投给自己
+             */
     		currentVote = new Vote(myid, getLastLoggedZxid(), getCurrentEpoch());
     	} catch(IOException e) {
     		RuntimeException re = new RuntimeException(e.getMessage());
     		re.setStackTrace(e.getStackTrace());
     		throw re;
     	}
+    	// 遍历集群中所有机器的id,获取当前机器自身的InetSocketAddress
         for (QuorumServer p : getView().values()) {
             if (p.id == myid) {
                 // 记录自己的地址
@@ -763,6 +766,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         if (myQuorumAddr == null) {
             throw new RuntimeException("My id " + myid + " not in the peer list");
         }
+        // electionType在配置文件中默认写死为3
         if (electionType == 0) {
             try {
                 udpSocket = new DatagramSocket(myQuorumAddr.getPort());
@@ -772,7 +776,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                 throw new RuntimeException(e);
             }
         }
-        // 创建选举算法
+        // 创建选举算法实例
         this.electionAlg = createElectionAlgorithm(electionType);
     }
     
@@ -854,6 +858,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     }
     // 创建选举算法，默认FastLeaderElection
     protected Election createElectionAlgorithm(int electionAlgorithm){
+        // 选举算法
         Election le=null;
                 
         //TODO: use a factory rather than a switch
@@ -872,6 +877,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             // 负责zk服务之间Leader选举过程中的网络通信
             // 内存同时创建了listener
             qcm = createCnxnManager();
+            // 获取内部的listener并启动
             QuorumCnxManager.Listener listener = qcm.listener;
             if(listener != null){
                 // 启动listener，监听其他zkServer发送过来的连接请求

@@ -229,7 +229,7 @@ public class FastLeaderElection implements Election {
     }
     // 记录要发送的选票
     LinkedBlockingQueue<ToSend> sendqueue;
-    // 记录接收到的消息
+    // 记录接收到的选票
     LinkedBlockingQueue<Notification> recvqueue;
 
     /**
@@ -458,6 +458,7 @@ public class FastLeaderElection implements Election {
                     try {
                         // 从sendqueue队列中获取要发送的ToSend对象,带超时时间的阻塞等待
                         ToSend m = sendqueue.poll(3000, TimeUnit.MILLISECONDS);
+                        // 没有要发送的消息,返回继续poll()
                         if(m == null) continue;
                         // 处理ToSend对象
                         process(m);
@@ -475,7 +476,7 @@ public class FastLeaderElection implements Election {
              */
             // 处理ToSend对象
             void process(ToSend m) {
-                // 构建ByteBuffer,然后将ByteBuffer发送给对应的sid的zk服务
+                // 构建ByteBuffer,然后将ByteBuffer发送给对应指定的sid(也就是zk服务)
                 ByteBuffer requestBuffer = buildMsg(m.state.ordinal(), 
                                                         m.leader,
                                                         m.zxid, 
@@ -486,8 +487,9 @@ public class FastLeaderElection implements Election {
             }
         }
 
-
+        // 负责集群间发送选票
         WorkerSender ws;
+        // 负责集群间接受选票
         WorkerReceiver wr;
 
         /**
@@ -525,7 +527,7 @@ public class FastLeaderElection implements Election {
     }
     // QuorumPeer对象,代表当前机器相关信息
     QuorumPeer self;
-    // 发送接收zkServer的选票
+    // 发送接收zkServer间的选票
     Messenger messenger;
     // 逻辑时钟，表示该服务器发起的第多少轮投票,用来判断多个投票是否在同一轮选举周期中
     // 初始投票前被置为1,参考lookForLeader()方法

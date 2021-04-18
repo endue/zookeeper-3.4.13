@@ -85,11 +85,11 @@ public class Vote {
         this.peerEpoch = peerEpoch;
         this.version = 0x0;
     }
-    
+    // 版本默认0x0
     final private int version;
-    
+    // id分配给当前zk服务的id,也就是myid文件中的值
     final private long id;
-    
+    // 服务器当前事务id
     final private long zxid;
     // 选举周期，用于判断是不是同一个选举周期，从0开始累计
     final private long electionEpoch;
