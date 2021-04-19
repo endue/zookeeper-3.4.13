@@ -183,7 +183,7 @@ public class NIOServerCnxn extends ServerCnxn {
                 return;
             }
         }
-        // 走到这里说明参数bb发送了拆包,那么将bb暂存到outgoingBuffers队列中
+        // 走到这里说明参数bb发生了拆包,那么将bb暂存到outgoingBuffers队列中
         // 等待后续doIO()方法的处理
         synchronized(this.factory){
             sk.selector().wakeup();

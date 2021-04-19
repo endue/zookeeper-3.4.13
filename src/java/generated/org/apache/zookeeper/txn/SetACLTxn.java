@@ -23,8 +23,11 @@ import org.apache.jute.*;
 import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Public
 public class SetACLTxn implements Record {
+  // 操作的路径
   private String path;
+  // 要更新为的权限列表
   private java.util.List<org.apache.zookeeper.data.ACL> acl;
+  // 旧的路径节点版本号
   private int version;
   public SetACLTxn() {
   }

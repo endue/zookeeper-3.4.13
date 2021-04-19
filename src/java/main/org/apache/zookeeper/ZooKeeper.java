@@ -1512,6 +1512,7 @@ public class ZooKeeper {
      * @throws org.apache.zookeeper.KeeperException.InvalidACLException If the acl is invalide.
      * @throws IllegalArgumentException if an invalid path is specified
      */
+    // 同步设置客户端ACL权限
     public Stat setACL(final String path, List<ACL> acl, int aclVersion)
         throws KeeperException, InterruptedException
     {
@@ -1543,21 +1544,26 @@ public class ZooKeeper {
      *
      * @see #setACL(String, List, int)
      */
+    // 异步设置客户端ACL权限
     public void setACL(final String path, List<ACL> acl, int version,
             StatCallback cb, Object ctx)
     {
+        // 验证操作路径
         final String clientPath = path;
         PathUtils.validatePath(clientPath);
-
+        // 转换为服务端路径
         final String serverPath = prependChroot(clientPath);
-
+        // 申请请求头
         RequestHeader h = new RequestHeader();
         h.setType(ZooDefs.OpCode.setACL);
+        // 设置请求
         SetACLRequest request = new SetACLRequest();
         request.setPath(serverPath);
         request.setAcl(acl);
         request.setVersion(version);
+        // 设置响应
         SetACLResponse response = new SetACLResponse();
+        // 提交请求
         cnxn.queuePacket(h, new ReplyHeader(), request, response, cb,
                 clientPath, serverPath, ctx, null);
     }

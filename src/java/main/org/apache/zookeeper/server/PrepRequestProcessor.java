@@ -516,12 +516,17 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 addChangeRecord(nodeRecord);
                 break;
             case OpCode.setACL:
+                // 检查session
                 zks.sessionTracker.checkSession(request.sessionId, request.getOwner());
+                // 反序列化出客户端的请求
                 SetACLRequest setAclRequest = (SetACLRequest)record;
                 if(deserialize)
                     ByteBufferInputStream.byteBuffer2Record(request.request, setAclRequest);
+                // 获取操作路径
                 path = setAclRequest.getPath();
+                // 验证路径
                 validatePath(path, request.sessionId);
+                // 去除重复的ACL权限
                 listACL = removeDuplicates(setAclRequest.getAcl());
                 if (!fixupACL(request.authInfo, listACL)) {
                     throw new KeeperException.InvalidACLException(path);
