@@ -965,6 +965,7 @@ public class ZooKeeper {
      *
      * @since 3.4.0
      */
+    // 多个命令一起操作
     public List<OpResult> multi(Iterable<Op> ops) throws InterruptedException, KeeperException {
         for (Op op : ops) {
             op.validate();
@@ -1018,6 +1019,12 @@ public class ZooKeeper {
         return results;
     }
 
+    /**
+     * 转换Op中的操作路径更新为服务端的路径
+     * 最后将多个命令封装为一个MultiTransactionRecord对象
+     * @param ops
+     * @return
+     */
     private MultiTransactionRecord generateMultiTransaction(Iterable<Op> ops) {
         List<Op> transaction = new ArrayList<Op>();
 
@@ -1027,9 +1034,16 @@ public class ZooKeeper {
         return new MultiTransactionRecord(transaction);
     }
 
+    /**
+     * 增加服务器前者
+     * @param op
+     * @return
+     */
     private Op withRootPrefix(Op op) {
         if (null != op.getPath()) {
+            // 根据用户选择的根路径拼接完整的操作路径
             final String serverPath = prependChroot(op.getPath());
+            // op中的path和服务端的路径不一致则更新op中的path为服务器的路径
             if (!op.getPath().equals(serverPath)) {
                 return op.withChroot(serverPath);
             }
@@ -1044,16 +1058,28 @@ public class ZooKeeper {
         cnxn.queuePacket(h, new ReplyHeader(), request, response, cb, null, null, ctx, null);
     }
 
+    /**
+     * 发生MultiTransactionRecord
+     * @param request
+     * @return
+     * @throws InterruptedException
+     * @throws KeeperException
+     */
     protected List<OpResult> multiInternal(MultiTransactionRecord request)
         throws InterruptedException, KeeperException {
+        // 创建请求头
         RequestHeader h = new RequestHeader();
+        // 设置请求类型
         h.setType(ZooDefs.OpCode.multi);
+        // 设置响应体
         MultiResponse response = new MultiResponse();
+        // 提交请求并等待响应
         ReplyHeader r = cnxn.submitRequest(h, request, response, null);
+        // 读取响应中异常
         if (r.getErr() != 0) {
             throw KeeperException.create(KeeperException.Code.get(r.getErr()));
         }
-
+        // 获取操作结果,返回结果的生成在org.apache.zookeeper.server.FinalRequestProcessor.processRequest
         List<OpResult> results = response.getResultList();
         
         ErrorResult fatalError = null;

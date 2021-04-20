@@ -201,14 +201,16 @@ public class FinalRequestProcessor implements RequestProcessor {
                 zks.finishSessionInit(request.cnxn, true);
                 return;
             }
+            // 多个操作命令组成的事务请求
             case OpCode.multi: {
                 lastOp = "MULT";
+                // 创建响应
                 rsp = new MultiResponse() ;
-
+                // 遍历处理后的结果
                 for (ProcessTxnResult subTxnResult : rc.multiResult) {
 
                     OpResult subResult ;
-
+                    // 转换结果为对应的数据
                     switch (subTxnResult.type) {
                         case OpCode.check:
                             subResult = new CheckResult();
@@ -228,7 +230,7 @@ public class FinalRequestProcessor implements RequestProcessor {
                         default:
                             throw new IOException("Invalid type of op");
                     }
-
+                    // 记录结果到rsp中返回给客户端
                     ((MultiResponse)rsp).add(subResult);
                 }
 

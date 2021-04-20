@@ -42,7 +42,9 @@ import java.util.List;
  * @see ZooKeeper#setData(String, byte[], int)
  */
 public abstract class Op {
+    // 操作的类型
     private int type;
+    // 操作的路径
     private String path;
 
     // prevent untyped construction
@@ -179,8 +181,11 @@ public abstract class Op {
     // these internal classes are public, but should not generally be referenced.
     //
     public static class Create extends Op {
+        // 设置的数据
         private byte[] data;
+        // 设置的ACL权限
         private List<ACL> acl;
+        // 创建的节点类型
         private int flags;
 
         private Create(String path, byte[] data, List<ACL> acl, int flags) {

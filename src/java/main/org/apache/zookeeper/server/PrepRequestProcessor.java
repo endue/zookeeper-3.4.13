@@ -211,6 +211,8 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
      * @return a map that contains previously existed records that probably need to be
      *         rolled back in any failure.
      */
+    // 根据multiRequest中的请求路径和请求路径的父路径或者在当前操作前已经变更的记录
+    // 用于处理multiRequest出现异常时的回滚
     HashMap<String, ChangeRecord> getPendingChanges(MultiTransactionRecord multiRequest) {
         HashMap<String, ChangeRecord> pendingChangeRecords = new HashMap<String, ChangeRecord>();
 
@@ -253,11 +255,12 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
      * value is still valid.
      *
      * @param zxid
-     * @param pendingChangeRecords
+     * @param pendingChangeRecords 在进行事务操作前,已经处理的记录
      */
     void rollbackPendingChanges(long zxid, HashMap<String, ChangeRecord>pendingChangeRecords) {
         synchronized (zks.outstandingChanges) {
             // Grab a list iterator starting at the END of the list so we can iterate in reverse
+            // 遍历所有暂存的记录,然后删除zxid等于参数zxid的ChangeRecord
             ListIterator<ChangeRecord> iter = zks.outstandingChanges.listIterator(zks.outstandingChanges.size());
             while (iter.hasPrevious()) {
                 ChangeRecord c = iter.previous();
@@ -272,21 +275,26 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
             }
 
             // we don't need to roll back any records because there is nothing left.
+            // outstandingChanges为空说明其内部刚刚记录的数据都是针对当前操作产生的
+            // 因为上面一步删除的是等于zxid的数据
             if (zks.outstandingChanges.isEmpty()) {
                 return;
             }
-
+            // 走到这里说明outstandingChanges还不为null,那么获取集合中最小的zxid
             long firstZxid = zks.outstandingChanges.get(0).zxid;
 
             for (ChangeRecord c : pendingChangeRecords.values()) {
                 // Don't apply any prior change records less than firstZxid.
                 // Note that previous outstanding requests might have been removed
                 // once they are completed.
+                // 需要回放记录的zxid小于当前集合中最小的zxid那么就不要处理了
+                // 因为此时的c已经被删除了see org.apache.zookeeper.server.FinalRequestProcessor.processRequest
                 if (c.zxid < firstZxid) {
                     continue;
                 }
 
                 // add previously existing records back.
+                // 将以前存在的记录添加回去,此举是防止误删除记录
                 zks.outstandingChangesForPath.put(c.path, c);
             }
         }
@@ -653,6 +661,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 pRequest2Txn(request.type, zks.getNextZxid(), request, setDataRequest, true);
                 break;
             case OpCode.setACL:
+                // 创建SetACLRequest用于解析客户端请求中的SetACLRequest
                 SetACLRequest setAclRequest = new SetACLRequest();                
                 pRequest2Txn(request.type, zks.getNextZxid(), request, setAclRequest, true);
                 break;
@@ -661,6 +670,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 pRequest2Txn(request.type, zks.getNextZxid(), request, checkRequest, true);
                 break;
             case OpCode.multi:
+                // 解析请求中的MultiTransactionRecord
                 MultiTransactionRecord multiRequest = new MultiTransactionRecord();
                 try {
                     ByteBufferInputStream.byteBuffer2Record(request.request, multiRequest);
@@ -671,14 +681,19 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 }
                 List<Txn> txns = new ArrayList<Txn>();
                 //Each op in a multi-op must have the same zxid!
+                // 获取一个zxid,
+                // 注意这里:OpCode.multi请求中包含的所有请求最终都是使用同一个zxid
                 long zxid = zks.getNextZxid();
                 KeeperException ke = null;
 
                 //Store off current pending change records in case we need to rollback
+                // 获取针对multiRequest中所操作路径已变更但是还未处理的ChangeRecord
+                // 这样是为了方便进行回滚操作,此时获取的这些ChangeRecord中的zxid肯定小于上面分配的zxid
                 HashMap<String, ChangeRecord> pendingChanges = getPendingChanges(multiRequest);
 
                 int index = 0;
                 for(Op op: multiRequest) {
+                    // 将Op中的请求类型转换为对应的Request
                     Record subrequest = op.toRequestRecord() ;
 
                     /* If we've already failed one of the ops, don't bother
@@ -693,6 +708,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                     /* Prep the request and convert to a Txn */
                     else {
                         try {
+                            // 开始处理请求也就是将请求转换为Txn
                             pRequest2Txn(op.getType(), zxid, request, subrequest, false);
                         } catch (KeeperException e) {
                             ke = e;
@@ -706,6 +722,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                             request.setException(e);
 
                             /* Rollback change records from failed multi-op */
+                            // 出现异常,回滚刚刚所有的操作
                             rollbackPendingChanges(zxid, pendingChanges);
                         }
                     }
@@ -713,6 +730,8 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                     //FIXME: I don't want to have to serialize it here and then
                     //       immediately deserialize in next processor. But I'm 
                     //       not sure how else to get the txn stored into our list.
+
+                    // 处理往当前请求则将请求中的Txn解析出来记录到txns集合中
                     ByteArrayOutputStream baos = new ByteArrayOutputStream();
                     BinaryOutputArchive boa = BinaryOutputArchive.getArchive(baos);
                     request.txn.serialize(boa, "request") ;
@@ -721,9 +740,10 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                     txns.add(new Txn(request.hdr.getType(), bb.array()));
                     index++;
                 }
-
+                // 创建事务头
                 request.hdr = new TxnHeader(request.sessionId, request.cxid, zxid,
                         Time.currentWallTime(), request.type);
+                // 创建MultiTxn
                 request.txn = new MultiTxn(txns);
                 
                 break;
