@@ -106,6 +106,8 @@ public class FinalRequestProcessor implements RequestProcessor {
         // 锁住zk服务器中的outstandingChanges队列
         synchronized (zks.outstandingChanges) {
             // while循环不断从outstandingChanges队列获取 <= 当前请求zxid的被修改路径对应的ChangeRecord
+            // Processor是一个个的请求处理的并且对应每个请求都会分配一个递增的zxid,所以当请求当前请求时,那么<= 当前请求的zxid
+            // 一定是被处理过了,删除记录
             while (!zks.outstandingChanges.isEmpty()
                     && zks.outstandingChanges.get(0).zxid <= request.zxid) {
                 ChangeRecord cr = zks.outstandingChanges.remove(0);
@@ -118,7 +120,7 @@ public class FinalRequestProcessor implements RequestProcessor {
                     zks.outstandingChangesForPath.remove(cr.path);
                 }
             }
-            // hdr不为空
+            // hdr不为空,说明是事务请求,然后将请求中的操作刷入内存目录树
             if (request.hdr != null) {
                TxnHeader hdr = request.hdr;
                Record txn = request.txn;
@@ -128,7 +130,11 @@ public class FinalRequestProcessor implements RequestProcessor {
                rc = zks.processTxn(hdr, txn);
             }
             // do not add non quorum packets to the queue.
-            // 校验是否为事务性请求，如果是则创建Proposal到committedLog队列中
+            /**
+             * 校验是否为事务性请求，如果是则创建Proposal到committedLog队列中
+             * committedLog队列中记录了最近的500个事务请求
+             * 这里的用处是集群模式中,参考{@link org.apache.zookeeper.server.quorum.LearnerHandler#run}
+             */
             if (Request.isQuorum(request.type)) {
                 zks.getZKDatabase().addCommittedProposal(request);
             }
@@ -179,13 +185,14 @@ public class FinalRequestProcessor implements RequestProcessor {
                 LOG.debug("{}",request);
             }
             switch (request.type) {
+                // 处理ping请求
             case OpCode.ping: {
                 zks.serverStats().updateLatency(request.createTime);
 
                 lastOp = "PING";
                 cnxn.updateStatsForResponse(request.cxid, request.zxid, lastOp,
                         request.createTime, Time.currentElapsedTime());
-
+                // 返回响应,响应头默认为-2
                 cnxn.sendResponse(new ReplyHeader(-2,
                         zks.getZKDatabase().getDataTreeLastProcessedZxid(), 0), null, "response");
                 return;
@@ -265,6 +272,7 @@ public class FinalRequestProcessor implements RequestProcessor {
                 err = Code.get(rc.err);
                 break;
             }
+            // 根据SyncRequest中的操作路径生成SyncResponse返回给客户端
             case OpCode.sync: {
                 lastOp = "SYNC";
                 SyncRequest syncRequest = new SyncRequest();

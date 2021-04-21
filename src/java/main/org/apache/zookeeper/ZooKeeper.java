@@ -1845,21 +1845,28 @@ public class ZooKeeper {
      * @param ctx context to be provided to the callback
      * @throws IllegalArgumentException if an invalid path is specified
      */
+    // 异步刷新,这个命令在单机zk中没有实际的作用,而是直接在processor中传递并最终返回个响应
     public void sync(final String path, VoidCallback cb, Object ctx){
+        // 验证操作路径
         final String clientPath = path;
         PathUtils.validatePath(clientPath);
-
+        // 转为服务端路径
         final String serverPath = prependChroot(clientPath);
-
+        // 设置请求头
         RequestHeader h = new RequestHeader();
         h.setType(ZooDefs.OpCode.sync);
+        // 设置请求
         SyncRequest request = new SyncRequest();
+        // 设置响应
         SyncResponse response = new SyncResponse();
         request.setPath(serverPath);
+        // 在发送出去请求前我们可以看到整个OpCode.sync命令,请求中只设置了路径其他任何东西也没有
+        // 指定调用cnxn.queuePacket()方法将请求异步发送出去
         cnxn.queuePacket(h, new ReplyHeader(), request, response, cb,
                 clientPath, serverPath, ctx, null);
     }
 
+    // 返回客户端状态
     public States getState() {
         return cnxn.getState();
     }

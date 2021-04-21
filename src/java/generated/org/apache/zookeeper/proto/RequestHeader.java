@@ -21,11 +21,17 @@ package org.apache.zookeeper.proto;
 
 import org.apache.jute.*;
 import org.apache.yetus.audience.InterfaceAudience;
+import org.apache.zookeeper.ClientCnxn;
+
+import java.util.LinkedList;
+import java.util.List;
+
 @InterfaceAudience.Public
 // 请求头实体
 public class RequestHeader implements Record {
   /**
-   * 请求头中的xid,设置地点在{@link org.apache.zookeeper.ClientCnxnSocketNIO.doIO }
+   * 请求头中的xid,设置地点在{@link org.apache.zookeeper.ClientCnxnSocketNIO#doIO(List, LinkedList, ClientCnxn)}  }
+   * 如果是ping命令,请求头中的zxid为-2{@link ClientCnxn.SendThread#sendPing()}
    */
   private int xid;
   /**

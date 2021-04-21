@@ -79,8 +79,9 @@ public class NIOServerCnxn extends ServerCnxn {
 
     /**
      * The number of requests that have been submitted but not yet responded to.
+     * 记录已提交当时还未收到回复的请求,当处理请求超过阈值后,则关闭客户端的SelectionKey.OP_READ事件
+     * 递增调用{@link org.apache.zookeeper.server.ZooKeeperServer#processPacket(ServerCnxn, ByteBuffer)}
      */
-    // 记录已提交当时还未收到回复的请求
     int outstandingRequests;
 
     /**

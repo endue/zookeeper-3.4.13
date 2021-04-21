@@ -142,7 +142,10 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
      * is more of a sanity check.
      */
     static final private long superSecret = 0XB3415C00L;
-    // 正在处理的客户端连接请求数量
+    /**
+     * 正在处理的客户端连接请求数量
+     * 递减操作调用:{@link org.apache.zookeeper.server.FinalRequestProcessor#processRequest(org.apache.zookeeper.server.Request)}
+     */
     private final AtomicInteger requestsInProcess = new AtomicInteger(0);
     // 记录更改后还未同步到ZKDatabase(内存数据库)中的节点信息
     final List<ChangeRecord> outstandingChanges = new ArrayList<ChangeRecord>();
@@ -1094,7 +1097,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         // 处理数据，将数据incomingBuffer封装为一个BinaryInputArchive
         InputStream bais = new ByteBufferInputStream(incomingBuffer);
         BinaryInputArchive bia = BinaryInputArchive.getArchive(bais);
-        // 解析出RequestHeader
+        // 解析出请求头RequestHeader
         RequestHeader h = new RequestHeader();
         h.deserialize(bia, "header");
         // Through the magic of byte buffers, txn will not be

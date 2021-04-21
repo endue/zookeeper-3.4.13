@@ -806,7 +806,7 @@ public class ClientCnxn {
      */
     // 该线程负责数据包的发送/响应的接收以及ping
     class SendThread extends ZooKeeperThread {
-        // 上一次ping的纳秒时间戳
+        // 上一次发送ping的纳秒时间戳
         private long lastPingSentNs;
         // 与zk服务端连接的socket,在构造方法中被初始化
         private final ClientCnxnSocket clientCnxnSocket;
@@ -823,7 +823,7 @@ public class ClientCnxn {
             ReplyHeader replyHdr = new ReplyHeader();
             // 读取响应
             replyHdr.deserialize(bbia, "header");
-            // 如果响应中的xid为-1表示ping的响应,不处理
+            // 如果响应中的xid为-2表示ping的响应,不处理
             if (replyHdr.getXid() == -2) {
                 // -2 is the xid for pings
                 if (LOG.isDebugEnabled()) {
@@ -1089,7 +1089,9 @@ public class ClientCnxn {
         // 发送ping
         private void sendPing() {
             lastPingSentNs = System.nanoTime();
+            // 创建ping请求头,xid写死为-2,响应中也是-2
             RequestHeader h = new RequestHeader(-2, OpCode.ping);
+            // 发送ping请求,只有请求头,其他啥也没有
             queuePacket(h, null, null, null, null, null, null, null, null);
         }
         // 读写zkserver地址
@@ -1246,7 +1248,7 @@ public class ClientCnxn {
                         throw new SessionTimeoutException(warnInfo);
                     }
                     // 2.3 ping心跳发送
-                    // 如果处理连接状态
+                    // 校验ClientCnxn当前的状态
                     if (state.isConnected()) {
                     	//1000(1 second) is to prevent race condition missing to send the second ping
                     	//also make sure not to send too many pings when readTimeout is small

@@ -26,6 +26,7 @@ import org.apache.yetus.audience.InterfaceAudience;
 public class ReplyHeader implements Record {
   // 响应头中的xid
   // 其实就是客户端发送请求时的xid
+  // 如果是ping命令则为-2
   private int xid;
   // 服务端处理该事务请求所分配的zxid
   private long zxid;

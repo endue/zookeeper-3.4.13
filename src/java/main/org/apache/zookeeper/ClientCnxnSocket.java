@@ -88,6 +88,11 @@ abstract class ClientCnxnSocket {
         return (int) (now - lastHeard);
     }
 
+    /**
+     * 距离上次发送数据已经过去的时间
+     * 有可能一直接收数据导致now变更了但是lastSend没变更
+     * @return
+     */
     int getIdleSend() {
         return (int) (now - lastSend);
     }
