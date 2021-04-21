@@ -680,6 +680,7 @@ public class ZooKeeper {
      * @param scheme
      * @param auth
      */
+    // 给当前客户端添加权限
     public void addAuthInfo(String scheme, byte auth[]) {
         cnxn.addAuthInfo(scheme, auth);
     }

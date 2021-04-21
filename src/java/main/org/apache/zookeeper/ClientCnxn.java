@@ -124,6 +124,7 @@ public class ClientCnxn {
         }
     }
 
+    // 权限信息对象
     static class AuthData {
         AuthData(String scheme, byte data[]) {
             this.scheme = scheme;
@@ -134,7 +135,7 @@ public class ClientCnxn {
 
         byte data[];
     }
-    // 客户端权限信息
+    // 当前客户端拥有的权限信息
     private final CopyOnWriteArraySet<AuthData> authInfo = new CopyOnWriteArraySet<AuthData>();
 
     /**
@@ -835,10 +836,11 @@ public class ClientCnxn {
                 }
                 return;
             }
-            // 如果响应中的xid为-4表示,表示Auth响应,读取响应触发事件
+            // 如果响应中的xid为-4表示,表示是addAuthInfo()操作后的响应
+            // 参考org.apache.zookeeper.server.ZooKeeperServer.processPacket
             if (replyHdr.getXid() == -4) {
                 // -4 is the xid for AuthPacket
-                // 认证失败
+                // 添加权限失败
                 if(replyHdr.getErr() == KeeperException.Code.AUTHFAILED.intValue()) {
                     // 修改状态
                     state = States.AUTH_FAILED;
@@ -1677,10 +1679,14 @@ public class ClientCnxn {
      * @param auth
      */
     public void addAuthInfo(String scheme, byte auth[]) {
+        // 校验当前客户端状态
         if (!state.isAlive()) {
             return;
         }
         authInfo.add(new AuthData(scheme, auth));
+        // 发送权限数据包
+        // 1.生成请求头,xid默认为-4,类型为OpCode.auth
+        // 2.生成请求AuthPacket
         queuePacket(new RequestHeader(-4, OpCode.auth), null,
                 new AuthPacket(0, scheme, auth), null, null, null, null,
                 null, null);

@@ -1113,7 +1113,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             // 读取客户端数据到AuthPacket
             AuthPacket authPacket = new AuthPacket();
             ByteBufferInputStream.byteBuffer2Record(incomingBuffer, authPacket);
-            // 获取授权模式world,auth,digest,ip或自定义
+            // 获取客户端的授权模式world,auth,digest,ip或自定义
             String scheme = authPacket.getScheme();
             // 获取对应的权限认证插件类
             AuthenticationProvider ap = ProviderRegistry.getProvider(scheme);
@@ -1123,7 +1123,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             if(ap != null) {
                 try {
                     // 将新增的授权模式添加到ServerCnxn的authInfo集合中
-                    // 并重新复制权限响应Code
+                    // 并重新赋值权限响应Code
                     authReturn = ap.handleAuthentication(cnxn, authPacket.getAuth());
                 } catch(RuntimeException e) {
                     LOG.warn("Caught runtime exception from AuthenticationProvider: " + scheme + " due to " + e);
@@ -1143,6 +1143,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
                 // 新建响应并返回给客户端
                 // 关闭session
                 // 取消客户端的OP_READ事件监听
+                // 响应头中分配的zxid为0
                 ReplyHeader rh = new ReplyHeader(h.getXid(), 0,
                         KeeperException.Code.AUTHFAILED.intValue());
                 cnxn.sendResponse(rh, null, null);
