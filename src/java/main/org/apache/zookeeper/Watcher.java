@@ -38,7 +38,7 @@ public interface Watcher {
     public interface Event {
         /**
          * Enumeration of states the ZooKeeper may be at the event
-         * 通知状态
+         * 服务器状态
          */
         @InterfaceAudience.Public
         public enum KeeperState {

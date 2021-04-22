@@ -161,7 +161,7 @@ public class ZooKeeper {
          *  在事件发生后，返回需要被通知的Watcher集合
          */
         @Override
-        public Set<Watcher> materialize(Watcher.Event.KeeperState state,// 事件状态
+        public Set<Watcher> materialize(Watcher.Event.KeeperState state,// 服务状态
                                         Watcher.Event.EventType type,// 事件类型
                                         String clientPath)// 路径
         {
@@ -1308,9 +1308,11 @@ public class ZooKeeper {
             throw KeeperException.create(KeeperException.Code.get(r.getErr()),
                     clientPath);
         }
+        // 将状态信息赋值到参数stat
         if (stat != null) {
             DataTree.copyStat(response.getStat(), stat);
         }
+        // 返回获取的数据
         return response.getData();
     }
 

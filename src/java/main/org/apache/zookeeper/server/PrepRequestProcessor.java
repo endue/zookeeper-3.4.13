@@ -303,7 +303,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
     /**
      * 在进行操作前检查ACL是否有这个权限
      * @param zks zk服务实例
-     * @param acl 操作路径父节点的ACL
+     * @param acl 操作路径父节点或当前路径节点的ACL
      * @param perm 当前的操作,参考{@link org.apache.zookeeper.ZooDefs.Perms}
      * @param ids 当前客户端ServerCnxn携带的权限信息
      * @throws KeeperException.NoAuthException

@@ -309,16 +309,20 @@ public class FinalRequestProcessor implements RequestProcessor {
             }
             case OpCode.getData: {
                 lastOp = "GETD";
+                // 解析客户端发送的GetDataRequest
                 GetDataRequest getDataRequest = new GetDataRequest();
                 ByteBufferInputStream.byteBuffer2Record(request.request,
                         getDataRequest);
+                // 读取路径下的节点信息
                 DataNode n = zks.getZKDatabase().getNode(getDataRequest.getPath());
                 if (n == null) {
                     throw new KeeperException.NoNodeException();
                 }
+                // 校验是否拥有权限
                 PrepRequestProcessor.checkACL(zks, zks.getZKDatabase().aclForNode(n),
                         ZooDefs.Perms.READ,
                         request.authInfo);
+                // 获取节点的状态信息以及节点上存储的数据然后返回给客户端
                 Stat stat = new Stat();
                 byte b[] = zks.getZKDatabase().getData(getDataRequest.getPath(), stat,
                         getDataRequest.getWatch() ? cnxn : null);
@@ -333,6 +337,7 @@ public class FinalRequestProcessor implements RequestProcessor {
              */
                 case OpCode.setWatches: {
                 lastOp = "SETW";
+                // 读取请求中的所有事件监听
                 SetWatches setWatches = new SetWatches();
                 // XXX We really should NOT need this!!!!
                 request.request.rewind();

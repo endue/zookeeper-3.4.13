@@ -23,7 +23,9 @@ import org.apache.jute.*;
 import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Public
 public class GetDataResponse implements Record {
+  // 路径节点存储的数据
   private byte[] data;
+  // 路径节点存储的状态信息
   private org.apache.zookeeper.data.Stat stat;
   public GetDataResponse() {
   }

@@ -23,7 +23,9 @@ import org.apache.jute.*;
 import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Public
 public class GetDataRequest implements Record {
+  // 要获取该路径的数据
   private String path;
+  // 是否设置监听器
   private boolean watch;
   public GetDataRequest() {
   }
