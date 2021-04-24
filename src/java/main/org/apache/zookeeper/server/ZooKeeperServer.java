@@ -1157,7 +1157,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
                               + scheme);
                 }
                 LOG.info("auth success " + cnxn.getRemoteSocketAddress());
-                // 封装响应
+                // 封装响应头
                 ReplyHeader rh = new ReplyHeader(h.getXid(), 0,
                         KeeperException.Code.OK.intValue());
                 cnxn.sendResponse(rh, null, null);

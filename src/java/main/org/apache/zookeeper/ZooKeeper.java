@@ -1036,7 +1036,7 @@ public class ZooKeeper {
     }
 
     /**
-     * 增加服务器前者
+     * 增加服务器前缀
      * @param op
      * @return
      */

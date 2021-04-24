@@ -24,6 +24,7 @@ import org.apache.zookeeper.data.Stat;
  * Encodes the result of a single part of a multiple operation commit.
  */
 public abstract class OpResult {
+    // 响应类型
     private int type;
 
     private OpResult(int type) {

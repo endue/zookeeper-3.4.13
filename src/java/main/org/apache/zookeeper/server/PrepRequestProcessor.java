@@ -215,7 +215,8 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
     // 用于处理multiRequest出现异常时的回滚
     HashMap<String, ChangeRecord> getPendingChanges(MultiTransactionRecord multiRequest) {
         HashMap<String, ChangeRecord> pendingChangeRecords = new HashMap<String, ChangeRecord>();
-
+        // 获取multiRequest要操作的路径对应的ChangeRecord
+        // 这些ChangeRecord此时还未写入事务日志文件
         for (Op op : multiRequest) {
             String path = op.getPath();
             ChangeRecord cr = getOutstandingChange(path);
@@ -233,6 +234,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
              * Otherwise, sequential node name generation will be incorrect
              * for a subsequent request.
              */
+            // 同理获取对应的父节点
             int lastSlash = path.lastIndexOf('/');
             if (lastSlash == -1 || path.indexOf('\0') != -1) {
                 continue;
@@ -687,8 +689,9 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 KeeperException ke = null;
 
                 //Store off current pending change records in case we need to rollback
-                // 获取针对multiRequest中所操作路径已变更但是还未处理的ChangeRecord
+                // 获取针对multiRequest中所操作路径的ChangeRecord
                 // 这样是为了方便进行回滚操作,此时获取的这些ChangeRecord中的zxid肯定小于上面分配的zxid
+                // 如果请求中操作了这些ChangeRecord那么等出现异常时,将pendingChanges中记录的操作前的记录回放即可
                 HashMap<String, ChangeRecord> pendingChanges = getPendingChanges(multiRequest);
 
                 int index = 0;
@@ -700,18 +703,24 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                      * trying the rest as we know it's going to fail and it
                      * would be confusing in the logfiles.
                      */
+                    // 有一个请求出现了异常,后续所有请求都走这里
                     if (ke != null) {
+                        // 封装异常信息
                         request.hdr.setType(OpCode.error);
                         request.txn = new ErrorTxn(Code.RUNTIMEINCONSISTENCY.intValue());
                     } 
                     
                     /* Prep the request and convert to a Txn */
+                    // 预处理该请求
                     else {
                         try {
-                            // 开始处理请求也就是将请求转换为Txn
+                            // 开始预处理请求
                             pRequest2Txn(op.getType(), zxid, request, subrequest, false);
                         } catch (KeeperException e) {
+                            // 走到这里说明处理当前Op出现了异常
+                            // 记录异常
                             ke = e;
+                            // 设置请求头的类型以及事务
                             request.hdr.setType(OpCode.error);
                             request.txn = new ErrorTxn(e.code().intValue());
                             LOG.info("Got user-level KeeperException when processing "
@@ -731,10 +740,14 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                     //       immediately deserialize in next processor. But I'm 
                     //       not sure how else to get the txn stored into our list.
 
-                    // 处理往当前请求则将请求中的Txn解析出来记录到txns集合中
+                    // 处理完当前请求则将请求中的Txn解析出来记录到txns集合中
                     ByteArrayOutputStream baos = new ByteArrayOutputStream();
                     BinaryOutputArchive boa = BinaryOutputArchive.getArchive(baos);
+                    // 分别是CreateTxn/DeleteTxn/SetDataTxn/CheckVersionTxn
                     request.txn.serialize(boa, "request") ;
+                    // 解析pRequest2Txn()方法执行后在request中设置的txn到baos
+                    // 然后将txn转为ByteBuffer
+                    // 最后将ByteBuffer以及当前请求的类型封装为一个Txn
                     ByteBuffer bb = ByteBuffer.wrap(baos.toByteArray());
 
                     txns.add(new Txn(request.hdr.getType(), bb.array()));

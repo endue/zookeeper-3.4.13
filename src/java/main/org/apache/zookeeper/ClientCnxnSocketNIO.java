@@ -136,7 +136,7 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
                         if ((p.requestHeader != null) &&
                                 (p.requestHeader.getType() != OpCode.ping) &&
                                 (p.requestHeader.getType() != OpCode.auth)) {
-                            // 设置请求头中的xid
+                            // 注意这里:设置请求头中的xid
                             p.requestHeader.setXid(cnxn.getXid());
                         }
                         // 组装数据到p.bb中

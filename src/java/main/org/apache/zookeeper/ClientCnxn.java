@@ -259,15 +259,16 @@ public class ClientCnxn {
      */
     // 数据包
     static class Packet {
-        // 请求头
+        // 请求头(会发送给zk服务端)
         RequestHeader requestHeader;
         // 响应头
         ReplyHeader replyHeader;
-        // 请求实体
+        // 请求实体(会发送给zk服务端)
         Record request;
         // 响应实体
         Record response;
         // 数据,详见自身的createBB()方法
+        // 保存可以发送给zk服务端的数据最后被发送出去
         ByteBuffer bb;
 
         /** Client's view of the path (may differ due to chroot) **/
@@ -287,7 +288,7 @@ public class ClientCnxn {
         // 就会封装一个WatchRegistration对象,用来绑定path和Watcher的对应关系
         // 当收到响应后会在该path上注册设置的Watcher
         WatchRegistration watchRegistration;
-        // 是否只读
+        // 是否只读(会发送给zk服务端)
         public boolean readOnly;
 
         /** Convenience ctor */

@@ -898,6 +898,8 @@ public class DataTree {
                     List<Txn> txns = multiTxn.getTxns();
                     rc.multiResult = new ArrayList<ProcessTxnResult>();
                     boolean failed = false;
+                    // 获取所有的事务请求,如个有请求在预处理阶段出现了异常,则标记failed为true
+                    // 也就是遍历到第一个出现异常的请求
                     for (Txn subtxn : txns) {
                         if (subtxn.getType() == OpCode.error) {
                             failed = true;
@@ -906,6 +908,7 @@ public class DataTree {
                     }
 
                     boolean post_failed = false;
+                    // 将事务请求转换为对应的请求
                     for (Txn subtxn : txns) {
                         ByteBuffer bb = ByteBuffer.wrap(subtxn.getData());
                         Record record = null;
@@ -919,6 +922,7 @@ public class DataTree {
                             case OpCode.setData:
                                 record = new SetDataTxn();
                                 break;
+                                // 请求投递失败
                             case OpCode.error:
                                 record = new ErrorTxn();
                                 post_failed = true;
@@ -932,7 +936,7 @@ public class DataTree {
                         assert(record != null);
 
                         ByteBufferInputStream.byteBuffer2Record(bb, record);
-                       
+                        // 如果有请求出现了失败但是并不是当前请求
                         if (failed && subtxn.getType() != OpCode.error){
                             int ec = post_failed ? Code.RUNTIMEINCONSISTENCY.intValue() 
                                                  : Code.OK.intValue();

@@ -80,6 +80,7 @@ public class Request {
     public final int type;
     // 如果是createSession请求,记录了session超时时间
     // 客户端发送请求时携带的请求体(针对不同操作携带不同数据)
+    // 就是org.apache.zookeeper.ClientCnxn.Packet中的bb属性
     public final ByteBuffer request;
     // 当前请求所属客户端在服务端对应的ServerCnxn
     public final ServerCnxn cnxn;
