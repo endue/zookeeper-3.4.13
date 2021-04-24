@@ -1113,7 +1113,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             // 读取客户端数据到AuthPacket
             AuthPacket authPacket = new AuthPacket();
             ByteBufferInputStream.byteBuffer2Record(incomingBuffer, authPacket);
-            // 获取客户端的授权模式world,auth,digest,ip或自定义
+            // 获取客户端的授权模式digest,ip或自定义
             String scheme = authPacket.getScheme();
             // 获取对应的权限认证插件类
             AuthenticationProvider ap = ProviderRegistry.getProvider(scheme);

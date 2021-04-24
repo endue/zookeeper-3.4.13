@@ -846,7 +846,28 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
      * @param acl list of ACLs being assigned to the node (create or setACL operation) 分配给节点的ACL
      * @return
      */
-    // 修改ACL权限
+    /**
+     * 作用是在Create或setAcl命令给节点赋值权限时,解析当前客户端ServerCnxn所拥有的权限,然后获取对应权限模式的权限集合最后解析为ACL
+     * 也就是最终访问这个节点所需要的权限
+     * 如下命令如果注释掉那段没打开,在创建节点时将抛出KeeperException$InvalidACLException异常
+     * ZooKeeper zk1 = new ZooKeeper("192.168.6.133", 50000, new Watcher() {
+     *    @Override
+     *    public void process(WatchedEvent watchedEvent) {
+     * 		System.out.println("事件" + watchedEvent.getType());
+     *    }
+     * });
+     * //zk1.addAuthInfo("digest", "admin:admin".getBytes());
+     * zk1.create("/auth-test", "test".getBytes(), ZooDefs.Ids.CREATOR_ALL_ACL, CreateMode.EPHEMERAL);
+     *
+     * 如果打开上述代码,然后在加上下列代码,下列代码将抛出KeeperException$NoAuthException异常
+     * ZooKeeper zk2 = new ZooKeeper("192.168.6.133", 50000, new Watcher() {
+     *        @Override
+     *    public void process(WatchedEvent watchedEvent) {
+     *
+     *    }
+     * });
+     * System.out.println(JSONUtil.toJsonStr(zk2.getData("/auth-test", false, null)));
+     */
     private boolean fixupACL(List<Id> authInfo, List<ACL> acl) {
         // 读取配置zookeeper.skipACL跳过权限验证,默认true
         if (skipACL) {
@@ -859,26 +880,29 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
         // 遍历分配给节点的ACL
         Iterator<ACL> it = acl.iterator();
         LinkedList<ACL> toAdd = null;
+        // 遍历分配给节点的ACL权限
         while (it.hasNext()) {
             // 获取分配的权限
             ACL a = it.next();
             // 获取授权模式和授权对象
             Id id = a.getId();
             // 1.授权模式是world并且授权对象是anyone
-            // 也就是是一种开发的权限控制模式
+            // 也就是是一种开放的权限控制模式
             if (id.getScheme().equals("world") && id.getId().equals("anyone")) {
                 // wide open
             // 2.授权模式是auth
-            // 更加当前客户端ServerCnxn所拥有的ACL进行遍历获取符合要求的autoInfo生成ACL加入到所操作znode的acl列表中
+                // 如果创建节点时分配了auth类型的权限模式,但是当前客户端却不存在这种模式的权限,则抛出异常认为是无效的权限模式
             } else if (id.getScheme().equals("auth")) {
                 // This is the "auth" id, so we have to expand it to the
                 // authenticated ids of the requestor
-                // 注意这里删除了该ACL
+                // 这里删除了该ACL
                 it.remove();
                 if (toAdd == null) {
                     toAdd = new LinkedList<ACL>();
                 }
                 boolean authIdValid = false;
+                // 获取客户端ServerCnxn所拥有的权限中isAuthenticated()方法为true的,然后解析为ACL
+                // 也就是说访问当前节点需要具备的权限
                 for (Id cid : authInfo) {
                     AuthenticationProvider ap =
                         ProviderRegistry.getProvider(cid.getScheme());

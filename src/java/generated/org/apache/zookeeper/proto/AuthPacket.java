@@ -23,8 +23,11 @@ import org.apache.jute.*;
 import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Public
 public class AuthPacket implements Record {
+  // 类型,默认为0
   private int type;
+  // 授权模式
   private String scheme;
+  // 认证方式
   private byte[] auth;
   public AuthPacket() {
   }

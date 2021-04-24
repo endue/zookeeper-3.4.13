@@ -26,10 +26,11 @@ public class Id implements Record {
 
   /**
    * 授权模式
-   * world 只有一个唯一的id：anyone；表示任何人都可以做对应的操作。这个scheme没有对应的鉴权实现。只要一个znode的ACL list中包含有这个scheme的Id，其对应的操作就运行执行
+   * world(digest特殊形式) 只有一个唯一的id：anyone；表示任何人都可以做对应的操作。这个scheme没有对应的鉴权实现。只要一个znode的ACL list中包含有这个scheme的Id，其对应的操作就运行执行
    * auth 没有对应的id，或者只有一个空串””id。这个scheme没有对应的鉴权实现。语义是当前连接绑定的适合做创建者鉴权的autoInfo (通过调用autoInfo的scheme对应的AP的isAuthenticated()得知)都拥有对应的权限。遇到这个auth后，Server会根据当前连接绑定的符合要求的autoInfo生成ACL加入到所操作znode的acl列表中。
    * digest 使用username:password格式的字符串生成MD5 hash 作为ACL ID。 具体格式为：username:base64 encoded SHA1 password digest.对应内置的鉴权插件：DigestAuthenticationProvider
    * ip 用IP通配符匹配客户端ip。对应内置鉴权插件IPAuthenticationProvider
+   * super 超级管理员
    */
   private String scheme;
   /**

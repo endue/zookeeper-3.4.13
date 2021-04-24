@@ -90,9 +90,13 @@ public class DigestAuthenticationProvider implements AuthenticationProvider {
 
     static public String generateDigest(String idPassword)
             throws NoSuchAlgorithmException {
+        // 用户名密码
         String parts[] = idPassword.split(":", 2);
+        // 用SHA1进行密码加密
         byte digest[] = MessageDigest.getInstance("SHA1").digest(
                 idPassword.getBytes());
+        // 在通过base64Encode对密码进行加密
+        // 最后将用户名和加密后的密码返回
         return parts[0] + ":" + base64Encode(digest);
     }
 
@@ -101,10 +105,14 @@ public class DigestAuthenticationProvider implements AuthenticationProvider {
     {
         String id = new String(authData);
         try {
+            // 生成摘要
             String digest = generateDigest(id);
+            // 如果当前客户端生成的摘要以"zookeeper.DigestAuthenticationProvider.superDigest"配置的一致
+            // 那么说明分配了一个超级用户权限
             if (digest.equals(superDigest)) {
                 cnxn.addAuthInfo(new Id("super", ""));
             }
+            // 添加权限
             cnxn.addAuthInfo(new Id(getScheme(), digest));
             return KeeperException.Code.OK;
         } catch (NoSuchAlgorithmException e) {

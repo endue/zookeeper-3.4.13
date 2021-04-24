@@ -130,9 +130,9 @@ public class ClientCnxn {
             this.scheme = scheme;
             this.data = data;
         }
-
+        // 授权模式
         String scheme;
-
+        // 认证方式
         byte data[];
     }
     // 当前客户端拥有的权限信息
@@ -712,7 +712,7 @@ public class ClientCnxn {
     /**
      * 完成数据包的处理
      * 在收到响应后获取客户端发送的Packet,里面记录了回调/事件等信息
-     * @param p
+     * @param p;
      */
     private void finishPacket(Packet p) {
         // 事件不为空,注册事件
@@ -1684,6 +1684,7 @@ public class ClientCnxn {
         if (!state.isAlive()) {
             return;
         }
+        // 首先把要增加的权限设置到当前客户端本地记录的权限信息中
         authInfo.add(new AuthData(scheme, auth));
         // 发送权限数据包
         // 1.生成请求头,xid默认为-4,类型为OpCode.auth

@@ -23,6 +23,7 @@ import org.apache.jute.*;
 import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Public
 public class SyncRequest implements Record {
+  // 操作的路径
   private String path;
   public SyncRequest() {
   }
