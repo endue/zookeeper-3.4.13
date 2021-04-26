@@ -48,6 +48,7 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
     // key是过期时间(也就是session的tickTime)，value是session集合
     HashMap<Long, SessionSet> sessionSets = new HashMap<Long, SessionSet>();
     // key是sessionid，value是session的超时周期
+    // 这个sessionsWithTimeouts在创建SessionTrackerImpl时被传递进来,来自ZKDatabase
     ConcurrentHashMap<Long, Integer> sessionsWithTimeout;
     // 下一个sessionId
     long nextSessionId = 0;
@@ -65,9 +66,10 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
         }
         // 会话ID
         final long sessionId;
-        // 会话超时时间
+        // 会话超时时间,一个固定的值
         final int timeout;
-        // 会话超时时间点，用于检测是否过期，会不断刷新
+        // 会话超时时间点，用于检测是否过期，会不断刷新,
+        // 当前时间 + timeout来计算
         long tickTime;
         // 是否关闭
         boolean isClosing;
@@ -86,6 +88,7 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
         return nextSid;
     }
 
+    // 集合记录了会话的实现类
     static class SessionSet {
         HashSet<SessionImpl> sessions = new HashSet<SessionImpl>();
     }
@@ -93,14 +96,22 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
     SessionExpirer expirer;
 
     // 会话分桶，举例：expirationInterval = 3
-    // 会话1、2过期时间分别为:3,4,计算结果为6,6
-    // 会话3、4过期时间分别为:5,6,计算结果为6,9
+    // 会话1、2过期时间分别为3,4,计算结果为6,6
+    // 会话3、4过期时间分别为5,6,计算结果为6,9
     // 通过这种方式将不同的会话计算出统一的一个数
     private long roundToInterval(long time) {
         // We give a one interval grace period
         return (time / expirationInterval + 1) * expirationInterval;
     }
 
+    /**
+     * 构造方法
+     * @param expirer
+     * @param sessionsWithTimeout
+     * @param tickTime
+     * @param sid 在单机模式中传递进来的为1,而机器模式中为各个服务器的sid
+     * @param listener
+     */
     public SessionTrackerImpl(SessionExpirer expirer,
             ConcurrentHashMap<Long, Integer> sessionsWithTimeout, int tickTime,
             long sid, ZooKeeperServerListener listener)
@@ -220,6 +231,7 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
         return true;
     }
 
+    // 标识session实现类中的关闭标识符
     synchronized public void setSessionClosing(long sessionId) {
         if (LOG.isTraceEnabled()) {
             LOG.info("Session closing: 0x" + Long.toHexString(sessionId));

@@ -68,6 +68,7 @@ public class ZKDatabase {
     // 内存文件目录树
     protected DataTree dataTree;
     // 记录客户端sessionId和对应的过期时间戳
+    // 这个sessionsWithTimeouts在创建SessionTrackerImpl是传递给它,所以它俩是同一个引用
     protected ConcurrentHashMap<Long, Integer> sessionsWithTimeouts;
     // FileTxnSnapLog里面记录了数据日志和事物快照的相关类
     // 单机模式在org.apache.zookeeper.server.ZooKeeperServer.startdata中被初始化

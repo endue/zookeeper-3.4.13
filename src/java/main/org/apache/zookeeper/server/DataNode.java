@@ -48,7 +48,7 @@ public class DataNode implements Record {
     /**
      * the acl map long for this datanode. the datatree has the map
      */
-    // 权限列表
+    // 权限列表转换为的long值
     Long acl;
 
     /**

@@ -80,7 +80,7 @@ public class PurgeTxnLog {
         }
 
         FileTxnSnapLog txnLog = new FileTxnSnapLog(dataDir, snapDir);
-        // 获取最近num个数据快照文件
+        // 获取最近num个数据快照文件,num默认为3
         List<File> snaps = txnLog.findNRecentSnapshots(num);
         int numSnaps = snaps.size();
         if (numSnaps > 0) {

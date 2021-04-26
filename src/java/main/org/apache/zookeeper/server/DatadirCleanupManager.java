@@ -39,6 +39,7 @@ public class DatadirCleanupManager {
 
     /**
      * Status of the dataDir purge task
+     * 启动状态枚举
      */
     public enum PurgeTaskStatus {
         NOT_STARTED, STARTED, COMPLETED;
@@ -91,7 +92,7 @@ public class DatadirCleanupManager {
      * 
      * @see PurgeTxnLog#purge(File, File, int)
      */
-    //
+    // 启动
     public void start() {
         // 校验启动状态
         if (PurgeTaskStatus.STARTED == purgeTaskStatus) {
@@ -99,7 +100,7 @@ public class DatadirCleanupManager {
             return;
         }
         // Don't schedule the purge task with zero or negative purge interval.
-        // 校验执行间隔
+        // 校验执行间隔,必须大于0
         if (purgeInterval <= 0) {
             LOG.info("Purge task is not scheduled.");
             return;
@@ -107,6 +108,7 @@ public class DatadirCleanupManager {
         // 创建定时清理任务并传入数据快照和事物日志的路径，然后启动并定期执行
         timer = new Timer("PurgeTask", true);
         TimerTask task = new PurgeTask(dataLogDir, snapDir, snapRetainCount);
+        // 每purgeInterval小时执行一次
         timer.scheduleAtFixedRate(task, 0, TimeUnit.HOURS.toMillis(purgeInterval));
         // 标记为启动状态
         purgeTaskStatus = PurgeTaskStatus.STARTED;
@@ -143,6 +145,7 @@ public class DatadirCleanupManager {
         public void run() {
             LOG.info("Purge task started.");
             try {
+                // 开始清理日志
                 PurgeTxnLog.purge(new File(logsDir), new File(snapsDir), snapRetainCount);
             } catch (Exception e) {
                 LOG.error("Error occurred while purging.", e);

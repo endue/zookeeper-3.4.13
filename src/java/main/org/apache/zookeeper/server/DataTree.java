@@ -423,7 +423,7 @@ public class DataTree {
         if (parent == null) {
             throw new KeeperException.NoNodeException();
         }
-        // 锁住父路径,反之并发创建节点
+        // 锁住父路径,防止并发创建节点
         synchronized (parent) {
             // 获取父路径的所有子路径
             Set<String> children = parent.getChildren();
@@ -574,7 +574,7 @@ public class DataTree {
         // 5.触发监听path路径的NodeDeleted事件
         Set<Watcher> processed = dataWatches.triggerWatch(path,
                 EventType.NodeDeleted);
-        // 6.todo? 这个是什么场景
+        // 6.这种场景就对某个路径监听了子节点的事件,但是该路径并没有子节点
         childWatches.triggerWatch(path, EventType.NodeDeleted, processed);
         // 7.触发监听parentName路径的NodeChildrenChanged事件
         childWatches.triggerWatch(parentName.equals("") ? "/" : parentName,
