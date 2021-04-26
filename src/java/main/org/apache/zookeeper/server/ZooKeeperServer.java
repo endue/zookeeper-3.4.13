@@ -339,6 +339,9 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         }
     }
 
+    /**
+     * 生成内部目录树和会话的数据快照文件到磁盘
+     */
     public void takeSnapshot(){
 
         try {

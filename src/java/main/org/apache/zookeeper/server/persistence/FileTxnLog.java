@@ -248,6 +248,7 @@ public class FileTxnLog implements TxnLog {
            // 3-5.根据当前事务日志文件的FileChannel初始化filePadding中的currentSize
            filePadding.setCurrentSize(fos.getChannel().position());
            // 3-6.记录新生成的事务日志文件对应的fos到streamsToFlush中表示待输入磁盘
+            // streamsToFlush是一个集合,里面可能记录了多个fos
            streamsToFlush.add(fos);
         }
         // 4.获取当前事务日志文件的FileChannel传入filePadding中
