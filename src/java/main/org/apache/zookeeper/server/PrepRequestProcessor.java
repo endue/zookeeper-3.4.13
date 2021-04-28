@@ -421,7 +421,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 if (ephemeralParent) {
                     throw new KeeperException.NoChildrenForEphemeralsException(path);
                 }
-                // 更新父节点的子节点版本号，也就是cversion
+                // 更新父节点的子节点版本号，也就是cversion,该值记录了子节点修改次数
                 int newCversion = parentRecord.stat.getCversion()+1;
                 // 生成txn
                 request.txn = new CreateTxn(path, createRequest.getData(),
@@ -544,6 +544,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 nodeRecord = getRecordForPath(path);
                 checkACL(zks, nodeRecord.acl, ZooDefs.Perms.ADMIN,
                         request.authInfo);
+                // 校验版本
                 version = setAclRequest.getVersion();
                 currentVersion = nodeRecord.stat.getAversion();
                 if (version != -1 && version != currentVersion) {
@@ -552,6 +553,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 version = currentVersion + 1;
                 request.txn = new SetACLTxn(path, listACL, version);
                 nodeRecord = nodeRecord.duplicate(request.hdr.getZxid());
+                // 更新aversion版本号
                 nodeRecord.stat.setAversion(version);
                 addChangeRecord(nodeRecord);
                 break;
@@ -572,8 +574,11 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 // queues up this operation without being the session owner.
                 // this request is the last of the session so it should be ok
                 //zks.sessionTracker.checkSession(request.sessionId, request.getOwner());
+                // 获取sessionID关联的所有临时路径,内部是克隆一份
                 HashSet<String> es = zks.getZKDatabase()
                         .getEphemerals(request.sessionId);
+                // 从switch所处理的请求中可以看出,只有delete命令在生成的ChangeRecord中没有stat
+                //
                 synchronized (zks.outstandingChanges) {
                     for (ChangeRecord c : zks.outstandingChanges) {
                         if (c.stat == null) {

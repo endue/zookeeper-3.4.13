@@ -110,6 +110,7 @@ public class DataTree {
 
     /**
      * the path trie that keeps track fo the quota nodes in this datatree
+     * 字典树
      */
     private final PathTrie pTrie = new PathTrie();
 
@@ -128,6 +129,7 @@ public class DataTree {
         if (retv == null) {
             return new HashSet<String>();
         }
+        // 注意这里,如果存在的话是克隆一份
         HashSet<String> cloned = null;
         synchronized (retv) {
             cloned = (HashSet<String>) retv.clone();
@@ -386,12 +388,13 @@ public class DataTree {
     /**
      * 创建节点Node
      * @param path 节点路径 比如:/data/gateway/user/add
-     * @param data 节点数据
+     * @param data 节点需要记录的数据
      * @param acl  节点ACL权限
      * @param ephemeralOwner 如果是临时节点则代表为当前节点的sessionId,否则为0(注释却写个-1,擦)
      *            the session id that owns this node. -1 indicates this is not
      *            an ephemeral node.
-     * @param zxid 事务ID
+     * @param parentCVersion
+     * @param zxid zk服务在处理该请求时分配的zxid
      * @param time 时间戳
      * @return the patch of the created node
      * @throws KeeperException
@@ -406,16 +409,21 @@ public class DataTree {
         String parentName = path.substring(0, lastSlash);
         // 截取出子路径add
         String childName = path.substring(lastSlash + 1);
-        // 封装一个节点信息stat
+        // 创建一个节点统计信息
         StatPersisted stat = new StatPersisted();
+        // 设置创建/修改时间
         stat.setCtime(time);
         stat.setMtime(time);
+        // 注意这里设置的相关zxid默认值为zk服务分配的zxid
         stat.setCzxid(zxid);
         stat.setMzxid(zxid);
         stat.setPzxid(zxid);
+        // 设置版本
         stat.setVersion(0);
         stat.setAversion(0);
-        // 设置节点信息stat的持有sessionID
+        // 设置节点统计信息stat的持有sessionID
+        // 0: 持久节点
+        // sessionId: 临时节点
         stat.setEphemeralOwner(ephemeralOwner);
         // 获取父路径对应的节点信息
         DataNode parent = nodes.get(parentName);
@@ -432,6 +440,7 @@ public class DataTree {
                 throw new KeeperException.NodeExistsException();
             }
             // 更新parentCVersion
+            // todo 什么时候为-1?
             if (parentCVersion == -1) {
                 parentCVersion = parent.stat.getCversion();
                 parentCVersion++;
@@ -445,7 +454,7 @@ public class DataTree {
             DataNode child = new DataNode(parent, data, longval, stat);
             // 添加子路径到父路径的子路径集合中
             parent.addChild(childName);
-            // 记录完整子路径和节点信息
+            // 记录完整子路径和节点信息到内存目录树
             nodes.put(path, child);
             // 如果是临时节点,记录完整路径和ephemeralOwner的关系
             if (ephemeralOwner != 0) {
@@ -460,17 +469,17 @@ public class DataTree {
             }
         }
         // now check if its one of the zookeeper node child
-        // 检查添加路径的父路径是否为/zookeeper/quota的子路径
+        // 检查添加节点的父路径是否以/zookeeper/quota开头
         if (parentName.startsWith(quotaZookeeper)) {
             // 走到这里说明是
             // now check if its the limit node
-            // 判断添加路径是否为zookeeper_limits
+            // 判断子路径是否为zookeeper_limits
             if (Quotas.limitNode.equals(childName)) {
                 // this is the limit node
                 // get the parent and add it to the trie
                 pTrie.addPath(parentName.substring(quotaZookeeper.length()));
             }
-            // 判断添加路径是否为zookeeper_stats
+            // 判断子路径是否为zookeeper_stats
             if (Quotas.statNode.equals(childName)) {
                 updateQuotaForPath(parentName
                         .substring(quotaZookeeper.length()));
@@ -504,45 +513,48 @@ public class DataTree {
      */
     public void deleteNode(String path, long zxid)
             throws KeeperException.NoNodeException {
+        // 计算path(假设为/data/gateway/user/add)路径最后一个/的位置
         int lastSlash = path.lastIndexOf('/');
-        // 获取父路径
+        // 截取出父路径/data/gateway/user
         String parentName = path.substring(0, lastSlash);
-        // 获取当前路径
+        // 截取出子路径add
         String childName = path.substring(lastSlash + 1);
-        // 1.校验并删除路径对应的节点信息
+        // 获取path在内存目录树中对应的节点信息
         DataNode node = nodes.get(path);
         if (node == null) {
             throw new KeeperException.NoNodeException();
         }
+        // 删除内存目录树中的path
         nodes.remove(path);
-        // 2.
+        // 删除acl缓存中对path路径权限的保存
         synchronized (node) {
             aclCache.removeUsage(node.acl);
         }
-        // 3. 校验父节点
+        // 获取父路径对应的节点信息
         DataNode parent = nodes.get(parentName);
         if (parent == null) {
             throw new KeeperException.NoNodeException();
         }
+        // 锁住父路径,防止并发操作
         synchronized (parent) {
-            // 3-1. 删除父节点下对应的子节点
+            // 删除父节点下对应的子节点
             parent.removeChild(childName);
-            // 3-3. 更新父节点的pzxid
+            // 更新父节点的pzxid
             parent.stat.setPzxid(zxid);
-            // 3-4. 获取当前节点的所有者
+            //获取当前节点的持有者
             long eowner = node.stat.getEphemeralOwner();
-            // 如果所有者sessionId不为0表示是一个临时节点
+            // 如果eowner不为0表示是一个临时节点
             if (eowner != 0) {
-                // 3-5. 获取临时sessionId对应的所有路径
+                // 获取eowner对应的所有临时路径集合
                 HashSet<String> nodes = ephemerals.get(eowner);
                 if (nodes != null) {
-                    // 3-6. 从当前sessionId对应的所有临时路径中删除当前路径
+                    // 从临时路径集合中删除当前路径
                     synchronized (nodes) {
                         nodes.remove(path);
                     }
                 }
             }
-            // 4.删除路径对应的父节点置为null
+            // 将path路径节点信息中对应的父节点置为null
             node.parent = null;
         }
         if (parentName.startsWith(procZookeeper)) {
@@ -571,12 +583,12 @@ public class DataTree {
             ZooTrace.logTraceMessage(LOG, ZooTrace.EVENT_DELIVERY_TRACE_MASK,
                     "childWatches.triggerWatch " + parentName);
         }
-        // 5.触发监听path路径的NodeDeleted事件
+        // 触发监听path路径的NodeDeleted事件
         Set<Watcher> processed = dataWatches.triggerWatch(path,
                 EventType.NodeDeleted);
-        // 6.这种场景就对某个路径监听了子节点的事件,但是该路径并没有子节点
+        // 这种场景就对某个路径监听了子节点的事件,但是该路径并没有子节点
         childWatches.triggerWatch(path, EventType.NodeDeleted, processed);
-        // 7.触发监听parentName路径的NodeChildrenChanged事件
+        // 触发监听parentName路径的NodeChildrenChanged事件
         childWatches.triggerWatch(parentName.equals("") ? "/" : parentName,
                 EventType.NodeChildrenChanged);
     }
@@ -586,23 +598,26 @@ public class DataTree {
      * @param path 路径
      * @param data 节点只
      * @param version 版本
-     * @param zxid zxid
+     * @param zxid 处理该请求zk服务端分配的zxid
      * @param time 时间戳
-     * @return Stat 要返回的信息对象
+     * @return Stat 返回更新路径后对应的统计信息
      * @throws KeeperException.NoNodeException
      */
     public Stat setData(String path, byte data[], int version, long zxid,
             long time) throws KeeperException.NoNodeException {
-        // 记录返回的节点信息
+        // 记录返回的路径统计信息
         Stat s = new Stat();
-        // 获取路径对应的节点信息
+        // 获取path路径对应的节点信息
         DataNode n = nodes.get(path);
         if (n == null) {
             throw new KeeperException.NoNodeException();
         }
+        // 记录更新节点data之前的旧值
         byte lastdata[] = null;
         synchronized (n) {
+            // 获取旧的data值
             lastdata = n.data;
+            // 更新
             n.data = data;
             n.stat.setMtime(time);
             n.stat.setMzxid(zxid);
@@ -728,11 +743,13 @@ public class DataTree {
     public Stat setACL(String path, List<ACL> acl, int version)
             throws KeeperException.NoNodeException {
         Stat stat = new Stat();
+        // 获取path路径对应的节点信息
         DataNode n = nodes.get(path);
         if (n == null) {
             throw new KeeperException.NoNodeException();
         }
         synchronized (n) {
+            // 更新节点信息中的acl权限
             aclCache.removeUsage(n.acl);
             n.stat.setAversion(version);
             n.acl = aclCache.convertAcls(acl);
@@ -822,7 +839,7 @@ public class DataTree {
         }
 
     }
-
+    // 已处理的请求中最大的zxid
     public volatile long lastProcessedZxid = 0;
 
     /**
@@ -837,11 +854,17 @@ public class DataTree {
         ProcessTxnResult rc = new ProcessTxnResult();
 
         try {
+            // 获取客户端的sessionId
             rc.clientId = header.getClientId();
+            // 获取客户端发送请求时分配的xid
             rc.cxid = header.getCxid();
+            // 获取服务端处理请求时分配的xid
             rc.zxid = header.getZxid();
+            // 请求类型
             rc.type = header.getType();
+            // 异常信息
             rc.err = 0;
+            // 记录multi命令结果
             rc.multiResult = null;
             switch (header.getType()) {
                 // 创建节点
@@ -854,7 +877,7 @@ public class DataTree {
                             createTxn.getPath(),
                             createTxn.getData(),
                             createTxn.getAcl(),
-                            createTxn.getEphemeral() ? header.getClientId() : 0,
+                            createTxn.getEphemeral() ? header.getClientId() : 0,// 如果不是临时节点就传递个0
                             createTxn.getParentCVersion(),
                             header.getZxid(), header.getTime());
                     break;
@@ -869,7 +892,9 @@ public class DataTree {
                     // 更新节点数据
                 case OpCode.setData:
                     SetDataTxn setDataTxn = (SetDataTxn) txn;
+                    // 获取要操作的路径
                     rc.path = setDataTxn.getPath();
+                    // 获取路径更新后的统计信息
                     rc.stat = setData(setDataTxn.getPath(), setDataTxn
                             .getData(), setDataTxn.getVersion(), header
                             .getZxid(), header.getTime());
@@ -984,6 +1009,7 @@ public class DataTree {
          * case where the snapshot contains data ahead of the zxid associated
          * with the file.
          */
+        // 更新当前已处理请求最大的zxid
         if (rc.zxid > lastProcessedZxid) {
         	lastProcessedZxid = rc.zxid;
         }
@@ -1002,6 +1028,7 @@ public class DataTree {
          * Note, such failures on DT should be seen only during
          * restore.
          */
+        // 如果是创建路径并且当前路径已经存在
         if (header.getType() == OpCode.create &&
                 rc.err == Code.NODEEXISTS.intValue()) {
             LOG.debug("Adjusting parent cversion for Txn: " + header.getType() +
@@ -1027,7 +1054,7 @@ public class DataTree {
     /**
      * 终止session
      * @param session 客户端sessionId
-     * @param zxid 终止session的事务id
+     * @param zxid 操作当前请求时分配的zxid
      * 注:由于终止了session所以也需要删除对应的临时路径
      */
     void killSession(long session, long zxid) {
@@ -1037,7 +1064,7 @@ public class DataTree {
         // so there is no need for synchronization. The list is not
         // changed here. Only create and delete change the list which
         // are again called from FinalRequestProcessor in sequence.
-        // 获取所有关于该sessionId的路径
+        // 获取邻居节点集合中记录的所有关于该sessionId的路径
         HashSet<String> list = ephemerals.remove(session);
         if (list != null) {
             // 遍历删除路径

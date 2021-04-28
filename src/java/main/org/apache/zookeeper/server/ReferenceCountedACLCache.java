@@ -197,8 +197,9 @@ public class ReferenceCountedACLCache {
             LOG.info("Ignoring acl " + acl + " as it does not exist in the cache");
             return;
         }
-
+        // 递减引用次数
         long newCount = referenceCounter.get(acl).decrementAndGet();
+        // 如果没有了引用次数,则删除相关记录
         if (newCount <= 0) {
             referenceCounter.remove(acl);
             aclKeyMap.remove(longKeyMap.get(acl));

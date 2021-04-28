@@ -65,6 +65,7 @@ public class DataNode implements Record {
     // 记录所有的子节点路径
     private Set<String> children = null;
 
+    // 当子节点为空时,返回该集合
     private static final Set<String> EMPTY_SET = Collections.emptySet();
 
     /**

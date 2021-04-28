@@ -23,14 +23,23 @@ import org.apache.jute.*;
 import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Public
 public class StatPersisted implements Record {
+  // 创建节点的事务的zxid
   private long czxid;
+  // 修改节点的事务的zxid
   private long mzxid;
+  // 创建的毫秒数(从1970年开始)
   private long ctime;
+  // 修改的毫秒数(从1970年开始)
   private long mtime;
+  //
   private int version;
+  // znode子节点变化号，znode子节点修改次数
   private int cversion;
+  // znode节点acl修改次数
   private int aversion;
+  // 如果是临时节点，这个是znode拥有者的session id。如果不是临时节点则是0
   private long ephemeralOwner;
+  // 最后更新子节点的zxid
   private long pzxid;
   public StatPersisted() {
   }

@@ -1252,6 +1252,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
                         + txn.getClass() + " "
                         + txn.toString());
             }
+        // 如果是关闭closeSession请求
         } else if (opCode == OpCode.closeSession) {
             sessionTracker.removeSession(sessionId);
         }
