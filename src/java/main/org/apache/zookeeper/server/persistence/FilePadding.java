@@ -43,7 +43,7 @@ public class FilePadding {
             }
         }
     }
-    // 当前文件大小
+    // 当前文件预分配的字节数
     private long currentSize;
 
     /**
@@ -76,14 +76,16 @@ public class FilePadding {
     // 填充内存
     long padFile(FileChannel fileChannel) throws IOException {
         // 重新计算fileChannel需要与分配的空间
+        // fileChannel.position()获取已写入的字节数
         long newFileSize = calculateFileSizeWithPadding(fileChannel.position(), currentSize, preAllocSize);
-        // 预分配的值和当前大小不一致,填充0
+        // 旧的预分配的文件字节数 != 新的预分配的文件字节数
+        // 填充0
         if (currentSize != newFileSize) {
             // 新文件填充0
             fileChannel.write((ByteBuffer) fill.position(0), newFileSize - fill.remaining());
             currentSize = newFileSize;
         }
-        // 当新的文件大小
+        // 预分配的文件大小(有可能是之前旧值也有可能是新值)
         return currentSize;
     }
 
@@ -91,9 +93,9 @@ public class FilePadding {
      * Calculates a new file size with padding. We only return a new size if
      * the current file position is sufficiently close (less than 4K) to end of
      * file and preAllocSize is > 0.
-     *
-     * @param position     the point in the file we have written to
-     * @param fileSize     application keeps track of the current file size
+     * 重新计算预分配文件的大小
+     * @param position     the point in the file we have written to 当前文件已写入的字节数
+     * @param fileSize     application keeps track of the current file size 当前文件预分配的字节数
      * @param preAllocSize how many bytes to pad
      * @return the new file size. It can be the same as fileSize if no
      * padding was done.
@@ -102,21 +104,22 @@ public class FilePadding {
     // VisibleForTesting
     public static long calculateFileSizeWithPadding(long position, long fileSize, long preAllocSize) {
         // If preAllocSize is positive and we are within 4KB of the known end of the file calculate a new file size
-        // fileChannel已写入的字节数 + 4k >= 预分配的大小了
-        // 那么需要重新计算预分配的大小
+        // 当前文件已写入的字节数 + 4k >= 预分配的大小了,那么需要重新计算预分配的大小
         if (preAllocSize > 0 && position + 4096 >= fileSize) {
             // If we have written more than we have previously preallocated we need to make sure the new
             // file size is larger than what we already have
-            // fileChannel已写入的字节数 > 预分配的大小了
+            // 如果写入的字节数已经 > 之前预分配的字节数了
             if (position > fileSize) {
                 // 重新计算一个接近preAllocSize整数倍的值
+                // 该值一定大于当前已文件已写入的字节数
                 fileSize = position + preAllocSize;
                 fileSize -= fileSize % preAllocSize;
             } else {
+                // 如果写入的字节数 <= 之前预分配的字节数
+                // 在之前预分配的字节数基础上加上一个preAllocSize
                 fileSize += preAllocSize;
             }
         }
-
         return fileSize;
     }
 }

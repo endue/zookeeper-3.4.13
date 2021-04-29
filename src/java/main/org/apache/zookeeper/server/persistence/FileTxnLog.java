@@ -117,6 +117,7 @@ public class FileTxnLog implements TxnLog {
     long lastZxidSeen;
     // 记录当前活跃事务日志文件的流
     volatile BufferedOutputStream logStream = null;
+    // 记录当前活跃事务日志文件的流
     volatile OutputArchive oa;
     // 记录当前活跃事务日志文件的流
     volatile FileOutputStream fos = null;
@@ -129,7 +130,8 @@ public class FileTxnLog implements TxnLog {
         new LinkedList<FileOutputStream>();
     // 当前事务日志文件
     File logFileWrite = null;
-    // 记录当前事务日志文件与分配的大小
+    // 用来预分配当前的事务日志文件
+    // 首先里面记录了当前事务日志文件写入的子节点
     private FilePadding filePadding = new FilePadding();
     // zk服务统计类,来自ZookeeperServer
     private ServerStats serverStats;
@@ -176,7 +178,9 @@ public class FileTxnLog implements TxnLog {
      * rollover the current log file to a new one.
      * @throws IOException
      */
-    // 将当前日志对应的流刷入磁盘,然后重置流,也就是等待后续重新创建一个日志文件
+    // 将当前事务日志文件对应的流刷入磁盘
+    // 然后重置流,也就是等待后续重新创建一个日志文件
+    // 这里并没有处理fos,因为fos记录到了streamsToFlush集合中
     public synchronized void rollLog() throws IOException {
         if (logStream != null) {
             this.logStream.flush();
@@ -200,7 +204,9 @@ public class FileTxnLog implements TxnLog {
     }
     
     /**
-     * 添加事物日志
+     * 添加事物请求到事务日志
+     * hdr的创建都是统一的:new TxnHeader(request.sessionId, request.cxid, zxid,Time.currentWallTime(), type)
+     * txn根据不同的请求创建的不一样
      * append an entry to the transaction log
      * @param hdr the header of the transaction
      * @param txn the transaction part of the entry
@@ -209,11 +215,11 @@ public class FileTxnLog implements TxnLog {
     public synchronized boolean append(TxnHeader hdr, Record txn)
         throws IOException
     {
-        // 1.事务头为空不处理
+        // 校验事务头为空不处理
         if (hdr == null) {
             return false;
         }
-        // 2.更新lastZxidSeen
+        // 更新lastZxidSeen为最大值,因为zxid是递增的
         if (hdr.getZxid() <= lastZxidSeen) {
             LOG.warn("Current zxid " + hdr.getZxid()
                     + " is <= " + lastZxidSeen + " for "
@@ -221,19 +227,22 @@ public class FileTxnLog implements TxnLog {
         } else {
             lastZxidSeen = hdr.getZxid();
         }
-        // 3.事务日志流未初始化
+        // 事务日志流未初始化
         if (logStream==null) {
+            // 执行到这里有两种可能 1.logStream未初始化 2.logStream被rollLog()方法置为null
            if(LOG.isInfoEnabled()){
                 LOG.info("Creating new log file: " + Util.makeLogName(hdr.getZxid()));
            }
-           // 3-1.初始化事务日志文件,根据参数hdr中的zxid创建文件
-           // 这里可以看出事务日志文件名中包含了文件中最小的zxid
+           // 根据请求中的zxid创建事物日志文件
            logFileWrite = new File(logDir, Util.makeLogName(hdr.getZxid()));
-           // 3-2.有了File日志文件,初始化流
+           // 根据新创建的事物日志文件初始化相关流
+           // FileOutputStream无缓冲区,write()一次直接写入文件,无flush()
            fos = new FileOutputStream(logFileWrite);
+           // BufferedOutputStream有缓存区,write()一次写入缓冲区,有flush()
            logStream=new BufferedOutputStream(fos);
+           // BinaryOutputArchive zk自定义的
            oa = BinaryOutputArchive.getArchive(logStream);
-           // 3-3.封装事务日志文件头并写入到流当中,包括:魔数,版本,数据库ID(默认是0)
+           // 创建并写入事务日志文件头,包括:魔数,版本,数据库ID(默认是0)
             // 也就如类注释中锁描述的那样
             // FileHeader: {
             //  magic 4bytes (ZKLG)
@@ -243,26 +252,29 @@ public class FileTxnLog implements TxnLog {
            FileHeader fhdr = new FileHeader(TXNLOG_MAGIC,VERSION, dbId);
            fhdr.serialize(oa, "fileheader");
            // Make sure that the magic number is written before padding.
-            // 3-4.确保在用0填充之前，先把魔数信息等写入到文件中，flush刚刚写入的内容
+           // 确保在填充文件前，将事务日志文件头写入到文件中
            logStream.flush();
-           // 3-5.根据当前事务日志文件的FileChannel初始化filePadding中的currentSize
+           // 将当前事务日志文件已写入的字节数设置到filePadding的currentSize属性中
+            // 表示当前事务日志文件预分配的大小
            filePadding.setCurrentSize(fos.getChannel().position());
-           // 3-6.记录新生成的事务日志文件对应的fos到streamsToFlush中表示待输入磁盘
-            // streamsToFlush是一个集合,里面可能记录了多个fos
+           // 将新生成的事务日志文件记录到streamsToFlush中表示待输入磁盘
+           // streamsToFlush是一个集合,里面可能记录了多个fos
            streamsToFlush.add(fos);
         }
-        // 4.获取当前事务日志文件的FileChannel传入filePadding中
-        // 目的是重新计算FileChannel预分配的大小从而判断是否需要填充0
+        // 获取当前事务日志文件的FileChannel传入filePadding中
+        // 目的是计算FileChannel是否需要预分配
         filePadding.padFile(fos.getChannel());
-        // 5.下面这几步就是将事务日志写入OutputArchive
+        // 序列化hdr和txn为byte数组
         // checksum Txnlen TxnHeader Record 0x42
         byte[] buf = Util.marshallTxnEntry(hdr, txn);
         if (buf == null || buf.length == 0) {
             throw new IOException("Faulty serialization for header " +
                     "and txn");
         }
+        // 计算CRC
         Checksum crc = makeChecksumAlgorithm();
         crc.update(buf, 0, buf.length);
+        // 写入CRC和上面的byte数组
         oa.writeLong(crc.getValue(), "txnEntryCRC");
         Util.writeTxnBytes(oa, buf);
 
@@ -368,6 +380,7 @@ public class FileTxnLog implements TxnLog {
         }
         // 遍历streamsToFlush,也刷磁盘
         for (FileOutputStream log : streamsToFlush) {
+            // FileOutputStream并没有实现flush()方法,而父类flush()什么也没做,所以这里操作意义是什么?
             log.flush();
             // 如果强制刷磁盘,则判断是否超时,超时报警
             if (forceSync) {
