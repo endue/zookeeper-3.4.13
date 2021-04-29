@@ -961,11 +961,13 @@ public class DataTree {
                         assert(record != null);
 
                         ByteBufferInputStream.byteBuffer2Record(bb, record);
-                        // 如果有请求出现了失败但是并不是当前请求
+                        // 如果multi操作中有请求出现了失败但是并不是当前请求
                         if (failed && subtxn.getType() != OpCode.error){
                             int ec = post_failed ? Code.RUNTIMEINCONSISTENCY.intValue() 
                                                  : Code.OK.intValue();
-
+                            // 将subtxn的type类型修改为error
+                            // 将record改为ErrorTxn
+                            // 这么做也就是将mulit操作中所有执行正确的命令修改为报错的
                             subtxn.setType(OpCode.error);
                             record = new ErrorTxn(ec);
                         }
@@ -1207,32 +1209,43 @@ public class DataTree {
      */
     void serializeNode(OutputArchive oa, StringBuilder path) throws IOException {
         String pathString = path.toString();
+        // 获取路径的节点信息
         DataNode node = getNode(pathString);
         if (node == null) {
             return;
         }
+        // 记录子节点
         String children[] = null;
         DataNode nodeCopy;
         synchronized (node) {
             scount++;
+            // 获取路径的统计信息
             StatPersisted statCopy = new StatPersisted();
+            // 复制路径的统计信息
             copyStatPersisted(node.stat, statCopy);
             //we do not need to make a copy of node.data because the contents
             //are never changed
+            // 复制路径的节点信息
             nodeCopy = new DataNode(node.parent, node.data, node.acl, statCopy);
+            // 获取子节点
             Set<String> childs = node.getChildren();
             children = childs.toArray(new String[childs.size()]);
         }
+        // 序列化路径和节点信息
         oa.writeString(pathString, "path");
         oa.writeRecord(nodeCopy, "node");
         path.append('/');
         int off = path.length();
+        // 遍历子节点
         for (String child : children) {
             // since this is single buffer being resused
             // we need
             // to truncate the previous bytes of string.
+            // path被重复利用,这里清空它
             path.delete(off, Integer.MAX_VALUE);
+            // 设置为新的路径
             path.append(child);
+            // 序列化该路径
             serializeNode(oa, path);
         }
     }
@@ -1249,7 +1262,9 @@ public class DataTree {
      */
     public void serialize(OutputArchive oa, String tag) throws IOException {
         scount = 0;
+        // 序列化记录的ACL集合
         aclCache.serialize(oa);
+        // 开始序列化内部目录树
         serializeNode(oa, new StringBuilder(""));
         // / marks end of stream
         // we need to check if clear had been called in between the snapshot.

@@ -138,7 +138,7 @@ public class SerializeUtils {
         HashMap<Long, Integer> sessSnap = new HashMap<Long, Integer>(sessions);
         // 序列化session个数
         oa.writeInt(sessSnap.size(), "count");
-        // 序列化session
+        // 序列化sessionId与对应的超时时间
         for (Entry<Long, Integer> entry : sessSnap.entrySet()) {
             oa.writeLong(entry.getKey().longValue(), "id");
             oa.writeInt(entry.getValue().intValue(), "timeout");

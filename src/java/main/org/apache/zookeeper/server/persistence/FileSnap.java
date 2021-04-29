@@ -248,7 +248,9 @@ public class FileSnap implements SnapShot {
         if(header==null)
             throw new IllegalStateException(
                     "Snapshot's not open for writing: uninitialized header");
+        // 序列化数据文件的头
         header.serialize(oa, "fileheader");
+        // 序列化内存目录树/session集合
         SerializeUtils.serializeSnapshot(dt,oa,sessions);
     }
 
@@ -262,15 +264,19 @@ public class FileSnap implements SnapShot {
     public synchronized void serialize(DataTree dt, Map<Long, Integer> sessions, File snapShot)
             throws IOException {
         if (!close) {
+            // 创建输出流
             OutputStream sessOS = new BufferedOutputStream(new FileOutputStream(snapShot));
             CheckedOutputStream crcOut = new CheckedOutputStream(sessOS, new Adler32());
             //CheckedOutputStream cout = new CheckedOutputStream()
             OutputArchive oa = BinaryOutputArchive.getArchive(crcOut);
+            // 创建数据文件的头
             FileHeader header = new FileHeader(SNAP_MAGIC, VERSION, dbId);
+            // 序列化数据
             serialize(dt,sessions,oa, header);
             long val = crcOut.getChecksum().getValue();
             oa.writeLong(val, "val");
             oa.writeString("/", "path");
+            // 刷磁盘关闭流
             sessOS.flush();
             crcOut.close();
             sessOS.close();
