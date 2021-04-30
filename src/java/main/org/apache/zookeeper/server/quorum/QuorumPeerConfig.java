@@ -96,7 +96,7 @@ public class QuorumPeerConfig {
     // Group1的法定数是：3+1+1=5，只要节点权重之和过半该组就是稳定的，当2,3,4,5,6挂掉，此时Group1和Group3是稳定状态，整个集群是稳定的
     protected HashMap<Long, Long> serverWeight = new HashMap<Long, Long>();
     // group组成员
-    // key是zk服务ID，value是组ID
+    // key是zk服务sID，value是组ID
     // group.1=1:2:3
     // group.2=4:5:6
     // group.3=7
@@ -246,14 +246,14 @@ public class QuorumPeerConfig {
                 snapRetainCount = Integer.parseInt(value);
             } else if (key.equals("autopurge.purgeInterval")) {
                 purgeInterval = Integer.parseInt(value);
-            // 解析server.配置，如配置文件中内容如下：
-            // server.1=192.168.6.130:2888:3888
-            // server.2=192.168.6.131:2888:3888
-            // server.3=192.168.6.132:2888:3888
+            // 解析server.配置，如配置文件中内容如下,最后的角色信息可以不配置,不配置就是participant
+            // server.1=192.168.6.130:2888:3888:observer
+            // server.2=192.168.6.131:2888:3888:participant
+            // server.3=192.168.6.132:2888:3888:participant
             } else if (key.startsWith("server.")) {
                 int dot = key.indexOf('.');
                 long sid = Long.parseLong(key.substring(dot + 1));
-                // parts解析后内容为：[192.168.6.130,2888,3888]
+                // parts解析后内容为：[192.168.6.130,2888,3888,participant]
                 String parts[] = splitWithLeadingHostname(value);
                 if ((parts.length != 2) && (parts.length != 3) && (parts.length !=4)) {
                     LOG.error(value
@@ -270,6 +270,7 @@ public class QuorumPeerConfig {
                 if (parts.length > 2){
                 	electionPort=Integer.parseInt(parts[2]);
                 }
+                // 解析zk服务在集群中的角色
                 if (parts.length > 3){
                     if (parts[3].toLowerCase().equals("observer")) {
                         type = LearnerType.OBSERVER;

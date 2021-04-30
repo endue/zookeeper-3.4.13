@@ -636,8 +636,8 @@ public class QuorumCnxManager {
     /**
      * Try to establish a connection with each server if one
      * doesn't exist.
+     * 尝试与集群中的每个zk服务建立连接
      */
-    
     public void connectAll(){
         long sid;
         for(Enumeration<Long> en = queueSendMap.keys();

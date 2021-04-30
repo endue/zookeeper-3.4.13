@@ -243,9 +243,9 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
         public int port=2888;
         // zk服务用来选举leader的端口,在QuorumPeerConfig中被赋值
         public int electionPort=-1;
-        // zk服务的id
+        // zk服务的sid
         public long id;
-        
+        // zk在集群中的角色,默认PARTICIPANT
         public LearnerType type = LearnerType.PARTICIPANT;
     }
     // 记录server所处的状态
@@ -883,7 +883,8 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                 // 启动listener，监听其他zkServer发送过来的连接请求
                 // 并为连接成功的zkServer创建对应的SendWorker和RecvWorker
                 listener.start();
-                // 进行leader选举
+                // 创建选举算法
+                // 里面同时创建了WorkerSender WorkerReceiver用于收发选票
                 le = new FastLeaderElection(this, qcm);
             } else {
                 LOG.error("Null listener when initializing cnx manager");
