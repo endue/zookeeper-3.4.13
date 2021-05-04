@@ -290,6 +290,7 @@ public class FileTxnLog implements TxnLog {
      * @return
      */
     // 从参数logDirList中获取snapshotZxid所在事务日志文件及之后的所有事务文件
+    // 这些事务日志文件是需要保留下来的
     public static File[] getLogFiles(File[] logDirList,long snapshotZxid) {
         // 获取所有的事务日志文件,按照文件中最小的zxid升序排列
         List<File> files = Util.sortDataDir(logDirList, LOG_FILE_PREFIX, true);

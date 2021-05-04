@@ -81,11 +81,12 @@ public class PurgeTxnLog {
 
         FileTxnSnapLog txnLog = new FileTxnSnapLog(dataDir, snapDir);
         // 获取最近num个数据快照文件,num默认为3
+        // 这num个文件是基于自己文件名中的zxid由大到小排列
         List<File> snaps = txnLog.findNRecentSnapshots(num);
         int numSnaps = snaps.size();
         if (numSnaps > 0) {
             // 删除旧的数据快照和事物日志文件
-            // 传入的参数为最近num个数据快照文件中zxid最大的文件
+            // 传入的参数为最近num个数据快照文件中zxid最小的文件
             purgeOlderSnapshots(txnLog, snaps.get(numSnaps - 1));
         }
     }
@@ -94,6 +95,7 @@ public class PurgeTxnLog {
     // 删除旧的数据快照和事物日志文件
     static void purgeOlderSnapshots(FileTxnSnapLog txnLog, File snapShot) {
         // 获取snapShot的zxid
+        // 该zxid是需要保留的zxid中的最小值
         final long leastZxidToBeRetain = Util.getZxidFromName(
                 snapShot.getName(), PREFIX_SNAPSHOT);
 
@@ -135,12 +137,13 @@ public class PurgeTxnLog {
                 // f文件不以prefix为前缀，返回false
                 if(!f.getName().startsWith(prefix + "."))
                     return false;
-                // 如果是需要保留的日志，返回false
+                // 如果是需要保留的事务日志文件，返回false
                 if (retainedTxnLogs.contains(f)) {
                     return false;
                 }
                 // 获取文件的zxid，如果 >=leastZxidToBeRetain,返回false
                 long fZxid = Util.getZxidFromName(f.getName(), prefix);
+                // 需要保留的数据快照文件,返回false
                 if (fZxid >= leastZxidToBeRetain) {
                     return false;
                 }
