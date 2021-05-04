@@ -396,6 +396,7 @@ public class FileTxnSnapLog {
      * @return
      */
     // 获取事物日志文件中 >= zxid的文件
+    // 这些文件也就是需要保留下来的事务日志文件
     public File[] getSnapshotLogs(long zxid) {
         return FileTxnLog.getLogFiles(dataDir.listFiles(), zxid);
     }
