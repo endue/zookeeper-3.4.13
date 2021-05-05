@@ -82,7 +82,7 @@ public class QuorumCnxManager {
     // Initialized to 1 to prevent sending
     // stale notifications to peers
     static final int SEND_CAPACITY = 1;
-
+    // 数据包最大长度为512字节
     static final int PACKETMAXSIZE = 1024 * 512;
 
     /*
@@ -166,6 +166,7 @@ public class QuorumCnxManager {
 
     /*
      * Counter to count worker threads
+     * 记录SendWorker的数量,当启动一个SendWorker时该数量+1
      */
     private AtomicInteger threadCnt = new AtomicInteger(0);
 
@@ -398,14 +399,15 @@ public class QuorumCnxManager {
      * connection if it wins. Notice that it checks whether it has a connection
      * to this server already or not. If it does, then it sends the smallest
      * possible long value to lose the challenge.
-     * 
+     * 处理接收到的连接请求
      */
     public void receiveConnection(final Socket sock) {
         DataInputStream din = null;
         try {
+            // 获取输入流
             din = new DataInputStream(
                     new BufferedInputStream(sock.getInputStream()));
-
+            // 建立连接
             handleConnection(sock, din);
         } catch (IOException e) {
             LOG.error("Exception handling connection, addr: {}, closing server connection",
@@ -477,6 +479,7 @@ public class QuorumCnxManager {
                  * Choose identifier at random. We need a value to identify
                  * the connection.
                  */
+                // 生成一个sid分配给Observer服务,注意这里是Decrement并且默认从-1开始
                 sid = observerCounter.getAndDecrement();
                 LOG.info("Setting arbitrary identifier to observer: " + sid);
             }
@@ -508,7 +511,9 @@ public class QuorumCnxManager {
              * Now we start a new connection
              */
             LOG.debug("Create new connection to server: " + sid);
+            // 关闭连接
             closeSocket(sock);
+            // 然后向这个服务发生socket连接,因为只允许大sid向小sid发生socket请求
             connectOne(sid);
 
             // Otherwise start worker threads to receive data.
@@ -520,7 +525,7 @@ public class QuorumCnxManager {
             sw.setRecv(rw);
 
             SendWorker vsw = senderWorkerMap.get(sid);
-            
+
             if(vsw != null)
                 vsw.finish();
             // 记录客户端(其他zk服务器)和对应SendWorker的关系
@@ -562,6 +567,7 @@ public class QuorumCnxManager {
              } else {
                  addToSendQueue(bq, b);
              }
+             // 与其他zk服务建立连接,这里就会用到Listener
              connectOne(sid);
                 
         }
@@ -574,7 +580,7 @@ public class QuorumCnxManager {
      */
     // 尝试与zk服务(通过sid)建立socket连接
     synchronized public void connectOne(long sid){
-        // 判断是否建立连接
+        // 判断是否已建立连接
         if (!connectedToPeer(sid)){
             // 当前zk服务要连接的其他zk服务
             InetSocketAddress electionAddr;
@@ -653,6 +659,8 @@ public class QuorumCnxManager {
      */
     // 检查队列是否都为空，如果为空说明与其他zkServer连接是没有问题的
     boolean haveDelivered() {
+        // queueSendMap不为空说明是有与其他zk服务建立连接的
+        // 当进行到第二个if时说明队列为空,也就是要发送的消息已经发送了出去
         for (ArrayBlockingQueue<ByteBuffer> queue : queueSendMap.values()) {
             LOG.debug("Queue size: " + queue.size());
             if (queue.size() == 0) {
@@ -941,8 +949,11 @@ public class QuorumCnxManager {
                 LOG.error("BufferUnderflowException ", be);
                 return;
             }
+            // 发送数据包的长度
             dout.writeInt(b.capacity());
+            // 发送数据包
             dout.write(b.array());
+
             dout.flush();
         }
 
@@ -1082,6 +1093,7 @@ public class QuorumCnxManager {
                      * Reads the first int to determine the length of the
                      * message
                      */
+                    // 读取数据包的长度
                     int length = din.readInt();
                     if (length <= 0 || length > PACKETMAXSIZE) {
                         throw new IOException(
@@ -1091,8 +1103,11 @@ public class QuorumCnxManager {
                     /**
                      * Allocates a new ByteBuffer to receive the message
                      */
+                    // 初始化byte数组准备读取数据
                     byte[] msgArray = new byte[length];
+                    // 读取数据
                     din.readFully(msgArray, 0, length);
+                    // 将byte数组转换为ByteBuffer
                     ByteBuffer message = ByteBuffer.wrap(msgArray);
                     addToRecvQueue(new Message(message.duplicate(), sid));
                 }
@@ -1191,6 +1206,7 @@ public class QuorumCnxManager {
      */
     public void addToRecvQueue(Message msg) {
         synchronized(recvQLock) {
+            // 如果剩余容量为0,则出队一个元素不处理
             if (recvQueue.remainingCapacity() == 0) {
                 try {
                     recvQueue.remove();
@@ -1201,6 +1217,7 @@ public class QuorumCnxManager {
                 }
             }
             try {
+                // 添加接受到的消息到队列
                 recvQueue.add(msg);
             } catch (IllegalStateException ie) {
                 // This should never happen

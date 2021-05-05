@@ -277,6 +277,7 @@ public class FastLeaderElection implements Election {
                         // 检查接收到的响应是否来自配置中的服务器
                         // 如果不是那么立即向该服务发生一个响应
                         if(!validVoter(response.sid)){
+                            // 将当前自己的选票发送给这个服务器
                             Vote current = self.getCurrentVote();
                             ToSend notmsg = new ToSend(ToSend.mType.notification,
                                     current.getId(),
@@ -921,10 +922,10 @@ public class FastLeaderElection implements Election {
                      * voting view for a replica in the voting view.
                      */
                     switch (n.state) {
-                    case LOOKING:// 当前服务处于LOOKING状态，收到n的选票并且n也处于LOOKING状态
+                    case LOOKING:// 当前服务处于LOOKING状态，收到选票并且发送该选票的服务处于LOOKING状态
                         // If notification > current, replace and send messages out
                         // 收到选票里的被选举服务器的epoch > 当前服务上的选票周期，说明当前zkServer上进行的本轮选举周期已经过时，更新自己的选举周期(logicalclock)
-                        // 清空所有已经收到的投票，更新自己本地的选票周期等信息，最终再将内部选票发送出去
+                        // 清空所有已经收到的选票，更新自己本地的选票周期等信息，最终再将内部选票发送出去
                         if (n.electionEpoch > logicalclock.get()) {
                             // 更新当前服务上的epoch，将已过时的当前zkServer上的选票更新为当前最新的选票
                             logicalclock.set(n.electionEpoch);
@@ -941,7 +942,7 @@ public class FastLeaderElection implements Election {
                                         getInitLastLoggedZxid(),
                                         getPeerEpoch());
                             }
-                            // 发送通知
+                            // 发送最新的选票
                             sendNotifications();
                         // 收到选票里的被选举服务器的epoch  < 当前服务上的epoch
                         // 不处理，说明n消息对应的服务的选票周期已过期了
@@ -953,7 +954,7 @@ public class FastLeaderElection implements Election {
                             }
                             break;
                         // 收到n服务通知里的周期 = 当前服务上的周期
-                        // 比较新的选票信息是否大于自己当前的选票信息
+                        // 比较收到的选票信息是否优于自己当前的选票信息
                         } else if (totalOrderPredicate(n.leader, n.zxid, n.peerEpoch,
                                 proposedLeader, proposedZxid, proposedEpoch)) {
                             // 更新选票为n服务
@@ -1002,7 +1003,7 @@ public class FastLeaderElection implements Election {
                                                         proposedZxid,
                                                         logicalclock.get(),
                                                         proposedEpoch);
-                                // 清空队列
+                                // 清空recvqueue队列
                                 leaveInstance(endVote);
                                 return endVote;
                             }
