@@ -856,13 +856,16 @@ public class Leader {
      * syncing
      * 
      * @param handler handler of the follower
+     * @param lastSeenZxid learner最后处理提案的zxid
      * @return last proposed zxid
      */
     synchronized public long startForwarding(LearnerHandler handler,
             long lastSeenZxid) {
         // Queue up any outstanding requests enabling the receipt of
         // new requests
+        // 如果当前leader已处理的提案 > lastSeenZxid
         if (lastProposed > lastSeenZxid) {
+            // 遍历已提交的提案,发送给learner
             for (Proposal p : toBeApplied) {
                 if (p.packet.getZxid() <= lastSeenZxid) {
                     continue;
@@ -871,12 +874,13 @@ public class Leader {
                 handler.queuePacket(p.packet);
                 // Since the proposal has been committed we need to send the
                 // commit message also
-                // 发送提案对应的COMMIT
+                // 发送提案
                 QuorumPacket qp = new QuorumPacket(Leader.COMMIT, p.packet
                         .getZxid(), null, null);
                 handler.queuePacket(qp);
             }
             // Only participant need to get outstanding proposals
+            // 处理已经提交但是未处理的提案
             if (handler.getLearnerType() == LearnerType.PARTICIPANT) {
                 List<Long>zxids = new ArrayList<Long>(outstandingProposals.keySet());
                 Collections.sort(zxids);
@@ -888,6 +892,7 @@ public class Leader {
                 }
             }
         }
+        // 记录follower或observer的处理线程
         if (handler.getLearnerType() == LearnerType.PARTICIPANT) {
             addForwardingFollower(handler);
         } else {

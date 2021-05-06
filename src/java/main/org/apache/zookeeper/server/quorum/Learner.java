@@ -287,28 +287,31 @@ public class Learner {
         /*
          * Send follower info, including last zxid and sid
          */
-        // 封装QuorumPacket
-        // 设置当前zkServer的最新epoch
+
+        // 设置当前zkServer最后处理的zxid
     	long lastLoggedZxid = self.getLastLoggedZxid();
-        QuorumPacket qp = new QuorumPacket();                
-        qp.setType(pktType);// 设置类型为Leader.FOLLOWERINFO或者Leader.OBSERVERINFO
-        qp.setZxid(ZxidUtils.makeZxid(self.getAcceptedEpoch(), 0));// 设置自己的zxid
+        // 构建一个集群数据包QuorumPacket
+        QuorumPacket qp = new QuorumPacket();
+        // 设置自身的角色类型为Leader.FOLLOWERINFO或者Leader.OBSERVERINFO
+        qp.setType(pktType);
+        // 根据acceptedEpoch设置自己的zxid
+        qp.setZxid(ZxidUtils.makeZxid(self.getAcceptedEpoch(), 0));
         
         /*
          * Add sid to payload
          */
-        // 设置当前zkServer的sid
+        // 设置learner信息,包括当前自己的sid以及版本号0x10000
         LearnerInfo li = new LearnerInfo(self.getId(), 0x10000);
         ByteArrayOutputStream bsid = new ByteArrayOutputStream();
         BinaryOutputArchive boa = BinaryOutputArchive.getArchive(bsid);
-        // 将自己的信息封装到数据包
+        // 封装learner信息到集群数据包QuorumPacket
         boa.writeRecord(li, "LearnerInfo");
         qp.setData(bsid.toByteArray());
-        // 发送qp数据包
+        // 发送集群数据包QuorumPacket
         writePacket(qp, true);
         // 读取数据到qp,leader此时发送的数据包内容如下:QuorumPacket(Leader.LEADERINFO, ZxidUtils.makeZxid(newEpoch, 0), ver, null)
         readPacket(qp);
-        // 解析leader节点的epoch
+        // 解析leader返回的最新的epoch
         final long newEpoch = ZxidUtils.getEpochFromZxid(qp.getZxid());
         // 响应数据包类型为LEADERINFO,这里结合org.apache.zookeeper.server.quorum.LearnerHandler.run()方法分析
 		if (qp.getType() == Leader.LEADERINFO) {
@@ -329,6 +332,7 @@ public class Learner {
         		// again, but we still need to send our lastZxid to the leader so that we can
         		// sync with it if it does assume leadership of the epoch.
         		// the -1 indicates that this reply should not count as an ack for the new epoch
+                // 设置个-1
                 wrappedEpochBytes.putInt(-1);
         	} else {
         		throw new IOException("Leaders epoch, " + newEpoch + " is less than accepted epoch, " + self.getAcceptedEpoch());
