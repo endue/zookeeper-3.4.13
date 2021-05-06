@@ -60,13 +60,13 @@ import org.slf4j.LoggerFactory;
 // 其负责Leader和Learner服务器之间几乎所有的消息通信和数据同步
 public class LearnerHandler extends ZooKeeperThread {
     private static final Logger LOG = LoggerFactory.getLogger(LearnerHandler.class);
-
+    // 已learner建立的socket连接
     protected final Socket sock;    
 
     public Socket getSocket() {
         return sock;
     }
-
+    // leader服务
     final Leader leader;
 
     /** Deadline for receiving the next ack. If we are bootstrapping then
@@ -95,6 +95,7 @@ public class LearnerHandler extends ZooKeeperThread {
     /**
      * The packets to be sent to the learner
      */
+    // 记录需要发送给learner的集群数据包
     final LinkedBlockingQueue<QuorumPacket> queuedPackets =
         new LinkedBlockingQueue<QuorumPacket>();
 
@@ -154,14 +155,22 @@ public class LearnerHandler extends ZooKeeperThread {
     };
 
     private SyncLimitCheck syncLimitCheck = new SyncLimitCheck();
-
+    // zk自定义的输入流
     private BinaryInputArchive ia;
-
+    // zk自定义的输出流
     private BinaryOutputArchive oa;
-
+    // 输入流
     private final BufferedInputStream bufferedInput;
+    // 输出流
     private BufferedOutputStream bufferedOutput;
 
+    /**
+     * 当leader收到一个learner的socket连接时就对应创建一个LearnerHandler
+     * @param sock 接收到的socket对象
+     * @param bufferedInput socket输入流
+     * @param leader leader对象
+     * @throws IOException
+     */
     LearnerHandler(Socket sock, BufferedInputStream bufferedInput,
                    Leader leader) throws IOException {
         super("LearnerHandler-" + sock.getRemoteSocketAddress());
@@ -322,11 +331,11 @@ public class LearnerHandler extends ZooKeeperThread {
             leader.addLearnerHandler(this);
             tickOfNextAckDeadline = leader.self.tick.get()
                     + leader.self.initLimit + leader.self.syncLimit;
-
+            // 构建zk自定义的输入流/输出流
             ia = BinaryInputArchive.getArchive(bufferedInput);
             bufferedOutput = new BufferedOutputStream(sock.getOutputStream());
             oa = BinaryOutputArchive.getArchive(bufferedOutput);
-
+            // 构建一个集群数据包用于解析请求
             QuorumPacket qp = new QuorumPacket();
             ia.readRecord(qp, "packet");
             // 校验请求中的角色
@@ -335,6 +344,7 @@ public class LearnerHandler extends ZooKeeperThread {
                         + " is not FOLLOWERINFO or OBSERVERINFO!");
                 return;
             }
+            // 解析请求中的数据
             byte learnerInfoData[] = qp.getData();
             if (learnerInfoData != null) {
                 // 如果数据包长度为8个字节,那么只包含一个sid
@@ -359,7 +369,7 @@ public class LearnerHandler extends ZooKeeperThread {
                     //  PARTICIPANT或OBSERVER
                   learnerType = LearnerType.OBSERVER;
             }            
-            // 从请求中的zxid中解析出epoch
+            // 从请求zxid中解析learner的epoch
             long lastAcceptedEpoch = ZxidUtils.getEpochFromZxid(qp.getZxid());
             
             long peerLastZxid;
@@ -378,18 +388,19 @@ public class LearnerHandler extends ZooKeeperThread {
                 // fake the message
                 // 封装一个假消息进行处理
                 leader.waitForEpochAck(this.getSid(), ss);
-            // 由于learner节点的版本为0x10000所以走这里的逻辑
+            // 由于learner的版本为0x10000所以走这里的逻辑
             } else {
-                // 这里解析org.apache.zookeeper.server.quorum.Learner.registerWithLeader()方法分析
+                // 这里结合org.apache.zookeeper.server.quorum.Learner.registerWithLeader()方法分析
                 // leader发送LEADERINFO数据包并等待ACKEPOCH的响应
 
                 // 构建LEADERINFO数据包,版本为写死的0x10000,然后包含自己最新的epoch
+                // 发送给集群中的learner
                 byte ver[] = new byte[4];
                 ByteBuffer.wrap(ver).putInt(0x10000);
                 QuorumPacket newEpochPacket = new QuorumPacket(Leader.LEADERINFO, ZxidUtils.makeZxid(newEpoch, 0), ver, null);
                 oa.writeRecord(newEpochPacket, "packet");
                 bufferedOutput.flush();
-                // 等待LEADERINFO数据包对应的响应,响应数据包个数为:QuorumPacket(Leader.ACKEPOCH, lastLoggedZxid, epochBytes, null)
+                // 等待LEADERINFO数据包对应的响应
                 QuorumPacket ackEpochPacket = new QuorumPacket();
                 ia.readRecord(ackEpochPacket, "packet");
                 // 响应的数据包类型不为ACKEPOCH
@@ -407,20 +418,23 @@ public class LearnerHandler extends ZooKeeperThread {
             }
             // 获取learner节点最后处理的zxid
             peerLastZxid = ss.getLastZxid();
-            // 接下来就是数据同步
+
+            /*...........接下来就是数据同步...........*/
+
             // 1. committedLog里面保存着Leader端处理的最新的500个Proposal
             //2. 当 Follower处理的Proposal大于 maxCommittedLog, 则 Follower 要TRUNC自己的Proposal至maxCommittedLog
             //3. 当 Follower处理的Proposal小于 maxCommittedLog, 大于minCommittedLog, 则Leader将Follower没有的Proposal发送到Follower, 让其处理
             //4. 当 Follower处理的Proposal小于 minCommittedLog, 则Leader发送 Leader.SNAP给FOLLOWER, 并且将自身的数据序列化成数据流, 发送给 Follower
 
             /* the default to send to the follower */
-            // 要发送给learner的包的类型
+            // 要发送给learner的数据包类型
             int packetToSend = Leader.SNAP;
             // 要发送给learner的zxid
             long zxidToSend = 0;
             // 要发送给learner的leader节点的最新的zxid
             long leaderLastZxid = 0;
             /** the packets that the follower needs to get updates from **/
+            // 记录learner当前已处理的最大的zxid
             long updates = peerLastZxid;
             
             /* we are sending the diff check if we have proposals in memory to be able to 

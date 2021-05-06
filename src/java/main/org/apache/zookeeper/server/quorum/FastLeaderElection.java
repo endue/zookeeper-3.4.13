@@ -632,7 +632,7 @@ public class FastLeaderElection implements Election {
                       " (myid), 0x" + Long.toHexString(proposedEpoch) + " (n.peerEpoch)");
             }
             // 将待发送的提案选票添加到sendqueue
-            // 后续由WorkerSender来处理
+            // 后续由WorkerSender来处理,内部如果服务连接不存在则会建立socket连接
             sendqueue.offer(notmsg);
         }
     }
@@ -680,8 +680,8 @@ public class FastLeaderElection implements Election {
      */
     // 验证自己的选票是否过半
     protected boolean termPredicate(
-            HashMap<Long, Vote> votes,
-            Vote vote) {
+            HashMap<Long, Vote> votes,// 接收到的提案
+            Vote vote) { // 当前服务自己的提案
 
         HashSet<Long> set = new HashSet<Long>();
 
@@ -931,6 +931,7 @@ public class FastLeaderElection implements Election {
                             logicalclock.set(n.electionEpoch);
                             // 清空收到的选票
                             recvset.clear();
+                            // 上面更新了当前服务的epoch,所以这里根据其他信息
                             // 比较新的选票信息是否优于自己当前的选票信息
                             if(totalOrderPredicate(n.leader, n.zxid, n.peerEpoch,
                                     getInitId(), getInitLastLoggedZxid(), getPeerEpoch())) {
@@ -979,9 +980,10 @@ public class FastLeaderElection implements Election {
                             // Verify if there is any change in the proposed leader
                             // 走到这里说明当前zkServer的选票已经符合裁定的条件，最后再次从接收消息队列中获取消息
                             // 1.没有消息，说明没有比当前更好的投票结果 n == null
-                            // 2.有消息，说明有比当前更好的投票结果 n != null
+                            // 2.有消息，说明可能有比当前更好的投票结果 n != null
                             while((n = recvqueue.poll(finalizeWait,
                                     TimeUnit.MILLISECONDS)) != null){
+                                // 验证最后收到的消息中的提案是否优于自己的提案
                                 if(totalOrderPredicate(n.leader, n.zxid, n.peerEpoch,
                                         proposedLeader, proposedZxid, proposedEpoch)){
                                     recvqueue.put(n);
@@ -1020,7 +1022,7 @@ public class FastLeaderElection implements Election {
                          */
                         // 判断当前zkServer与n是否在同一个选举周期内
                         if(n.electionEpoch == logicalclock.get()){
-                            // 记录收到的消息
+                            // 记录收到的消息中的提案
                             recvset.put(n.sid, new Vote(n.leader,
                                                           n.zxid,
                                                           n.electionEpoch,
