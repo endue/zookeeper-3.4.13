@@ -327,6 +327,8 @@ public class LearnerHandler extends ZooKeeperThread {
     @Override
     public void run() {
         try {
+            /* 1.基于learner的连接构建输入输出流 */
+
             // 记录新添加的learner，最终走到下面会是一个while循环
             leader.addLearnerHandler(this);
             tickOfNextAckDeadline = leader.self.tick.get()
@@ -335,23 +337,26 @@ public class LearnerHandler extends ZooKeeperThread {
             ia = BinaryInputArchive.getArchive(bufferedInput);
             bufferedOutput = new BufferedOutputStream(sock.getOutputStream());
             oa = BinaryOutputArchive.getArchive(bufferedOutput);
-            // 构建一个集群数据包用于解析请求
+
+            /* 2.读取learner发送过来的它们自身信息 */
+
+            // 2.1解析packet标签对应的QuorumPacket
             QuorumPacket qp = new QuorumPacket();
             ia.readRecord(qp, "packet");
-            // 校验请求中的角色
+            // 2.2校验learner的角色
             if(qp.getType() != Leader.FOLLOWERINFO && qp.getType() != Leader.OBSERVERINFO){
             	LOG.error("First packet " + qp.toString()
                         + " is not FOLLOWERINFO or OBSERVERINFO!");
                 return;
             }
-            // 解析请求中的数据,包含了learner的sid以及写死的版本号0x10000
+            // 2.3 解析请求中的LearnerInfo数据,包含了learner的sid以及写死的版本号0x10000
             byte learnerInfoData[] = qp.getData();
             if (learnerInfoData != null) {
-                // 如果数据包长度为8个字节,那么只包含一个sid
+                // 2.3.1如果数据包长度为8个字节,那么只包含一个sid
             	if (learnerInfoData.length == 8) {
             		ByteBuffer bbsid = ByteBuffer.wrap(learnerInfoData);
             		this.sid = bbsid.getLong();
-            	} else {// 否则说明包含sid和version(我们这里就是走的这个)
+            	} else {// 2.3.2否则说明包含sid和version(我们这里就是走的这个)
             		LearnerInfo li = new LearnerInfo();
             		ByteBufferInputStream.byteBuffer2Record(ByteBuffer.wrap(learnerInfoData), li);
             		this.sid = li.getServerid();
@@ -364,43 +369,49 @@ public class LearnerHandler extends ZooKeeperThread {
 
             LOG.info("Follower sid: " + sid + " : info : "
                     + leader.self.quorumPeers.get(sid));
-            // 设置learner的类型,learner类型传递过来的包括:Leader.FOLLOWERINFO或者Leader.OBSERVERINFO
+            // 2.4从请求中读取learner的角色类型并更新到LearnerHandler中
             if (qp.getType() == Leader.OBSERVERINFO) {
                     //  PARTICIPANT或OBSERVER
                   learnerType = LearnerType.OBSERVER;
             }            
-            // 从请求中解析learner的acceptedEpoch
+            // 2.5从请求的zxid中解析learner的acceptedEpoch
             long lastAcceptedEpoch = ZxidUtils.getEpochFromZxid(qp.getZxid());
-            
+            // 记录learner最后处理的zxid
             long peerLastZxid;
+            // 记录learner的统计信息
             StateSummary ss = null;
-            // 从请求中解析learner的zxid
+            // 2.6从请求中解析learner的zxid
             long zxid = qp.getZxid();
-            // 将learner的Leader选举的epoch,sid加入到connectingFollowers里面, 判断集群中过半的Leader参与者了getEpochToPropose
-            // 更新集群中的epoch和acceptedEpoch,该方法会阻塞,当超过集群中过半节点连接后,阻塞解除
+            // 2.7根据learner发生过来信息中的lastAcceptedEpoch更新leader的epoch
+            // leader的epoch会从集群中的所有lastAcceptedEpoch中获取一个最大值在+1,作为整个集群新的epoch
+            // getEpochToPropose()方法会阻塞,最后返回集群新的epoch
             long newEpoch = leader.getEpochToPropose(this.getSid(), lastAcceptedEpoch);
 
+            /* 这里的逻辑忽略 */
             if (this.getVersion() < 0x10000) {
-                // 这里的逻辑忽略
                 // we are going to have to extrapolate the epoch information
                 long epoch = ZxidUtils.getEpochFromZxid(zxid);
                 ss = new StateSummary(epoch, zxid);
                 // fake the message
                 // 封装一个假消息进行处理
                 leader.waitForEpochAck(this.getSid(), ss);
-            // 由于learner的版本为0x10000所以走这里的逻辑
+            /* 由于learner的版本为0x10000所以走这里的逻辑 */
             } else {
                 // 这里结合org.apache.zookeeper.server.quorum.Learner.registerWithLeader()方法分析
-                // leader发送LEADERINFO数据包并等待ACKEPOCH的响应
 
-                // 构建LEADERINFO数据包,版本为写死的0x10000,然后包含自己最新的epoch
-                // 发送给集群中的learner
+                /* 3.leader发送LEADERINFO数据包并等待learner的ACKEPOCH的响应 */
+
+                // 3.1构建LEADERINFO数据包,版本为写死的0x10000以及基于最新的epoch构建的zxid
                 byte ver[] = new byte[4];
                 ByteBuffer.wrap(ver).putInt(0x10000);
                 QuorumPacket newEpochPacket = new QuorumPacket(Leader.LEADERINFO, ZxidUtils.makeZxid(newEpoch, 0), ver, null);
+                // 3.2发送数据包给learner,标签为packet
                 oa.writeRecord(newEpochPacket, "packet");
                 bufferedOutput.flush();
-                // 等待LEADERINFO数据包对应的响应
+
+                /* 4.等待并解析learner对LEADERINFO数据包的响应ACKEPOCH */
+
+                // 解析learner的ACKEPOCH数据包
                 QuorumPacket ackEpochPacket = new QuorumPacket();
                 ia.readRecord(ackEpochPacket, "packet");
                 // 响应的数据包类型不为ACKEPOCH
@@ -411,12 +422,15 @@ public class LearnerHandler extends ZooKeeperThread {
 				}
                 // 读取learner的epoch
                 ByteBuffer bbepoch = ByteBuffer.wrap(ackEpochPacket.getData());
-                // 封装learner的一个状态摘要
+                // 封装learner的一个状态摘要,注意bbepoch.getInt()该值可能为-1
                 ss = new StateSummary(bbepoch.getInt(), ackEpochPacket.getZxid());
                 // 等待过半机器(Learner和leader)针对Leader发出的LEADERINFO回复ACKEPOCH
                 leader.waitForEpochAck(this.getSid(), ss);
             }
-            // 获取learner节点最后处理的zxid
+
+            /* 5.准备与learner进行数据同步 */
+
+            // 获取learner节点最后处理的zxid,该值将作为同步数据的锚点
             peerLastZxid = ss.getLastZxid();
 
             /*...........接下来就是数据同步...........*/

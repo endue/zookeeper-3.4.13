@@ -61,19 +61,22 @@ public class Observer extends Learner{
         zk.registerJMX(new ObserverBean(this, zk), self.jmxLocalPeerBean);
 
         try {
-            // 查找leader节点信息
+            /* 1.查找leader服务信息 */
             QuorumServer leaderServer = findLeader();
             LOG.info("Observing " + leaderServer.addr);
             try {
-                // 与leader节点建立socket连接
+                /* 2.与leader服务建立socket连接 */
                 connectToLeader(leaderServer.addr, leaderServer.hostname);
-                // 与leader节点建立完连接后以当前zk服务的角色注册到leader上
+                /* 3.以自身角色信息注册到leader上 */
                 long newLeaderZxid = registerWithLeader(Leader.OBSERVERINFO);
-
+                /* 4.与leader进行数据同步 */
                 syncWithLeader(newLeaderZxid);
+                /* 5.处理与leader之间的集群数据 */
                 QuorumPacket qp = new QuorumPacket();
                 while (this.isRunning()) {
+                    /* 5.1读取数据包 */
                     readPacket(qp);
+                    /* 5.2处理数据包 */
                     processPacket(qp);                   
                 }
             } catch (Exception e) {

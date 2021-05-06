@@ -68,29 +68,31 @@ public class Follower extends Learner{
         self.end_fle = 0;
         fzk.registerJMX(new FollowerBean(this, zk), self.jmxLocalPeerBean);
         try {
-            // 查找leader并初始化其QuorumServer类内部的addr和electionAddr
+            /* 1.查找leader服务信息 */
             QuorumServer leaderServer = findLeader();            
             try {
-                // 尝试与leader节点建立连接
+                /* 2.与leader服务建立socket连接 */
                 connectToLeader(leaderServer.addr, leaderServer.hostname);
-                // 与leader节点建立完连接后以当前zk服务的角色注册到leader上
+                /* 3.以自身角色信息注册到leader上 */
                 long newEpochZxid = registerWithLeader(Leader.FOLLOWERINFO);
 
                 //check to see if the leader zxid is lower than ours
                 //this should never happen but is just a safety check
-                // 校验leader epoch和自己的acceptedEpoch
+                // 校验leader epoch不能小于自己的acceptedEpoch
                 long newEpoch = ZxidUtils.getEpochFromZxid(newEpochZxid);
                 if (newEpoch < self.getAcceptedEpoch()) {
                     LOG.error("Proposed leader epoch " + ZxidUtils.zxidToString(newEpochZxid)
                             + " is less than our accepted epoch " + ZxidUtils.zxidToString(self.getAcceptedEpoch()));
                     throw new IOException("Error: Epoch of leader is lower");
                 }
-                // 与leader进行历史数据同步
-                syncWithLeader(newEpochZxid);                
+                /* 4.与leader进行数据同步 */
+                syncWithLeader(newEpochZxid);
+                /* 5.处理与leader之间的集群数据 */
                 QuorumPacket qp = new QuorumPacket();
-                // 不断循环处理读写数据请求
                 while (this.isRunning()) {
+                    /* 5.1读取数据包 */
                     readPacket(qp);
+                    /* 5.2处理数据包 */
                     processPacket(qp);
                 }
             } catch (Exception e) {

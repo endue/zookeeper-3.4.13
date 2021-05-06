@@ -142,7 +142,7 @@ public class Learner {
      *                the proposal packet to be sent to the leader
      * @throws IOException
      */
-    // 将数据pp发送给leader
+    // 将数据包发送给leader,数据标签为packet
     void writePacket(QuorumPacket pp, boolean flush) throws IOException {
         synchronized (leaderOs) {
             if (pp != null) {
@@ -209,10 +209,12 @@ public class Learner {
      */
     // 查找leader节点
     protected QuorumServer findLeader() {
+        // 记录leader服务
         QuorumServer leaderServer = null;
         // Find the leader by id
-        // 获取当前的选票,然后根据选票中记录的sid来获取leader
+        // 获取当前的选票
         Vote current = self.getCurrentVote();
+        // 遍历集群服务,根据sid获取leader节点
         for (QuorumServer s : self.getView().values()) {
             if (s.id == current.getId()) {
                 // Ensure we have the leader's correct IP address before
@@ -239,14 +241,13 @@ public class Learner {
      * @throws ConnectException
      * @throws InterruptedException
      */
-    // 与leader节点建立连接
-    // 1.创建socket客户端
-    // 2.初始化输入输出流
+    // 与leader节点建立socket连接  1.创建socket客户端 2.初始化输入输出流
     protected void connectToLeader(InetSocketAddress addr, String hostname)
             throws IOException, ConnectException, InterruptedException {
+        // 1. 初始化socket
         sock = new Socket();        
         sock.setSoTimeout(self.tickTime * self.initLimit);
-        // 建立socket连接，最多重试5次
+        // 2.建立socket连接，最多重试5次
         for (int tries = 0; tries < 5; tries++) {
             try {
                 sock.connect(addr, self.tickTime * self.syncLimit);
@@ -263,11 +264,12 @@ public class Learner {
                     sock.setSoTimeout(self.tickTime * self.initLimit);
                 }
             }
+            // leader Socket服务还未初始化好,休眠1s
             Thread.sleep(1000);
         }
-        // 身份认证
+        // 3.身份认证
         self.authLearner.authenticate(sock, hostname);
-        // 封装输入、输出流
+        // 4.构建zk自定义的输入、输出流
         leaderIs = BinaryInputArchive.getArchive(new BufferedInputStream(
                 sock.getInputStream()));
         bufferedOutput = new BufferedOutputStream(sock.getOutputStream());
@@ -288,45 +290,53 @@ public class Learner {
          * Send follower info, including last zxid and sid
          */
 
-        // 设置当前zkServer最后处理的zxid
+        /* 1.构建自身信息发生给leader */
+
+        // 1.1.获取当前zkServer最后处理的zxid
     	long lastLoggedZxid = self.getLastLoggedZxid();
-        // 构建一个集群数据包QuorumPacket
+        // 1.2.构建一个集群数据包QuorumPacket
         QuorumPacket qp = new QuorumPacket();
-        // 设置自身的角色类型为Leader.FOLLOWERINFO或者Leader.OBSERVERINFO
+        // 1.2.1设置自身的角色类型为Leader.FOLLOWERINFO或者Leader.OBSERVERINFO
         qp.setType(pktType);
-        // 根据acceptedEpoch设置自己的zxid
+        // 1.2.2根据acceptedEpoch设置新的zxid
         qp.setZxid(ZxidUtils.makeZxid(self.getAcceptedEpoch(), 0));
-        
         /*
          * Add sid to payload
          */
-        // 设置learner信息,包括当前自己的sid以及版本号0x10000
+        // 1.3.构建learner信息,包括当前自己的sid以及版本号0x10000
         LearnerInfo li = new LearnerInfo(self.getId(), 0x10000);
         ByteArrayOutputStream bsid = new ByteArrayOutputStream();
         BinaryOutputArchive boa = BinaryOutputArchive.getArchive(bsid);
-        // 封装learner信息到集群数据包QuorumPacket
+        // 1.4.封装learner信息到zk自定义输出流,标签为LearnerInfo
         boa.writeRecord(li, "LearnerInfo");
+        // 1.5.将zk自定义输出流封装到集群数据包QuorumPacket
         qp.setData(bsid.toByteArray());
-        // 发送集群数据包QuorumPacket
+        // 1.6.发送集群数据包QuorumPacket,对应的标签为packet
         writePacket(qp, true);
-        // 读取数据到qp,leader此时发送的数据包内容如下:QuorumPacket(Leader.LEADERINFO, ZxidUtils.makeZxid(newEpoch, 0), ver, null)
+
+        /* 2.读取leader发送过来的LEADERINFO类型数据包 */
+
+        // 2.1读取数据到qp
+        // leader此时发送的数据包内容如下:QuorumPacket(Leader.LEADERINFO, ZxidUtils.makeZxid(newEpoch, 0), ver, null)
         readPacket(qp);
-        // 解析leader返回的最新的epoch
+        // 2.2解析leader返回的新的epoch
         final long newEpoch = ZxidUtils.getEpochFromZxid(qp.getZxid());
-        // 响应数据包类型为LEADERINFO,这里结合org.apache.zookeeper.server.quorum.LearnerHandler.run()方法分析
+        // 2.3响应数据包类型为LEADERINFO
+        // 这里结合org.apache.zookeeper.server.quorum.LearnerHandler.run()方法分析
 		if (qp.getType() == Leader.LEADERINFO) {
         	// we are connected to a 1.0 server so accept the new epoch and read the next packet
-            // 读取leader的版本,写死的0x10000
+            // 2.3.1读取leader的版本,写死的0x10000
         	leaderProtocolVersion = ByteBuffer.wrap(qp.getData()).getInt();
+        	// 封装一个bute数组,用于记录learner的currentEpoch并返回给leader
         	byte epochBytes[] = new byte[4];
         	final ByteBuffer wrappedEpochBytes = ByteBuffer.wrap(epochBytes);
-        	// leader的epoch > 自己的acceptedEpoch
+        	// 2.3.2 leader新的epoch > 自己的acceptedEpoch
         	if (newEpoch > self.getAcceptedEpoch()) {
-        	    // 设置自己currentEpoch到数据包准备返回给leader
+        	    // 2.3.2.1 设置自己currentEpoch到数据包准备返回给leader
         		wrappedEpochBytes.putInt((int)self.getCurrentEpoch());
-        		// 更新自己的acceptedEpoch为leader的epoch
+        		// 2.3.2.2 更新自己的acceptedEpoch为leader新的epoch
         		self.setAcceptedEpoch(newEpoch);
-        	// 	leader的epoch = 自己的acceptedEpoch
+        	// 	2.3.3 leader的epoch = 自己的acceptedEpoch
         	} else if (newEpoch == self.getAcceptedEpoch()) {
         		// since we have already acked an epoch equal to the leaders, we cannot ack
         		// again, but we still need to send our lastZxid to the leader so that we can
@@ -337,10 +347,10 @@ public class Learner {
         	} else {
         		throw new IOException("Leaders epoch, " + newEpoch + " is less than accepted epoch, " + self.getAcceptedEpoch());
         	}
-        	// 封装ACKEPOCH数据包返回给leader
+        	// 2.3.4 封装一个ACKEPOCH数据包返回给leader
         	QuorumPacket ackNewEpoch = new QuorumPacket(Leader.ACKEPOCH, lastLoggedZxid, epochBytes, null);
         	writePacket(ackNewEpoch, true);
-        	// 更新自己的zxid中高32位的epoch为新的epoch,低32为0
+        	// 根据leader新的epoch,构建新的zxid返回
             return ZxidUtils.makeZxid(newEpoch, 0);
         } else {
 		    // 旧版本leader用于兼容

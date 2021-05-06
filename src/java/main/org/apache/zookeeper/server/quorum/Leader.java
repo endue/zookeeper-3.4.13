@@ -902,28 +902,29 @@ public class Leader {
         return lastProposed;
     }
     // VisibleForTesting
-    // 记录集群中learner以及自己的sid
+    // 记录集群中learner以及leader的sid
     // 表示已经连接上的learner
     protected Set<Long> connectingFollowers = new HashSet<Long>();
     // 该方法会在Leader.lead()和LearnerHandler.run()方法中被调用
     // 获取集群中最大的lastAcceptedEpoch,然后+1更新到epoch中
     public long getEpochToPropose(long sid, long lastAcceptedEpoch) throws InterruptedException, IOException {
         synchronized(connectingFollowers) {
-            // 是否在等待新的epoch,不在等待时直接返回
+            // 1.是否在等待新的epoch,不在等待时直接返回
             if (!waitingForNewEpoch) {
                 return epoch;
             }
-            // 如果参数lastAcceptedEpoch超过自己当前的epoch,那么将参数lastAcceptedEpoch + 1赋值给epoch
-            // 也就是获取集群中最大的epoch,然后更新自己的epoch + 1
+            // 2.如果参数lastAcceptedEpoch超过自己当前的epoch,那么将参数lastAcceptedEpoch + 1赋值给epoch
+            // 也就是在不断的将集群中最大的epoch + 1操作
             if (lastAcceptedEpoch >= epoch) {
                 epoch = lastAcceptedEpoch+1;
             }
-            // 如果参数sid是集群的一部分,则记录到connectingFollowers集合中
+            // 3.如果参数sid是集群的一部分,则记录到connectingFollowers集合中
             if (isParticipant(sid)) {
                 connectingFollowers.add(sid);
             }
             QuorumVerifier verifier = self.getQuorumVerifier();
-            // connectingFollowers集合中已包含自己并且也包含过半的机器了
+            // 4.connectingFollowers集合中已包含自己说明自己已经在集群中并且
+            // 也包含过半的机器了,说明当前已经过半的集群达成了epoch
             // 那么就不需要在继续等待
             if (connectingFollowers.contains(self.getId()) && 
                                             verifier.containsQuorum(connectingFollowers)) {
@@ -931,9 +932,9 @@ public class Leader {
                 waitingForNewEpoch = false;
                 // 设置最新的acceptedEpoch
                 self.setAcceptedEpoch(epoch);
-                // 缓存等待的线程,这里有可能其他learner注册的时候发生并发,导致阻塞在入口synchronized上
+                // 唤醒等待的线程,这里有可能其他learner注册的时候发生并发,导致阻塞在入口synchronized上
                 connectingFollowers.notifyAll();
-            } else {// 连接的集群未过半,那么等待一段时间后直接返回
+            } else {// 5.连接的集群未过半,那么等待一段时间后直接返回
                 // 获取开始时间,结束时间
                 long start = Time.currentElapsedTime();
                 long cur = start;
