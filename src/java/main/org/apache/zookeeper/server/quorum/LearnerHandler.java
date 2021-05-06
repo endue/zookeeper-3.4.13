@@ -215,7 +215,7 @@ public class LearnerHandler extends ZooKeeperThread {
     /**
      * This method will use the thread to send packets added to the
      * queuedPackets list
-     *
+     * 将queuedPackets队列中的数据包获取出来并发送给learner
      * @throws InterruptedException
      */
     private void sendPackets() throws InterruptedException {
@@ -559,6 +559,7 @@ public class LearnerHandler extends ZooKeeperThread {
                 queuedPackets.add(newLeaderQP);
             }
             bufferedOutput.flush();
+            // 构建一个SNAP或TRUNC或DIFF请求并发送
             //Need to set the zxidToSend to the latest zxid
             if (packetToSend == Leader.SNAP) {
                 zxidToSend = leader.zk.getZKDatabase().getDataTreeLastProcessedZxid();
@@ -567,6 +568,7 @@ public class LearnerHandler extends ZooKeeperThread {
             bufferedOutput.flush();
             
             /* if we are not truncating or sending a diff just send a snapshot */
+            // 发送快照设置一个签名
             if (packetToSend == Leader.SNAP) {
                 LOG.info("Sending snapshot last zxid of peer is 0x"
                         + Long.toHexString(peerLastZxid) + " " 
@@ -581,7 +583,8 @@ public class LearnerHandler extends ZooKeeperThread {
             bufferedOutput.flush();
             
             // Start sending packets
-            // 与learner进行数据同步
+            // 启动一个线程处理queuedPackets队列中的数据包
+            // 也就是与learner进行数据同步
             new Thread() {
                 public void run() {
                     Thread.currentThread().setName(

@@ -383,7 +383,7 @@ public class Learner {
         // 记录收到的proposal但是还未commit
         LinkedList<PacketInFlight> packetsNotCommitted = new LinkedList<PacketInFlight>();
         synchronized (zk) {
-            //  DIFF数据包(DIFF数据包显示集群中两个节点的 lastZxid 相同)
+            //  DIFF数据包(learner和leader已处理的zxid相同)
             if (qp.getType() == Leader.DIFF) {
                 LOG.info("Getting a diff from the leader 0x{}", Long.toHexString(qp.getZxid()));
                 snapshotNeeded = false;
@@ -396,6 +396,7 @@ public class Learner {
                 // 清空自己的数据库然后将leader节点数据保存到本地
                 zk.getZKDatabase().clear();
                 zk.getZKDatabase().deserializeSnapshot(leaderIs);
+                // 读取签名
                 String signature = leaderIs.readString("signature");
                 if (!signature.equals("BenWasHere")) {
                     LOG.error("Missing signature. Got " + signature);
@@ -437,7 +438,7 @@ public class Learner {
             boolean writeToTxnLog = !snapshotNeeded;
             // we are now going to start getting transactions to apply followed by an UPTODATE
             outerLoop:
-            while (self.isRunning()) {// 启动时数据同步,不断读取leader的数据，直到收到UPTODATE表示同步完成
+            while (self.isRunning()) {// 启动数据同步,不断读取leader的数据，直到收到UPTODATE表示同步完成
                 // 读数据
                 readPacket(qp);
                 switch(qp.getType()) {
