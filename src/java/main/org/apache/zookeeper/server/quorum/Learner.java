@@ -246,7 +246,7 @@ public class Learner {
             throws IOException, ConnectException, InterruptedException {
         sock = new Socket();        
         sock.setSoTimeout(self.tickTime * self.initLimit);
-        // 建立连接，最多重试5次
+        // 建立socket连接，最多重试5次
         for (int tries = 0; tries < 5; tries++) {
             try {
                 sock.connect(addr, self.tickTime * self.syncLimit);
@@ -281,7 +281,7 @@ public class Learner {
      * @return the zxid the Leader sends for synchronization purposes.
      * @throws IOException
      */
-    // 以某种角色注册到leader上
+    // 以zk服务自身当前的角色注册到leader上
     // 返回leader的zxid
     protected long registerWithLeader(int pktType) throws IOException{
         /*

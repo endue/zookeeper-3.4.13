@@ -63,7 +63,7 @@ public class Leader {
     static {
         LOG.info("TCP NoDelay set to: " + nodelay);
     }
-    // 提案类
+    // 提案
     static public class Proposal {
         // 数据包
         public QuorumPacket packet;
@@ -87,10 +87,11 @@ public class Leader {
     
     // the follower acceptor thread
     // 接受来自learner的请求连接,为每个learner创建一个LearnerHandler
+    // 用于后续通信
     LearnerCnxAcceptor cnxAcceptor;
     
     // list of all the followers
-    // 记录所有的learner的处理线程
+    // 记录所有的learner的处理线程,也就是集群中所有的follower
     private final HashSet<LearnerHandler> learners =
         new HashSet<LearnerHandler>();
 
@@ -195,6 +196,7 @@ public class Leader {
     }
 
     // 与learner节点的socket连接服务端
+    // 构造方法中初始化
     ServerSocket ss;
 
     Leader(QuorumPeer self,LeaderZooKeeperServer zk) throws IOException {
@@ -377,6 +379,7 @@ public class Leader {
     long epoch = -1;
     // 是否在等待new epoch
     boolean waitingForNewEpoch = true;
+    // 当前leader服务器是否
     volatile boolean readyToStart = false;
     
     /**
@@ -405,8 +408,7 @@ public class Leader {
 
             // Start thread that waits for connection requests from 
             // new followers.
-            // 创建并启动LearnerCnxAcceptor接受来自learner的连接请求
-            // 内部是一个线程的死循环,Socket服务器端监听相关断开,当有一个learner连接时,就会创建一个对应的LearnerHandler
+            // 创建并启动LearnerCnxAcceptor接收来自learner的连接请求以及后续其他操作命令
             cnxAcceptor = new LearnerCnxAcceptor();
             cnxAcceptor.start();
             
@@ -419,7 +421,7 @@ public class Leader {
             synchronized(this){
                 lastProposed = zk.getZxid();
             }
-            // 创建一个新leader信息的数据包,类型为NEWLEADER,包含自己当前的zxid
+            // 创建一个NEWLEADER数据包,包含自己当前的zxid
             newLeaderProposal.packet = new QuorumPacket(NEWLEADER, zk.getZxid(),
                     null, null);
 
@@ -761,7 +763,7 @@ public class Leader {
         sendObserverPacket(qp);
     }
 
-    // 最后一次提议中的zxid
+    // 最后一次提案中的zxid
     long lastProposed;
 
     
@@ -924,7 +926,7 @@ public class Leader {
                 waitingForNewEpoch = false;
                 // 设置最新的acceptedEpoch
                 self.setAcceptedEpoch(epoch);
-                // 缓存等待的线程,这里有可能其他learner注册的时候发生编发,导致阻塞在入口synchronized上
+                // 缓存等待的线程,这里有可能其他learner注册的时候发生并发,导致阻塞在入口synchronized上
                 connectingFollowers.notifyAll();
             } else {// 连接的集群未过半,那么等待一段时间后直接返回
                 // 获取开始时间,结束时间

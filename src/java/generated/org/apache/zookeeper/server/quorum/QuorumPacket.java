@@ -22,8 +22,11 @@ package org.apache.zookeeper.server.quorum;
 import org.apache.jute.*;
 import org.apache.yetus.audience.InterfaceAudience;
 @InterfaceAudience.Public
+// 用于集群间通信
 public class QuorumPacket implements Record {
+  // 数据包类型
   private int type;
+  // 发送该数据包分配的zxid
   private long zxid;
   private byte[] data;
   private java.util.List<org.apache.zookeeper.data.Id> authinfo;

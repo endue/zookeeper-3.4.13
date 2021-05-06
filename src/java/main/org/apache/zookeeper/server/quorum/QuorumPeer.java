@@ -277,7 +277,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
      * at least for QuorumCnxManager. We use the following constant to as the
      * value of such a generic identifier. 
      */
-    
+    // Observer服务在建立集群连接是,将自身ID设置为Long.MAX_VALUE
     static final long OBSERVER_ID = Long.MAX_VALUE;
 
     /*
@@ -341,7 +341,11 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
     /**
      * This is who I think the leader currently is.
      */
-    // 当前选票
+    /**
+     * 当前选票
+     * 在服务启动开始投票选举前会更新选票为自己,参考{@link org.apache.zookeeper.server.quorum.QuorumPeer#startLeaderElection}
+     * 在服务投票结束后会更新为最终的投票结果,参考{@link Election#lookForLeader()}
+     */
     volatile private Vote currentVote;
     
     /**
@@ -1017,7 +1021,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                     } else {
                         try {
                             setBCVote(null);
-                            // leader选举并设置最终的选举结果
+                            // leader选举并设置最终的选举结果endVote
                             setCurrentVote(makeLEStrategy().lookForLeader());
                         } catch (Exception e) {
                             LOG.warn("Unexpected exception", e);
