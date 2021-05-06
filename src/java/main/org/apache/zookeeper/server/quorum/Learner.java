@@ -535,6 +535,7 @@ public class Learner {
             }
         }
         ack.setZxid(ZxidUtils.makeZxid(newEpoch, 0));
+        // 返回ack数据包给leader
         writePacket(ack, true);
         sock.setSoTimeout(self.tickTime * self.syncLimit);
         // 启动zk服务器
