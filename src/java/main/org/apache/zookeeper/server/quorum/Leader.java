@@ -408,11 +408,15 @@ public class Leader {
 
             // Start thread that waits for connection requests from 
             // new followers.
-            // 创建并启动LearnerCnxAcceptor接收来自learner的连接请求以及后续其他操作命令
+
+            /* 1.启动socket服务等待learner的连接 */
+
+            // 1.创建并启动LearnerCnxAcceptor接收来自learner的连接请求以及后续其他操作命令
             cnxAcceptor = new LearnerCnxAcceptor();
             cnxAcceptor.start();
             
             readyToStart = true;
+            /* 2.获取集群中最大的astAcceptedEpoch,然后+1更新到epoch中 */
             // 获取集群中最大的lastAcceptedEpoch,然后+1更新到epoch中
             // 这个方法会阻塞住并返回最新的epoch
             long epoch = getEpochToPropose(self.getId(), self.getAcceptedEpoch());
@@ -430,7 +434,6 @@ public class Leader {
                 LOG.info("NEWLEADER proposal has Zxid of "
                         + Long.toHexString(newLeaderProposal.packet.getZxid()));
             }
-            // 注意这里也会阻塞
             // 等待过半机器(Learner和leader)针对Leader发出的LEADERINFO回复ACKEPOCH
             waitForEpochAck(self.getId(), leaderStateSummary);
             self.setCurrentEpoch(epoch);
@@ -490,7 +493,7 @@ public class Leader {
             // We ping twice a tick, so we only update the tick every other
             // iteration
             boolean tickSkip = true;
-    
+            // while循环不断的进行ping,检查learner是否活跃
             while (true) {
                 Thread.sleep(self.tickTime / 2);
                 if (!tickSkip) {

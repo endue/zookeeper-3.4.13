@@ -381,24 +381,27 @@ public class Learner {
     //  UPTODATE(表示过半机器已完成同步，可以对外工作)
     //  NEWLEADER(leader告诉learner同步的相关请求已经发完了)
     protected void syncWithLeader(long newLeaderZxid) throws IOException, InterruptedException{
+        // 1.构建一个ACK数据包
         QuorumPacket ack = new QuorumPacket(Leader.ACK, 0, null, null);
         QuorumPacket qp = new QuorumPacket();
         long newEpoch = ZxidUtils.getEpochFromZxid(newLeaderZxid);
         // In the DIFF case we don't need to do a snapshot because the transactions will sync on top of any existing snapshot
         // For SNAP and TRUNC the snapshot is needed to save that history
+        /* 2.开始进行数据同步 */
         boolean snapshotNeeded = true;
+        // 2.1 读取同步数据的模式
         readPacket(qp);
         // 记录需要commit的zxid
         LinkedList<Long> packetsCommitted = new LinkedList<Long>();
         // 记录收到的proposal但是还未commit
         LinkedList<PacketInFlight> packetsNotCommitted = new LinkedList<PacketInFlight>();
         synchronized (zk) {
-            //  DIFF数据包(learner和leader已处理的zxid相同)
+            //  2.1.1 DIFF数据包(learner和leader已处理的zxid相同或者learner少于leader已处理的提案)
             if (qp.getType() == Leader.DIFF) {
                 LOG.info("Getting a diff from the leader 0x{}", Long.toHexString(qp.getZxid()));
                 snapshotNeeded = false;
             }
-            // SNAP则从leader复制一份镜像数据到本地
+            // 2.1.2 SNAP从leader复制一份镜像数据到本地
             else if (qp.getType() == Leader.SNAP) {
                 LOG.info("Getting a snapshot from leader 0x" + Long.toHexString(qp.getZxid()));
                 // The leader is going to dump the database
@@ -413,7 +416,7 @@ public class Learner {
                     throw new IOException("Missing signature");                   
                 }
                 zk.getZKDatabase().setlastProcessedZxid(qp.getZxid());
-            // TRUNC表示将本地数据回滚到leader节点返回的zxid的位置
+            // 2.1.3 TRUNC表示将本地数据回滚到leader节点返回的zxid位置
             } else if (qp.getType() == Leader.TRUNC) {
                 //we need to truncate the log to the lastzxid of the leader
                 LOG.warn("Truncating log to get in sync with the leader 0x"
@@ -447,6 +450,9 @@ public class Learner {
             // but written out to the transaction log
             boolean writeToTxnLog = !snapshotNeeded;
             // we are now going to start getting transactions to apply followed by an UPTODATE
+
+            /* 3.开始数据同步 */
+
             outerLoop:
             while (self.isRunning()) {// 启动数据同步,不断读取leader的数据，直到收到UPTODATE表示同步完成
                 // 读数据
@@ -539,13 +545,14 @@ public class Learner {
                     }
                     writeToTxnLog = true; //Anything after this needs to go to the transaction log, not applied directly in memory
                     isPreZAB1_0 = false;
+                    // 返回ACK数据包
                     writePacket(new QuorumPacket(Leader.ACK, newLeaderZxid, null, null), true);
                     break;
                 }
             }
         }
         ack.setZxid(ZxidUtils.makeZxid(newEpoch, 0));
-        // 返回ack数据包给leader
+        // 4. 返回ack数据包给leader
         writePacket(ack, true);
         sock.setSoTimeout(self.tickTime * self.syncLimit);
         // 启动zk服务器
