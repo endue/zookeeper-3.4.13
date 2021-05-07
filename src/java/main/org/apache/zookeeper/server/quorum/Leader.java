@@ -69,7 +69,7 @@ public class Leader {
         public QuorumPacket packet;
         // 记录接受到ack的zk服务器的sid集合
         public HashSet<Long> ackSet = new HashSet<Long>();
-        // 请求
+        // 数据包中对应的请求
         public Request request;
 
         @Override
@@ -316,9 +316,9 @@ public class Leader {
      * This message type informs observers of a committed proposal.
      */
     final static int INFORM = 8;
-    // 已经提出但是没有处理的提案
+    // 已经提交给集群中其他成员但是还没有ACK的提案
     ConcurrentMap<Long, Proposal> outstandingProposals = new ConcurrentHashMap<Long, Proposal>();
-    // 已经被CommitProcessor处理过的可被提交的Proposal
+
     ConcurrentLinkedQueue<Proposal> toBeApplied = new ConcurrentLinkedQueue<Proposal>();
     // new leader提案
     Proposal newLeaderProposal = new Proposal();
@@ -425,7 +425,7 @@ public class Leader {
             synchronized(this){
                 lastProposed = zk.getZxid();
             }
-            // 创建一个NEWLEADER数据包,包含自己当前的zxid
+            // 3.创建一个NEWLEADER数据包,包含自己当前的zxid
             newLeaderProposal.packet = new QuorumPacket(NEWLEADER, zk.getZxid(),
                     null, null);
 
@@ -434,7 +434,7 @@ public class Leader {
                 LOG.info("NEWLEADER proposal has Zxid of "
                         + Long.toHexString(newLeaderProposal.packet.getZxid()));
             }
-            // 等待过半机器(Learner和leader)针对Leader发出的LEADERINFO回复ACKEPOCH
+            // 4.等待过半机器(Learner和leader)针对Leader发出的LEADERINFO回复ACKEPOCH
             waitForEpochAck(self.getId(), leaderStateSummary);
             self.setCurrentEpoch(epoch);
 
@@ -442,7 +442,7 @@ public class Leader {
             // us. We do this by waiting for the NEWLEADER packet to get
             // acknowledged
             try {
-                // 等到有过半的参与者针对Leader发出的NEWLEADER返回ACK
+                // 5.等到有过半的参与者针对Leader发出的NEWLEADER返回ACK
                 waitForNewLeaderAck(self.getId(), zk.getZxid());
             } catch (InterruptedException e) {
                 shutdown("Waiting for a quorum of followers, only synced with sids: [ "
@@ -459,7 +459,7 @@ public class Leader {
                 self.tick.incrementAndGet();
                 return;
             }
-            // 启动zk服务器
+            // 6.启动zk服务器
             startZkServer();
             
             /**
@@ -586,7 +586,6 @@ public class Leader {
      *                the zxid of the proposal sent out
      * @param followerAddr
      */
-    // 处理follower的ack
     synchronized public void processAck(long sid, long zxid, SocketAddress followerAddr) {
         if (LOG.isTraceEnabled()) {
             LOG.trace("Ack zxid: 0x{}", Long.toHexString(zxid));
@@ -664,6 +663,11 @@ public class Leader {
     static class ToBeAppliedRequestProcessor implements RequestProcessor {
         private RequestProcessor next;
 
+        /**
+         * 赋值地点参考
+         * {@link LeaderZooKeeperServer#setupRequestProcessors()}
+         * 该属性值保留至Leader.toBeApplied属性的引用
+         */
         private ConcurrentLinkedQueue<Proposal> toBeApplied;
 
         /**
@@ -677,6 +681,7 @@ public class Leader {
          */
         ToBeAppliedRequestProcessor(RequestProcessor next,
                 ConcurrentLinkedQueue<Proposal> toBeApplied) {
+            // 注意这里,如果nextProcessor不是FinalRequestProcessor立即报错
             if (!(next instanceof FinalRequestProcessor)) {
                 throw new RuntimeException(ToBeAppliedRequestProcessor.class
                         .getName()
@@ -694,10 +699,12 @@ public class Leader {
          * 
          * @see org.apache.zookeeper.server.RequestProcessor#processRequest(org.apache.zookeeper.server.Request)
          */
+        // 处理请求
         public void processRequest(Request request) throws RequestProcessorException {
             // request.addRQRec(">tobe");
-            // 交给finalRequestProcessor
+            // 首先将请求交给FinalRequestProcessor来进行同步处理
             next.processRequest(request);
+            // 最后获取toBeApplied头位置中的提案,如果和请求的zxid一致则从toBeApplied中删除
             Proposal p = toBeApplied.peek();
             if (p != null && p.request != null
                     && p.request.zxid == request.zxid) {
@@ -722,7 +729,7 @@ public class Leader {
      * @param qp
      *                the packet to be sent
      */
-    // 发送数据包到learner
+    // 将数据包提交给各个learner的LearnerHandler线程来处理
     void sendPacket(QuorumPacket qp) {
         synchronized (forwardingFollowers) {
             for (LearnerHandler f : forwardingFollowers) {                
@@ -792,6 +799,7 @@ public class Leader {
      * @param request
      * @return the proposal that is queued to send to all the members
      */
+    // 创建一个提案然后提交给集群中的其他成员
     public Proposal propose(Request request) throws XidRolloverException {
         /**
          * Address the rollover issue. All lower 32bits set indicate a new leader
@@ -803,8 +811,12 @@ public class Leader {
             shutdown(msg);
             throw new XidRolloverException(msg);
         }
+        /* 1. 序列化请求封装为QuorumPacket数据包 */
+        // 1.1将请求序列化为byte数组
         byte[] data = SerializeUtils.serializeRequest(request);
+        // 1.2记录提案中请求的大小
         proposalStats.setLastProposalSize(data.length);
+        // 1.3封装为一个请求数据包
         QuorumPacket pp = new QuorumPacket(Leader.PROPOSAL, request.zxid, data, null);
         
         Proposal p = new Proposal();
@@ -816,6 +828,7 @@ public class Leader {
             }
 
             lastProposed = p.packet.getZxid();
+            // 将提案记录到outstandingProposals集合中
             outstandingProposals.put(lastProposed, p);
             // 同步到其他learner
             sendPacket(pp);

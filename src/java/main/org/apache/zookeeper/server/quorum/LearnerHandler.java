@@ -812,6 +812,10 @@ public class LearnerHandler extends ZooKeeperThread {
         }
     }
 
+    /**
+     * 添加数据包到queuedPackets集合
+     * @param p
+     */
     void queuePacket(QuorumPacket p) {
         queuedPackets.add(p);
     }

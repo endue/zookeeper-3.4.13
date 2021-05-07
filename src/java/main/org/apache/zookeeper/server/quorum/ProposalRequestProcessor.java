@@ -55,7 +55,12 @@ public class ProposalRequestProcessor implements RequestProcessor {
     public void initialize() {
         syncProcessor.start();
     }
-    
+
+    /**
+     * 处理请求
+     * @param request
+     * @throws RequestProcessorException
+     */
     public void processRequest(Request request) throws RequestProcessorException {
         // LOG.warn("Ack>>> cxid = " + request.cxid + " type = " +
         // request.type + " id = " + request.sessionId);
@@ -75,6 +80,9 @@ public class ProposalRequestProcessor implements RequestProcessor {
         } else {
             // 提交请求到nextProcessor
             nextProcessor.processRequest(request);
+            // 判断是否是事务请求,如果是做如下两个操作
+            // 1.将请求封装为提案提交给集群中其他成员
+            // 2.同时将请求记录到事务日志
             if (request.hdr != null) {
                 // We need to sync and get consensus on any transactions
                 try {
@@ -83,7 +91,7 @@ public class ProposalRequestProcessor implements RequestProcessor {
                 } catch (XidRolloverException e) {
                     throw new RequestProcessorException(e.getMessage(), e);
                 }
-                // 准备写磁盘事务日志
+                // 准备写磁盘事务日志,走SyncRequestProcessor -> AckRequestProcessor
                 syncProcessor.processRequest(request);
             }
         }

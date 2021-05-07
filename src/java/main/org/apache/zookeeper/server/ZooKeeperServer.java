@@ -830,9 +830,8 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         submitRequest(si);
     }
 
-    // 如果是ZooKeeperServer,执行顺序为PrepRequestProcessor -> SyncRequestProcessor -> finalProcessor
-    // 如果是FollowerZookeeperServer,执行顺序为FollowerRequestProcessor -> CommitProcessor -> FinalRequestProcessor
-    // 如果是LeaderZookeeperServer,执行顺序为PrepRequestProcessor -> ProposalRequestProcessor -> CommitProcessor -> ToBeAppliedRequestProcessor -> FinalRequestProcessor
+    // 如果是单机模式,走ZooKeeperServer,执行顺序为PrepRequestProcessor -> SyncRequestProcessor -> finalProcessor
+    // 如果是集群模式,走不通的Server,执行顺序也不一样
     public void submitRequest(Request si) {
         // 由于NIOServerCnxnFactory先启动,那么如果此时有客户端请求,就一定处理,由于ZookeeperServer还未完成责任链的初始化
         // 所有此时firstProcessor可能为null,那么就需要等待责任链的初始化

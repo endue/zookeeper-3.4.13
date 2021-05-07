@@ -25,16 +25,19 @@ public class ProposalStats {
     /**
      * Size of the last generated proposal. This should fit into server's jute.maxbuffer setting.
      */
+    // 最后提交给集群成员的提案大小
     private int lastProposalSize = -1;
 
     /**
      * Size of the smallest proposal which has been generated since the server was started.
      */
+    // 最小提交给集群成员的提案大小
     private int minProposalSize = -1;
 
     /**
      * Size of the largest proposal which has been generated since the server was started.
      */
+    // 最大提交给集群成员的提案大小
     private int maxProposalSize = -1;
 
     public synchronized int getLastProposalSize() {
