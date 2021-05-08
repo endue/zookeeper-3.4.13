@@ -156,6 +156,7 @@ public class FinalRequestProcessor implements RequestProcessor {
 
         /*------准备发送响应给客户端--------*/
 
+        // 集群模式时,leader发送给learner的请求,learner处理的时候cnxn为null
         if (request.cnxn == null) {
             return;
         }

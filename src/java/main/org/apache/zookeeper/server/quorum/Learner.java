@@ -629,11 +629,16 @@ public class Learner {
         }
     }
 
-    // learner接收leader的ping命令时，返回LearnerSessionTracker的快照
+    /**
+     * 处理leader发送过来的Leader.PING数据包
+     * @param qp
+     * @throws IOException
+     */
     protected void ping(QuorumPacket qp) throws IOException {
         // Send back the ping with our session data
         ByteArrayOutputStream bos = new ByteArrayOutputStream();
         DataOutputStream dos = new DataOutputStream(bos);
+        // 获取LearnerSessionTracker中记录session以及过期时间的touchTable集合
         HashMap<Long, Integer> touchTable = zk
                 .getTouchSnapshot();
         for (Entry<Long, Integer> entry : touchTable.entrySet()) {
@@ -641,6 +646,7 @@ public class Learner {
             dos.writeInt(entry.getValue());
         }
         qp.setData(bos.toByteArray());
+        // 发送给leader
         writePacket(qp, true);
     }
     

@@ -33,6 +33,7 @@ import org.apache.zookeeper.txn.TxnHeader;
  */
 public class Follower extends Learner{
 
+    // 记录最后一个收到的事务请求的zxid
     private long lastQueued;
     // This is the same object as this.zk, but we cache the downcast op
     final FollowerZooKeeperServer fzk;
@@ -116,13 +117,18 @@ public class Follower extends Learner{
      * @param qp
      * @throws IOException
      */
+    // 处理leader发送过来的数据包
     protected void processPacket(QuorumPacket qp) throws IOException{
         switch (qp.getType()) {
         case Leader.PING:            
             ping(qp);            
             break;
-        case Leader.PROPOSAL:            
+        case Leader.PROPOSAL:
+            /* 收到的是一个提案,里面必包括一个事务请求 */
+
+            // 1.解析事务请求的请求头
             TxnHeader hdr = new TxnHeader();
+            // 2.解析事务请求的请求体
             Record txn = SerializeUtils.deserializeTxn(qp.getData(), hdr);
             if (hdr.getZxid() != lastQueued + 1) {
                 LOG.warn("Got zxid 0x"
@@ -131,18 +137,17 @@ public class Follower extends Learner{
                         + Long.toHexString(lastQueued + 1));
             }
             lastQueued = hdr.getZxid();
-            // 交给follower的zk服务器来处理
+            // 3.处理请求
             fzk.logRequest(hdr, txn);
             break;
         case Leader.COMMIT:
-            // 交给follower的zk服务器来处理
+            /* 针对上面的Leader.PROPOSAL类型数据包进行commit操作 */
             fzk.commit(qp.getZxid());
             break;
         case Leader.UPTODATE:
             LOG.error("Received an UPTODATE message after Follower started");
             break;
         case Leader.REVALIDATE:
-            // 交给follower的zk服务器来处理
             revalidate(qp);
             break;
         case Leader.SYNC:

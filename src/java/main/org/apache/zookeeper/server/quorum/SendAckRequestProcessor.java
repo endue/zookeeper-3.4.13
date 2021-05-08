@@ -37,7 +37,11 @@ public class SendAckRequestProcessor implements RequestProcessor, Flushable {
         this.learner = peer;
     }
 
-    // 处理请求
+    /**
+     * 当follower收到leader的Leader.PROPOSAL类型数据包后会调用SyncRequestProcessor -> SendAckRequestProcessor处理链
+     * 最后记录到自己的磁盘日志后返回一个ACK给leader
+     * @param si
+     */
     public void processRequest(Request si) {
         // 如果请求非sync类型，则返回一个ACK给leader
         if(si.type != OpCode.sync){

@@ -91,20 +91,38 @@ public class FollowerZooKeeperServer extends LearnerZooKeeperServer {
                 new SendAckRequestProcessor((Learner)getFollower()));
         syncProcessor.start();
     }
-    // 等待处理的事务请求
+
+    /**
+     * 记录收到的Leader.PROPOSAL类型数据包,也就是提案.此时的提案还未进行commit操作
+     */
     LinkedBlockingQueue<Request> pendingTxns = new LinkedBlockingQueue<Request>();
 
-    // 记录事务请求到等待队列
+    /**
+     * 处理leader发送过来的事务请求
+     * 该方法别调用的地方包括两处
+     * {@link Follower#processPacket(org.apache.zookeeper.server.quorum.QuorumPacket)} follower接收到leader的Leader.PROPOSAL类型数据包
+     * {@link Learner#syncWithLeader(long)} follower与leader进行数据同步
+     * @param hdr 事务请求头
+     * @param txn 事务请求实体
+     */
     public void logRequest(TxnHeader hdr, Record txn) {
+        // 根据hdr和txn构建一个请求
+        /**
+         * 注意细节:构建Request的第一个参数cnxn赋值为了null
+         * 为什么这样?参考{@link org.apache.zookeeper.server.FinalRequestProcessor.processRequest}
+         * 避免多个集群服务对同一个客户端进行响应
+         */
         Request request = new Request(null, hdr.getClientId(), hdr.getCxid(),
                 hdr.getType(), null, null);
         request.hdr = hdr;
         request.txn = txn;
         request.zxid = hdr.getZxid();
+        // 判断是否是一个有效的事务请求,如果是则将该事务请求记录到pendingTxns集合的尾部
+        // 等待后续commit操作
         if ((request.zxid & 0xffffffffL) != 0) {
             pendingTxns.add(request);
         }
-        // 提交该请求，处理流程SyncRequestProcessor -> SendAckRequestProcessor
+        // 处理事务请求,流程SyncRequestProcessor -> SendAckRequestProcessor
         syncProcessor.processRequest(request);
     }
 
@@ -114,14 +132,18 @@ public class FollowerZooKeeperServer extends LearnerZooKeeperServer {
      * the pendingTxns queue and hands it to the commitProcessor to commit.
      * @param zxid - must correspond to the head of pendingTxns if it exists
      */
-    // 提交zxid对应的请求(pendingTxns.element()也就是获取pendingTxns队列首元素)
+    /**
+     * 根据zxid对之前收到的提案进行commit操作
+     * @param zxid
+     */
     public void commit(long zxid) {
+        // 1.没有待commit操作的提案,不继续处理
         if (pendingTxns.size() == 0) {
             LOG.warn("Committing " + Long.toHexString(zxid)
                     + " without seeing txn");
             return;
         }
-        // 获取pendingTxns队列的首元素，只是查看并不出队
+        // 2.非阻塞的方式获取pendingTxns队列中的头元素,只是peek一下并未出队
         long firstElementZxid = pendingTxns.element().zxid;
         // 如果队首元素的zxid不等于需要提交的zxid，则退出程序
         if (firstElementZxid != zxid) {
@@ -130,9 +152,9 @@ public class FollowerZooKeeperServer extends LearnerZooKeeperServer {
                     + Long.toHexString(firstElementZxid));
             System.exit(12);
         }
-        // 移除队首元素并返回
+        // 3.移除pendingTxns队列中的头元素
         Request request = pendingTxns.remove();
-        // 提交该请求，处理流程CommitProcessor -> FinalRequestProcessor
+        // 4.提交该请求，继续后续处理流程CommitProcessor -> FinalRequestProcessor
         commitProcessor.commit(request);
     }
 
@@ -142,7 +164,7 @@ public class FollowerZooKeeperServer extends LearnerZooKeeperServer {
             LOG.warn("Not expecting a sync.");
             return;
         }
-        // 直接从pendingSyncs队列中获取队首元素，处理流程  CommitProcessor -> FinalRequestProcessor
+        // 直接从pendingSyncs队列中获取队首元素，处理流程CommitProcessor -> FinalRequestProcessor
         Request r = pendingSyncs.remove();
 		commitProcessor.commit(r);
     }
