@@ -28,6 +28,7 @@ import org.slf4j.LoggerFactory;
 /**
  * This RequestProcessor simply forwards requests to an AckRequestProcessor and
  * SyncRequestProcessor.
+ * 只是简单的将请求转交给AckRequestProcessor和SyncRequestProcessor两个请求处理器
  */
 public class ProposalRequestProcessor implements RequestProcessor {
     private static final Logger LOG =
@@ -57,7 +58,7 @@ public class ProposalRequestProcessor implements RequestProcessor {
     }
 
     /**
-     * 处理请求
+     * 同步处理请求,
      * @param request
      * @throws RequestProcessorException
      */
@@ -75,7 +76,7 @@ public class ProposalRequestProcessor implements RequestProcessor {
          * call processRequest on the next processor.
          */
         
-        if(request instanceof LearnerSyncRequest){// 如果是Sync请求
+        if(request instanceof LearnerSyncRequest){
             zks.getLeader().processSync((LearnerSyncRequest)request);
         } else {
             // 提交请求到nextProcessor

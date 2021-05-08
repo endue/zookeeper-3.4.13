@@ -943,7 +943,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
         return acl.size() > 0;
     }
 
-    // 处理请求，将请求添加到submittedRequests中,内部run()方法不断重该队列中获取请求进行处理
+    // 处理请求，将请求添加到submittedRequests中,内部run()方法不断从该队列中获取请求进行处理
     public void processRequest(Request request) {
         // request.addRQRec(">prep="+zks.outstandingChanges.size());
         submittedRequests.add(request);

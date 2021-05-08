@@ -59,6 +59,7 @@ public class LeaderZooKeeperServer extends QuorumZooKeeperServer {
     // 初始化链条
     // 包含两条
     // PrepRequestProcessor -> ProposalRequestProcessor -> CommitProcessor -> ToBeAppliedRequestProcessor -> FinalRequestProcessor
+    //                                                \
     //                                                  -> SyncRequestProcessor -> AckRequestProcessor
     @Override
     protected void setupRequestProcessors() {
