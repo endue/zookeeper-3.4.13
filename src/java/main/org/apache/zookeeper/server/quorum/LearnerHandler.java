@@ -222,13 +222,15 @@ public class LearnerHandler extends ZooKeeperThread {
         long traceMask = ZooTrace.SERVER_PACKET_TRACE_MASK;
         while (true) {
             try {
+                // 非阻塞的方式获取queuedPackets队列中的一个请求
                 QuorumPacket p;
                 p = queuedPackets.poll();
+                // queuedPackets已经没有任何请求,采用阻塞的方式获取queuedPackets队列中的一个请求
                 if (p == null) {
                     bufferedOutput.flush();
                     p = queuedPackets.take();
                 }
-
+                // 校验LearnerHandler是否已经关闭
                 if (p == proposalOfDeath) {
                     // Packet of death!
                     break;
@@ -242,6 +244,7 @@ public class LearnerHandler extends ZooKeeperThread {
                 if (LOG.isTraceEnabled()) {
                     ZooTrace.logQuorumPacket(LOG, traceMask, 'o', p);
                 }
+                // 最后发送数据包
                 oa.writeRecord(p, "packet");
             } catch (IOException e) {
                 if (!sock.isClosed()) {
@@ -659,7 +662,7 @@ public class LearnerHandler extends ZooKeeperThread {
             // 5.8 发送一个UPTODATE请求,表示请求处理结束
             queuedPackets.add(new QuorumPacket(Leader.UPTODATE, -1, null, null));
 
-            // 5.9不断的读取follower的请求
+            // 5.9 从这里开始不断的读取follower的请求
             while (true) {
                 qp = new QuorumPacket();
                 ia.readRecord(qp, "packet");
@@ -680,6 +683,7 @@ public class LearnerHandler extends ZooKeeperThread {
                 int type;
 
                 switch (qp.getType()) {
+                    // 5.9.1 learner发送回来的ACK请求
                 case Leader.ACK:
                     if (this.learnerType == LearnerType.OBSERVER) {
                         if (LOG.isDebugEnabled()) {

@@ -67,7 +67,7 @@ public class Leader {
     static public class Proposal {
         // 数据包
         public QuorumPacket packet;
-        // 记录接受到ack的zk服务器的sid集合
+        // 记录已经处理该提案并返回ack的learner的sid集合
         public HashSet<Long> ackSet = new HashSet<Long>();
         // 数据包中对应的请求
         public Request request;
@@ -149,7 +149,6 @@ public class Leader {
     }
 
     // Pending sync requests. Must access under 'this' lock.
-    // 正在同步的请求,需要等待ack过半才算完成
     private final HashMap<Long,List<LearnerSyncRequest>> pendingSyncs =
         new HashMap<Long,List<LearnerSyncRequest>>();
     
@@ -316,9 +315,18 @@ public class Leader {
      * This message type informs observers of a committed proposal.
      */
     final static int INFORM = 8;
-    // 已经提交给集群中其他成员但是还没有ACK的提案
+    /**
+     * 已经提交给集群中其他成员但是还没有ACK的提案
+     * 参考 {@link Leader#propose(org.apache.zookeeper.server.Request)}
+     * 上面方法的调用参考
+     * {@link ProposalRequestProcessor#processRequest(org.apache.zookeeper.server.Request)}
+     */
     ConcurrentMap<Long, Proposal> outstandingProposals = new ConcurrentHashMap<Long, Proposal>();
 
+    /**
+     * 记录以及被过半learner接收到的请求
+     * 参考 {@link Leader#processAck(long, long, java.net.SocketAddress)}
+     */
     ConcurrentLinkedQueue<Proposal> toBeApplied = new ConcurrentLinkedQueue<Proposal>();
     // new leader提案
     Proposal newLeaderProposal = new Proposal();
@@ -581,11 +589,13 @@ public class Leader {
     /**
      * Keep a count of acks that are received by the leader for a particular
      * proposal
-     * 
-     * @param zxid
+     *
+     * @param sid learner的sid
+     * @param zxid 针对这个请求分配的zxid
      *                the zxid of the proposal sent out
-     * @param followerAddr
+     * @param followerAddr learner的Socket信息
      */
+    // 处理接收到的follower和leader自己的Leader.ACK类型数据包
     synchronized public void processAck(long sid, long zxid, SocketAddress followerAddr) {
         if (LOG.isTraceEnabled()) {
             LOG.trace("Ack zxid: 0x{}", Long.toHexString(zxid));
@@ -605,13 +615,15 @@ public class Leader {
              */
             return;
         }
-    
+        // 虽然接收到learner的ACK数据包,但是此时没有等到ACK的请求,不继续处理
         if (outstandingProposals.size() == 0) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("outstanding is 0");
             }
             return;
         }
+        // 虽然接收到learner的ACK数据包,但是learner返回的ACK针对的zxid小于当前最后提交的请求的zxid, 不继续处理
+        // todo? 这里如何确定一定被提交了?
         if (lastCommitted >= zxid) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("proposal has already been committed, pzxid: 0x{} zxid: 0x{}",
@@ -620,38 +632,46 @@ public class Leader {
             // The proposal has already been committed
             return;
         }
+        // 获取zxid对应的提案,该提案是等待过半learner ACK的提案
+        // 此时说明该提案已被learner接收到
         Proposal p = outstandingProposals.get(zxid);
         if (p == null) {
             LOG.warn("Trying to commit future proposal: zxid 0x{} from {}",
                     Long.toHexString(zxid), followerAddr);
             return;
         }
-        
+        // 将learner的sid记录到提案自己的ackSet中
         p.ackSet.add(sid);
         if (LOG.isDebugEnabled()) {
             LOG.debug("Count for zxid: 0x{} is {}",
                     Long.toHexString(zxid), p.ackSet.size());
         }
         // 判断收到的ack是否过半
-        if (self.getQuorumVerifier().containsQuorum(p.ackSet)){             
+        if (self.getQuorumVerifier().containsQuorum(p.ackSet)){
+            /* 进入到这里说明该提案已经被过半learner接收到 */
             if (zxid != lastCommitted+1) {
                 LOG.warn("Commiting zxid 0x{} from {} not first!",
                         Long.toHexString(zxid), followerAddr);
                 LOG.warn("First is 0x{}", Long.toHexString(lastCommitted + 1));
             }
+            // 从outstandingProposals队列中移除该提案
+            // 因为该提案已经被过半learner接收到
             outstandingProposals.remove(zxid);
             if (p.request != null) {
+                // 获取提案中的请求,记录到toBeApplied集合
                 toBeApplied.add(p);
             }
 
             if (p.request == null) {
                 LOG.warn("Going to commmit null request for proposal: {}", p);
             }
-            // 发送commit请求
+            // 发送Leader.COMMIT请求给各个follower
             commit(zxid);
-            // 通知observers
+            // 发送Leader.INFORM请求给observer
             inform(p);
+            // 将请求传递给CommitProcessor唤醒里面的等待
             zk.commitProcessor.commit(p.request);
+            // todo 这里是什么请求
             if(pendingSyncs.containsKey(zxid)){
                 for(LearnerSyncRequest r: pendingSyncs.remove(zxid)) {
                     sendSync(r);

@@ -88,10 +88,10 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
                 /* 3.第三步看这里处理事务请求 */
 
                 synchronized (this) {
-                    // 3.1 没有请求或者已经被过半提交的请求
-                    // a.没有待处理的请求(queuedRequests.size() == 0) 或者 有待处理的事务请求(nextPending != null)
-                    // b.没有已经被过半learner处理的请求(committedRequests.size() == 0)
-                    // a && b阻塞等待,直到被commit()或者processRequest()方法唤醒也就是有新的请求或者有已经被过半提交的请求
+                    // 3.1
+                    // a.没有待处理的请求(queuedRequests.size() == 0) 或者 有事务请求正在等待过半learner处理后的回复(nextPending != null)
+                    // b.没有事务请求被过半learner处理(committedRequests.size() == 0)
+                    // a && b成立,阻塞等待,直到被commit()或者processRequest()方法唤醒也就是有新的请求或者有已经被过半learner处理的事务请求
                     if ((queuedRequests.size() == 0 || nextPending != null)
                             && committedRequests.size() == 0) {
                         wait();
@@ -99,12 +99,13 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
                     }
                     // First check and see if the commit came in for the pending
                     // request
-                    // 3.2 没有请求但是有已经被过半提交的请求
-                    // a.没有待处理的请求(queuedRequests.size() == 0) 或者 有待处理的事务请求(nextPending != null)
-                    // b.有已经被过半learner处理的请求(committedRequests.size() > 0)
+                    // 3.2
+                    // a.没有待处理的请求(queuedRequests.size() == 0) 或者  有事务请求正在等待过半learner处理后的回复(nextPending != null)
+                    // b.有事务请求被过半learner处理(committedRequests.size() > 0)
+                    // a && b成立,说明有某个事务请求被过半learner处理了
                     if ((queuedRequests.size() == 0 || nextPending != null)
                             && committedRequests.size() > 0) {
-                        // 3.2.1 获取已经被learner过半提交的请求
+                        // 3.2.1 从头位置获取已经被learner过半提交的事务请求
                         Request r = committedRequests.remove();
                         /*
                          * We match with nextPending so that we can move to the
@@ -112,7 +113,9 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
                          * use nextPending because it has the cnxn member set
                          * properly.
                          */
-                        //
+                        // 3.2.2 判断被过半learner处理的事务请求和当前正在等待过半learner回复的事务请求是否是同一个
+                        // 如果是同一个将nextPending置为null方便继续处理后续的事务请求,然后将该事务请求添加到toProcess队列
+                        // 如果不是则将请求添加到toProcess队列
                         if (nextPending != null
                                 && nextPending.sessionId == r.sessionId
                                 && nextPending.cxid == r.cxid) {
@@ -133,6 +136,7 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
 
                 // We haven't matched the pending requests, so go back to
                 // waiting
+                // 有事务请求存在,返回等待
                 if (nextPending != null) {
                     continue;
                 }
@@ -187,6 +191,7 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Committing request:: " + request);
             }
+            // 添加到committedRequests队列默认
             committedRequests.add(request);
             notifyAll();
         }
