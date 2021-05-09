@@ -262,7 +262,8 @@ public class FastLeaderElection implements Election {
                 while (!stop) {
                     // Sleeps on receive
                     try{
-                        // 读取选票
+                        // 读取QuorumCnxManager的recvQueue队列里的数据
+                        // 该队列中的数据由RecvWorker放入其中
                         response = manager.pollRecvQueue(3000, TimeUnit.MILLISECONDS);
                         if(response == null) continue;
 
@@ -274,7 +275,7 @@ public class FastLeaderElection implements Election {
                          * learner in the future, we'll have to change the
                          * way we check for observers.
                          */
-                        // 检查接收到的响应是否来自配置中的服务器
+                        // 检查接收到的数据是否来自配置中的服务器
                         // 如果不是那么立即向该服务发生一个响应
                         if(!validVoter(response.sid)){
                             // 将当前自己的选票发送给这个服务器
@@ -288,7 +289,7 @@ public class FastLeaderElection implements Election {
                                     current.getPeerEpoch());
                             // 将待发送的选票记录到sendqueue中
                             sendqueue.offer(notmsg);
-                        // 接收到的选票来自配置中的服务器
+                        // 接收到的数据来自配置中的服务器
                         } else {
                             // Receive new message
                             if (LOG.isDebugEnabled()) {
@@ -311,6 +312,7 @@ public class FastLeaderElection implements Election {
                             // Instantiate Notification and set its attributes
                             Notification n = new Notification();
                             // State of peer that sent this message
+                            // 发送数据的zk服务器的状态
                             QuorumPeer.ServerState ackstate = QuorumPeer.ServerState.LOOKING;
                             // 判断响应中服务器的状态
                             switch (response.buffer.getInt()) {
@@ -329,7 +331,7 @@ public class FastLeaderElection implements Election {
                             default:
                                 continue;
                             }
-                            // 读取响应封装到Notification中
+                            // 读取数据中的信息封装到Notification中
                             n.leader = response.buffer.getLong();
                             n.zxid = response.buffer.getLong();
                             n.electionEpoch = response.buffer.getLong();
@@ -559,6 +561,7 @@ public class FastLeaderElection implements Election {
      */
     public FastLeaderElection(QuorumPeer self, QuorumCnxManager manager){
         this.stop = false;
+        // 构造方法传递进来的QuorumCnxManager
         this.manager = manager;
         // 里面会初始化并启动WorkerSender WorkerReceiver
         starter(self, manager);

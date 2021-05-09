@@ -110,7 +110,7 @@ public class FollowerZooKeeperServer extends LearnerZooKeeperServer {
         /**
          * 注意细节:构建Request的第一个参数cnxn赋值为了null
          * 为什么这样?参考{@link org.apache.zookeeper.server.FinalRequestProcessor.processRequest}
-         * 避免多个集群服务对同一个客户端进行响应
+         * 避免集群中多个服务都对同一个客户端进行响应
          */
         Request request = new Request(null, hdr.getClientId(), hdr.getCxid(),
                 hdr.getType(), null, null);

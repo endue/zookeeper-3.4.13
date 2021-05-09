@@ -136,18 +136,21 @@ public class QuorumCnxManager {
     // key是zk服务的sid
     final ConcurrentHashMap<Long, SendWorker> senderWorkerMap;
     // 记录zk服务和对应的队列，key是zk服务的sid
-    // 该队列用来存储要发送到zk服务的数据
+    // value是用来存储要发送到zk服务的队列,默认大小为1
+    // 由SendWorker负责从中读取数据发送给其他zk服务
     final ConcurrentHashMap<Long, ArrayBlockingQueue<ByteBuffer>> queueSendMap;
-    // 记录发送到zk服务最近的一条数据
+    // 记录发送到zk服务最近的一条数据,key是zk服务的sid
     final ConcurrentHashMap<Long, ByteBuffer> lastMessageSent;
 
     /*
      * Reception queue
      */
-    // 记录接受到的消息
+    // 记录接受到的消息,默认大小为100
+    // 由RecvWorker将数据放入其中
     public final ArrayBlockingQueue<Message> recvQueue;
     /*
      * Object to synchronize access to recvQueue
+     * 当操作recvQueue时,使用该锁
      */
     private final Object recvQLock = new Object();
 
@@ -399,7 +402,7 @@ public class QuorumCnxManager {
      * connection if it wins. Notice that it checks whether it has a connection
      * to this server already or not. If it does, then it sends the smallest
      * possible long value to lose the challenge.
-     * 处理接收到的连接请求
+     * 接收到的连接请求
      */
     public void receiveConnection(final Socket sock) {
         DataInputStream din = null;
@@ -447,9 +450,10 @@ public class QuorumCnxManager {
             receiveConnection(sock);
         }
     }
-    // 处理其他zk服务的socket连接
+    // 处理连接请求
     private void handleConnection(Socket sock, DataInputStream din)
             throws IOException {
+        // 记录发起连接的zk服务的sid
         Long sid = null;
         try {
             // Read server id
@@ -474,6 +478,7 @@ public class QuorumCnxManager {
                     LOG.error("Read only " + num_read + " bytes out of " + num_remaining_bytes + " sent by server " + sid);
                 }
             }
+            // 如果是Observer服务,在建立连接时发送过来的sid一定是个Long.MAX_VALUE
             if (sid == QuorumPeer.OBSERVER_ID) {
                 /*
                  * Choose identifier at random. We need a value to identify
@@ -839,6 +844,7 @@ public class QuorumCnxManager {
         
         /**
          * Halts this listener thread.
+         * 停止当前Listener的线程,直接关闭ServerSocket
          */
         void halt(){
             try{
@@ -862,10 +868,15 @@ public class QuorumCnxManager {
     // 负责发送集群间的消息
     // 采用的是BIO
     class SendWorker extends ZooKeeperThread {
+        // 客户端(指其他zk服务)的sid
         Long sid;
+        // 客户端的socket
         Socket sock;
+        // 接收线程
         RecvWorker recvWorker;
+        // 运行标识
         volatile boolean running = true;
+        // 输出流
         DataOutputStream dout;
 
         /**
@@ -959,6 +970,7 @@ public class QuorumCnxManager {
 
         @Override
         public void run() {
+            // 记录运行的SendWorker数量
             threadCnt.incrementAndGet();
             try {
                 /**
@@ -1004,7 +1016,7 @@ public class QuorumCnxManager {
                         // 获取发送到sid服务的数据所对应的队列
                         ArrayBlockingQueue<ByteBuffer> bq = queueSendMap
                                 .get(sid);
-                        // 队列不为空，获取队列中的一条数据
+                        // 队列不为空，采用阻塞的方式从队列中获取一条数据
                         if (bq != null) {
                             b = pollSendQueue(bq, 1000, TimeUnit.MILLISECONDS);
                         } else {
@@ -1039,14 +1051,14 @@ public class QuorumCnxManager {
      */
     // 获取其他server的（投票）信息 并存入队列
     class RecvWorker extends ZooKeeperThread {
-        // 客户端的sid
+        // 客户端(指其他zk服务)的sid
         Long sid;
         // 客户端的socket
         Socket sock;
         volatile boolean running = true;
         // 对应客户端的输入流
         final DataInputStream din;
-
+        // 发送线程
         final SendWorker sw;
 
         RecvWorker(Socket sock, DataInputStream din, Long sid, SendWorker sw) {
@@ -1095,6 +1107,7 @@ public class QuorumCnxManager {
                      */
                     // 读取数据包的长度
                     int length = din.readInt();
+                    // 数据包长度不符合要求抛出异常
                     if (length <= 0 || length > PACKETMAXSIZE) {
                         throw new IOException(
                                 "Received packet with invalid packet: "
@@ -1105,10 +1118,11 @@ public class QuorumCnxManager {
                      */
                     // 初始化byte数组准备读取数据
                     byte[] msgArray = new byte[length];
-                    // 读取数据
+                    // 读取数据到msgArray
                     din.readFully(msgArray, 0, length);
                     // 将byte数组转换为ByteBuffer
                     ByteBuffer message = ByteBuffer.wrap(msgArray);
+                    // 再将ByteBuffer和客户端的sid封装为Message
                     addToRecvQueue(new Message(message.duplicate(), sid));
                 }
             } catch (Exception e) {
@@ -1205,8 +1219,9 @@ public class QuorumCnxManager {
      *          Reference to the message to be inserted in the queue
      */
     public void addToRecvQueue(Message msg) {
+        // 加锁,因为可能存在多个RecvWorker同时接收到响应往recvQueue队列里写数据
         synchronized(recvQLock) {
-            // 如果剩余容量为0,则出队一个元素不处理
+            // 如果剩余容量为0,则删除一个元素,默认初始大小为100
             if (recvQueue.remainingCapacity() == 0) {
                 try {
                     recvQueue.remove();
@@ -1238,6 +1253,12 @@ public class QuorumCnxManager {
        return recvQueue.poll(timeout, unit);
     }
 
+    /**
+     * 当前zk服务于集群中其他zk服务建立连接后,会将连接记录到senderWorkerMap中
+     * key是其他zk服务的sid,value是SendWorker
+     * @param peerSid
+     * @return
+     */
     public boolean connectedToPeer(long peerSid) {
         return senderWorkerMap.get(peerSid) != null;
     }

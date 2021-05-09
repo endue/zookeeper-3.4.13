@@ -771,6 +771,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             throw new RuntimeException("My id " + myid + " not in the peer list");
         }
         // electionType在配置文件中默认写死为3
+        // 详见:org.apache.zookeeper.server.quorum.QuorumPeerConfig.electionAlg
         if (electionType == 0) {
             try {
                 udpSocket = new DatagramSocket(myQuorumAddr.getPort());
