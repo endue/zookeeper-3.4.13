@@ -77,7 +77,7 @@ public class Leader {
             return packet.getType() + ", " + packet.getZxid() + ", " + request;
         }
     }
-    // zk服务器
+    // zk服务器,构造方法中初始化
     final LeaderZooKeeperServer zk;
     // 当前集群对象
     final QuorumPeer self;
