@@ -927,7 +927,7 @@ public class FastLeaderElection implements Election {
                     switch (n.state) {
                     case LOOKING:// 当前服务处于LOOKING状态，收到选票并且发送该选票的服务处于LOOKING状态
                         // If notification > current, replace and send messages out
-                        // 收到选票里的被选举服务器的epoch > 当前服务上的选票周期，说明当前zkServer上进行的本轮选举周期已经过时，更新自己的选举周期(logicalclock)
+                        // 收到选票里的被选举服务器的选票周期 > 当前服务上的选票周期，说明当前zkServer上进行的本轮选举周期已经过时，更新自己的选举周期(logicalclock)
                         // 清空所有已经收到的选票，更新自己本地的选票周期等信息，最终再将内部选票发送出去
                         if (n.electionEpoch > logicalclock.get()) {
                             // 更新当前服务上的epoch，将已过时的当前zkServer上的选票更新为当前最新的选票
