@@ -296,36 +296,36 @@ public class Learner {
     	long lastLoggedZxid = self.getLastLoggedZxid();
         // 1.2.构建一个集群数据包QuorumPacket
         QuorumPacket qp = new QuorumPacket();
-        // 1.2.1设置自身的角色类型为Leader.FOLLOWERINFO或者Leader.OBSERVERINFO
+        // 1.2.1 设置自身的角色类型为Leader.FOLLOWERINFO或者Leader.OBSERVERINFO
         qp.setType(pktType);
-        // 1.2.2根据acceptedEpoch设置新的zxid
+        // 1.2.2 根据acceptedEpoch重新计算zxid并设置到请求数据包中
         qp.setZxid(ZxidUtils.makeZxid(self.getAcceptedEpoch(), 0));
         /*
          * Add sid to payload
          */
-        // 1.3.构建learner信息,包括当前自己的sid以及版本号0x10000
+        // 1.3.构建LearnerInfo信息,包括当前自己的sid以及版本号0x10000
         LearnerInfo li = new LearnerInfo(self.getId(), 0x10000);
         ByteArrayOutputStream bsid = new ByteArrayOutputStream();
         BinaryOutputArchive boa = BinaryOutputArchive.getArchive(bsid);
         // 1.4.封装learner信息到zk自定义输出流,标签为LearnerInfo
         boa.writeRecord(li, "LearnerInfo");
-        // 1.5.将zk自定义输出流封装到集群数据包QuorumPacket
+        // 1.5.将LearnerInfo封装到QuorumPacket
         qp.setData(bsid.toByteArray());
         // 1.6.发送集群数据包QuorumPacket,对应的标签为packet
         writePacket(qp, true);
 
         /* 2.读取leader发送过来的LEADERINFO类型数据包 */
 
-        // 2.1读取数据到qp
+        // 2.1 读取数据到qp
         // leader此时发送的数据包内容如下:QuorumPacket(Leader.LEADERINFO, ZxidUtils.makeZxid(newEpoch, 0), ver, null)
         readPacket(qp);
-        // 2.2解析leader返回的新的epoch
+        // 2.2 解析leader返回的新的epoch
         final long newEpoch = ZxidUtils.getEpochFromZxid(qp.getZxid());
-        // 2.3响应数据包类型为LEADERINFO
+        // 2.3 响应数据包类型为LEADERINFO
         // 这里结合org.apache.zookeeper.server.quorum.LearnerHandler.run()方法分析
 		if (qp.getType() == Leader.LEADERINFO) {
         	// we are connected to a 1.0 server so accept the new epoch and read the next packet
-            // 2.3.1读取leader的版本,写死的0x10000
+            // 2.3.1 读取leader的版本,写死的0x10000
         	leaderProtocolVersion = ByteBuffer.wrap(qp.getData()).getInt();
         	// 封装一个bute数组,用于记录learner的currentEpoch并返回给leader
         	byte epochBytes[] = new byte[4];
@@ -347,7 +347,7 @@ public class Learner {
         	} else {
         		throw new IOException("Leaders epoch, " + newEpoch + " is less than accepted epoch, " + self.getAcceptedEpoch());
         	}
-        	// 2.3.4 封装一个ACKEPOCH数据包返回给leader
+        	// 2.3.4 封装一个ACKEPOCH数据包返回给leader,包括自身的currentEpoch和lastLoggedZxid
         	QuorumPacket ackNewEpoch = new QuorumPacket(Leader.ACKEPOCH, lastLoggedZxid, epochBytes, null);
         	writePacket(ackNewEpoch, true);
         	// 根据leader新的epoch,构建新的zxid返回
