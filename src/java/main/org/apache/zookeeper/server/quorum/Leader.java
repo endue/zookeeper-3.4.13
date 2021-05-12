@@ -850,7 +850,7 @@ public class Leader {
             lastProposed = p.packet.getZxid();
             // 将提案记录到outstandingProposals集合中
             outstandingProposals.put(lastProposed, p);
-            // 同步到其他learner
+            // 同步follower对应的LearnerHandler同步数据
             sendPacket(pp);
         }
         return p;
