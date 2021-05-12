@@ -683,7 +683,9 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             // load the epochs
             // 获取最后处理的zxid,初始值为0
             long lastProcessedZxid = zkDb.getDataTree().lastProcessedZxid;
-            // 从zxid中解析出最后的epoch
+
+            /* 1.开始处理currentEpoch以及currentEpoch对应的文件 */
+            // 从zxid中解析出epoch
     		long epochOfZxid = ZxidUtils.getEpochFromZxid(lastProcessedZxid);
             try {
                 // 从currentEpoch文件中解析出当前zkServer所处的epoch
@@ -693,7 +695,7 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
                              "taking a snapshot but before updating current " +
                              "epoch. Setting current epoch to {}.",
                              UPDATING_EPOCH_FILENAME, epochOfZxid);
-                    // 更新当zkServer的epoch并写入文件
+                    // 更新zkServer的epoch并写入文件
                     setCurrentEpoch(epochOfZxid);
                     // 删除updatingEpoch文件
                     if (!updating.delete()) {
@@ -716,6 +718,8 @@ public class QuorumPeer extends ZooKeeperThread implements QuorumStats.Provider 
             if (epochOfZxid > currentEpoch) {
             	throw new IOException("The current epoch, " + ZxidUtils.zxidToString(currentEpoch) + ", is older than the last zxid, " + lastProcessedZxid);
             }
+
+            /* 2.开始处理acceptedEpoch以及acceptedEpoch对应的文件*/
             try {
                 // 读取acceptedEpoch文件中的数据
             	acceptedEpoch = readLongFromFile(ACCEPTED_EPOCH_FILENAME);

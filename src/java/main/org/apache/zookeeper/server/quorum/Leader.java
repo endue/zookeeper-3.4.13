@@ -91,7 +91,7 @@ public class Leader {
     LearnerCnxAcceptor cnxAcceptor;
     
     // list of all the followers
-    // 记录所有的learner的处理线程,也就是集群中所有的follower
+    // 记录所有learner的处理线程
     private final HashSet<LearnerHandler> learners =
         new HashSet<LearnerHandler>();
 
@@ -850,7 +850,7 @@ public class Leader {
             lastProposed = p.packet.getZxid();
             // 将提案记录到outstandingProposals集合中
             outstandingProposals.put(lastProposed, p);
-            // 同步到其他learner
+            // 同步follower对应的LearnerHandler同步数据
             sendPacket(pp);
         }
         return p;

@@ -330,32 +330,37 @@ public class LearnerHandler extends ZooKeeperThread {
     @Override
     public void run() {
         try {
-            /* 1.基于learner的连接构建输入输出流 */
+            /**
+             * 1.基于learner的连接构建输入输出流
+             */
 
             // 记录新添加的learner，最终走到下面会是一个while循环
             leader.addLearnerHandler(this);
             tickOfNextAckDeadline = leader.self.tick.get()
                     + leader.self.initLimit + leader.self.syncLimit;
-            // 构建zk自定义的输入流/输出流
+            // 构建zk自定义的输入/输出流
             ia = BinaryInputArchive.getArchive(bufferedInput);
             bufferedOutput = new BufferedOutputStream(sock.getOutputStream());
             oa = BinaryOutputArchive.getArchive(bufferedOutput);
 
-            /* 2.读取learner发送过来的它们自身信息 */
+            /**
+             * 2.读取learner发送过来的包含它们自身信息的QuorumPacket
+             * 关联代码{@link org.apache.zookeeper.server.quorum.Learner.registerWithLeader}
+             */
 
-            // 2.1解析packet标签对应的QuorumPacket
+            // 2.1 解析packet标签对应的QuorumPacket
             QuorumPacket qp = new QuorumPacket();
             ia.readRecord(qp, "packet");
-            // 2.2校验learner的角色
+            // 2.2 校验learner的角色
             if(qp.getType() != Leader.FOLLOWERINFO && qp.getType() != Leader.OBSERVERINFO){
             	LOG.error("First packet " + qp.toString()
                         + " is not FOLLOWERINFO or OBSERVERINFO!");
                 return;
             }
-            // 2.3 解析请求中的LearnerInfo数据,包含了learner的sid以及写死的版本号0x10000
+            // 2.3 解析请求中携带的LearnerInfo对象,包含了learner的sid以及写死的版本号0x10000
             byte learnerInfoData[] = qp.getData();
             if (learnerInfoData != null) {
-                // 2.3.1如果数据包长度为8个字节,那么只包含一个sid
+                // 2.3.1如果数据包长度为8个字节,那么只包含一个long sid
             	if (learnerInfoData.length == 8) {
             		ByteBuffer bbsid = ByteBuffer.wrap(learnerInfoData);
             		this.sid = bbsid.getLong();
@@ -372,20 +377,20 @@ public class LearnerHandler extends ZooKeeperThread {
 
             LOG.info("Follower sid: " + sid + " : info : "
                     + leader.self.quorumPeers.get(sid));
-            // 2.4从请求中读取learner的角色类型并更新到LearnerHandler中
+            // 2.4 从请求中读取learner的角色类型并更新对应的LearnerHandler中
             if (qp.getType() == Leader.OBSERVERINFO) {
                     //  PARTICIPANT或OBSERVER
                   learnerType = LearnerType.OBSERVER;
             }            
-            // 2.5从请求的zxid中解析learner的acceptedEpoch
+            // 2.5 从请求中读取learner的zxid中的acceptedEpoch
             long lastAcceptedEpoch = ZxidUtils.getEpochFromZxid(qp.getZxid());
             // 记录learner最后处理的zxid
             long peerLastZxid;
             // 记录learner的统计信息
             StateSummary ss = null;
-            // 2.6从请求中解析learner的zxid
+            // 2.6 从请求中读取learner的zxid
             long zxid = qp.getZxid();
-            // 2.7根据learner发生过来信息中的lastAcceptedEpoch更新leader的epoch
+            // 2.7 根据从learner发送过来的请求中的lastAcceptedEpoch更新leader的epoch
             // leader的epoch会从集群中的所有lastAcceptedEpoch中获取一个最大值在+1,作为整个集群新的epoch
             // getEpochToPropose()方法会阻塞,最后返回集群新的epoch
             long newEpoch = leader.getEpochToPropose(this.getSid(), lastAcceptedEpoch);
@@ -402,13 +407,13 @@ public class LearnerHandler extends ZooKeeperThread {
             } else {
                 // 这里结合org.apache.zookeeper.server.quorum.Learner.registerWithLeader()方法分析
 
-                /* 3.leader发送LEADERINFO数据包并等待learner的ACKEPOCH的响应 */
+                /* 3 leader发送LEADERINFO数据包并等待learner的ACKEPOCH的响应 */
 
-                // 3.1构建LEADERINFO数据包,版本为写死的0x10000以及基于最新的epoch构建的zxid
+                // 3.1 构建LEADERINFO数据包,版本为写死的0x10000以及基于最新的epoch构建的zxid
                 byte ver[] = new byte[4];
                 ByteBuffer.wrap(ver).putInt(0x10000);
                 QuorumPacket newEpochPacket = new QuorumPacket(Leader.LEADERINFO, ZxidUtils.makeZxid(newEpoch, 0), ver, null);
-                // 3.2发送数据包给learner,标签为packet
+                // 3.2 发送数据包给learner,标签为packet
                 oa.writeRecord(newEpochPacket, "packet");
                 bufferedOutput.flush();
 
@@ -423,7 +428,7 @@ public class LearnerHandler extends ZooKeeperThread {
                             + " is not ACKEPOCH");
                     return;
 				}
-                // 读取learner的epoch
+                // 读取learner发送过来的它自身的currentEpoch
                 ByteBuffer bbepoch = ByteBuffer.wrap(ackEpochPacket.getData());
                 // 封装learner的一个状态摘要,注意bbepoch.getInt()该值可能为-1
                 ss = new StateSummary(bbepoch.getInt(), ackEpochPacket.getZxid());
@@ -446,10 +451,10 @@ public class LearnerHandler extends ZooKeeperThread {
             int packetToSend = Leader.SNAP;
             // 数据同步时,发送给learner的首个数据包的zxid
             long zxidToSend = 0;
-            // 要发送给learner的leader节点的最新的zxid
+            // 要发送给learner的leader节点的最大的zxid
             long leaderLastZxid = 0;
             /** the packets that the follower needs to get updates from **/
-            // 记录learner需要处理的最大的zxid
+            // learner需要从该位置+1的位置同步数据
             long updates = peerLastZxid;
             
             /* we are sending the diff check if we have proposals in memory to be able to 
@@ -479,7 +484,7 @@ public class LearnerHandler extends ZooKeeperThread {
                             Long.toHexString(peerLastZxid));
                     packetToSend = Leader.DIFF;
                     zxidToSend = peerLastZxid;
-                // 5.2.4 learner与leader的zxid不一致&&leder已提交的提案信息不为空
+                // 5.2.4 learner与leader的zxid不一致 && leader已提交的提案信息不为空
                 } else if (proposals.size() != 0) {
                     LOG.debug("proposal size is {}", proposals.size());
                     // 5.2.4.1 learner的zxid介于[minCommittedLog,maxCommittedLog]之间,learner的数据少于leader,需要同步
@@ -587,7 +592,7 @@ public class LearnerHandler extends ZooKeeperThread {
                 queuedPackets.add(newLeaderQP);
             }
             bufferedOutput.flush();
-            // 5.4 封装一个请求并发送,告诉learner最新的zxidToSend以及同步数据的类型模式
+            // 5.4 封装一个请求并发送,告诉learner最新的zxidToSend以及同步数据的模式
             //Need to set the zxidToSend to the latest zxid
             if (packetToSend == Leader.SNAP) {
                 zxidToSend = leader.zk.getZKDatabase().getDataTreeLastProcessedZxid();

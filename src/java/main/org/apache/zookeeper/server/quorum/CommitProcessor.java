@@ -71,6 +71,10 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
     // 是否关闭标识符
     volatile boolean finished = false;
 
+    /**
+     * 该方法在处理请求的时候会将队列中的Request赋值给局部遍历nextPending
+     * 注意并没有将cnxn同步过去，这样做的原因是谁接收的请求，谁来进行响应
+     */
     @Override
     public void run() {
         try {
