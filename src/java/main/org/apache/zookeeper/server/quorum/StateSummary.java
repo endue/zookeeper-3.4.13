@@ -23,6 +23,10 @@ package org.apache.zookeeper.server.quorum;
  * how two different states are compared.
  */
 public class StateSummary {
+	/**
+	 * 该值可能为-1
+	 * 参考{@link org.apache.zookeeper.server.quorum.Learner#registerWithLeader}
+	 */
 	private long currentEpoch;
 	private long lastZxid;
 	public StateSummary(long currentEpoch, long lastZxid) {

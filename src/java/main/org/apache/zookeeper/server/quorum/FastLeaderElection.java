@@ -535,6 +535,9 @@ public class FastLeaderElection implements Election {
     // 逻辑时钟，表示该服务器发起的第多少轮投票,用来判断多个投票是否在同一轮选举周期中
     // 初始投票前被置为1,参考lookForLeader()方法
     AtomicLong logicalclock = new AtomicLong(); /* Election instance */
+
+    /* 提案中的内容 */
+
     // 提案中的leader
     long proposedLeader;
     // 提案中的leader的lastZxid
@@ -655,7 +658,7 @@ public class FastLeaderElection implements Election {
     protected boolean totalOrderPredicate(long newId, long newZxid, long newEpoch, long curId, long curZxid, long curEpoch) {
         LOG.debug("id: " + newId + ", proposed id: " + curId + ", zxid: 0x" +
                 Long.toHexString(newZxid) + ", proposed zxid: 0x" + Long.toHexString(curZxid));
-        // 如果自己的优先级为0，不参与选票
+        // 如果自己的权重为0，不参与选票
         if(self.getQuorumVerifier().getWeight(newId) == 0){
             return false;
         }
@@ -868,9 +871,9 @@ public class FastLeaderElection implements Election {
             int notTimeout = finalizeWait;
 
             synchronized(this){
-                // 注意这里执行了logicalclock,所以初始值为1
+                // logicalclock递增,标识zk服务自己所在选举的周期
                 logicalclock.incrementAndGet();
-                // 更新选票为当前服务自己的id,zxid,currentEpoch
+                // 更新选票为zk服务自己的id,zxid,currentEpoch
                 updateProposal(getInitId(), getInitLastLoggedZxid(), getPeerEpoch());
             }
 

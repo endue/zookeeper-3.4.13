@@ -324,7 +324,7 @@ public class Leader {
     ConcurrentMap<Long, Proposal> outstandingProposals = new ConcurrentHashMap<Long, Proposal>();
 
     /**
-     * 记录以及被过半learner接收到的请求
+     * 记录以及被过半learner接收到的请求,但是还未被FinalRequestProcessor处理添加到database的请求
      * 参考 {@link Leader#processAck(long, long, java.net.SocketAddress)}
      */
     ConcurrentLinkedQueue<Proposal> toBeApplied = new ConcurrentLinkedQueue<Proposal>();
@@ -899,24 +899,27 @@ public class Leader {
             long lastSeenZxid) {
         // Queue up any outstanding requests enabling the receipt of
         // new requests
-        // 如果当前leader已处理的提案 > lastSeenZxid
+        // 如果当前leader最后Proposal的Proposed的zxid > lastSeenZxid
+        // 说明有Proposal要提给learner
         if (lastProposed > lastSeenZxid) {
-            // 遍历已提交的提案,发送给learner
+            // 将已经被过半follower处理并回应ACK的Proposal添加到queuedPackets队列
+            // 这些提案还未进入database,所以在前面的比较环节是不包含这些提案的
             for (Proposal p : toBeApplied) {
                 if (p.packet.getZxid() <= lastSeenZxid) {
                     continue;
                 }
-                // 发送提案
+                // 将Proposal添加到queuedPackets队列
                 handler.queuePacket(p.packet);
                 // Since the proposal has been committed we need to send the
                 // commit message also
-                // 发送提案
+                // 对应Proposal添加一个Leader.COMMIT类型的QuorumPacket到queuedPackets队列
                 QuorumPacket qp = new QuorumPacket(Leader.COMMIT, p.packet
                         .getZxid(), null, null);
                 handler.queuePacket(qp);
             }
             // Only participant need to get outstanding proposals
-            // 处理已经提交但是未处理的提案
+            // 将已经提交给集群中其他成员但是还没有ACK的Proposal添加到queuedPackets队列
+            // 这里判断了LearnerHandler对应的learner的类型,只发送给follower,不发送给observer
             if (handler.getLearnerType() == LearnerType.PARTICIPANT) {
                 List<Long>zxids = new ArrayList<Long>(outstandingProposals.keySet());
                 Collections.sort(zxids);
@@ -938,8 +941,7 @@ public class Leader {
         return lastProposed;
     }
     // VisibleForTesting
-    // 记录集群中learner以及leader的sid
-    // 表示已经连接上的learner
+    // 记录集群中follower和leader的sid
     protected Set<Long> connectingFollowers = new HashSet<Long>();
     // 该方法会在Leader.lead()和LearnerHandler.run()方法中被调用
     // 获取集群中最大的lastAcceptedEpoch,然后+1更新到epoch中
@@ -955,6 +957,7 @@ public class Leader {
                 epoch = lastAcceptedEpoch+1;
             }
             // 3.如果参数sid是集群的一部分,则记录到connectingFollowers集合中
+            // 并且类型为sid所属服务的server.type == LearnerType.PARTICIPANT才加入connectingFollowers集合中
             if (isParticipant(sid)) {
                 connectingFollowers.add(sid);
             }
@@ -962,6 +965,10 @@ public class Leader {
             // 4.connectingFollowers集合中已包含自己说明自己已经在集群中并且
             // 也包含过半的机器了,说明当前已经过半的集群达成了epoch
             // 那么就不需要在继续等待
+            /**
+             * 不明白为什么需要执行connectingFollowers.contains(self.getId())判断可以
+             * 参考{@link org.apache.zookeeper.server.quorum.Leader#lead}或当前方法的注释
+             */
             if (connectingFollowers.contains(self.getId()) && 
                                             verifier.containsQuorum(connectingFollowers)) {
                 // 更新等待标识
@@ -989,7 +996,7 @@ public class Leader {
         }
     }
     // VisibleForTesting
-    // 记录针对Leader发出的LEADERINFO回复ACKEPOCH的服务的sid
+    // 记录针对Leader发出的LEADERINFO回复ACKEPOCH的follower和leader服务的sid
     protected Set<Long> electingFollowers = new HashSet<Long>();
     // VisibleForTesting
     // 记录是否已有过半的(learner针对Leader发出的LEADERINFO回复ACKEPOCH
@@ -998,9 +1005,29 @@ public class Leader {
     // 该方法会被leader.lead()和LearnerHandler.run()方法调用
     public void waitForEpochAck(long id, StateSummary ss) throws IOException, InterruptedException {
         synchronized(electingFollowers) {
+            // 已经收到过半的learner回复ACKEPOCH
             if (electionFinished) {
                 return;
             }
+            /**
+             * 如果收到learner的CurrentEpoch为-1
+             * 说明在上一步进行newEpoch计算的时候,learner的AcceptedEpoch与leader的epoch一致
+             * 这种情况应该属于集群中其他learner的AcceptedEpoch <= leader的epoch,所以导致leader的epoch并没有发生更新
+             * 但是收到learner的CurrentEpoch不为-1
+             * 说明集群中有的服务的AcceptedEpoch要高于leader的epoch,导致leader的epoch发生更新
+             * 由于learner在收到LEADERINFO类型的QuorumPacket会响应自己的CurrentEpoch和LastZxid,所以这里要比对一下
+             * 1.learner的currentEpoch > leader的currentEpoch
+             * 2.learner的currentEpoch = leader的currentEpoch && earner的lastZxid > leader的lastZxid
+             * 以上两种情况任一发生都要抛出异常,因为按照选举的优先级来说这是不可能出现的
+             * 选举优先级策略参考{@link org.apache.zookeeper.server.quorum.FastLeaderElection.totalOrderPredicate}
+             */
+
+            /**
+             * 同时在注意一点
+             * 只有learner的CurrentEpoch不为-1才会进入if分支并加入electingFollowers集合中
+             * electingFollowers集合用来决定当前阻塞是否阻塞以及唤醒被阻塞的LearnerHandler
+             * 这里也就明白了{@link Learner#registerWithLeader(int)}方法中341--344代码的注释
+             */
             if (ss.getCurrentEpoch() != -1) {
                 // 校验
                 if (ss.isMoreRecentThan(leaderStateSummary)) {
@@ -1011,14 +1038,20 @@ public class Leader {
                                                     + " (last zxid)");
                 }
                 // 校验,记录sid
+                // 并且类型为sid所属服务的server.type == LearnerType.PARTICIPANT才加入electingFollowers集合中
                 if (isParticipant(id)) {
                     electingFollowers.add(id);
                 }
             }
             QuorumVerifier verifier = self.getQuorumVerifier();
             // 校验是否已过半机器针对Leader发出的LEADERINFO回复ACKEPOCH
+            /**
+             * 不明白为什么需要执行electingFollowers.contains(self.getId())判断可以
+             * 参考{@link org.apache.zookeeper.server.quorum.Leader#lead}或当前方法的注释
+             */
             if (electingFollowers.contains(self.getId()) && verifier.containsQuorum(electingFollowers)) {
                 electionFinished = true;
+                // 唤醒被阻塞的所有LearnerHandler,因为其他LearnerHandler都阻塞在了else分支下面
                 electingFollowers.notifyAll();
             } else {// 如果没有过半的集群针对Leader发出的LEADERINFO回复ACKEPOCH
                 long start = Time.currentElapsedTime();
@@ -1082,6 +1115,7 @@ public class Leader {
      * @param sid
      * @throws InterruptedException
      */
+    // 该方法会被leader.lead()和LearnerHandler.run()方法调用
     public void waitForNewLeaderAck(long sid, long zxid)
             throws InterruptedException {
 
