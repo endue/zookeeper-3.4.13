@@ -695,6 +695,7 @@ public class LearnerHandler extends ZooKeeperThread {
 
                 switch (qp.getType()) {
                     // 5.9.1 learner发送回来的ACK请求
+                    // 同步的数据已经处理完毕
                 case Leader.ACK:
                     if (this.learnerType == LearnerType.OBSERVER) {
                         if (LOG.isDebugEnabled()) {
