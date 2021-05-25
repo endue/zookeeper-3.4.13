@@ -326,6 +326,8 @@ public class Leader {
     /**
      * 记录以及被过半learner接收到的请求,但是还未被FinalRequestProcessor处理添加到database的请求
      * 参考 {@link Leader#processAck(long, long, java.net.SocketAddress)}
+     *
+     * 删除的地点参考{@link org.apache.zookeeper.server.quorum.Leader.ToBeAppliedRequestProcessor#processRequest(org.apache.zookeeper.server.Request)}
      */
     ConcurrentLinkedQueue<Proposal> toBeApplied = new ConcurrentLinkedQueue<Proposal>();
     // new leader提案
@@ -686,7 +688,7 @@ public class Leader {
         /**
          * 赋值地点参考
          * {@link LeaderZooKeeperServer#setupRequestProcessors()}
-         * 该属性值保留至Leader.toBeApplied属性的引用
+         * 该属性为Leader.toBeApplied属性的引用
          */
         private ConcurrentLinkedQueue<Proposal> toBeApplied;
 

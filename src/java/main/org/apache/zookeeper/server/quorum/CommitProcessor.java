@@ -41,13 +41,14 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
     /**
      * Requests that we are holding until the commit comes in.
      */
-    // 记录接收到的请求,当请求到达该Processor时,保存到当前队列
+    // 记录接收到的请求,当请求通过processRequest()方法到达该Processor时,保存到当前队列
     LinkedList<Request> queuedRequests = new LinkedList<Request>();
 
     /**
      * Requests that have been committed.
      */
-    // 记录收到的已经被过半learner commit的请求
+    // 记录收到的请求,当请求通过commit()方法到达该Processor时,保存到当前队列
+    // 也就是已经被过半learner commit的请求
     LinkedList<Request> committedRequests = new LinkedList<Request>();
 
     RequestProcessor nextProcessor;
@@ -82,7 +83,8 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
             while (!finished) {
                 /* 2.第二步在看这里处理非事务请求 */
 
-                // 2.1 将toProcess集合中待处理的非事务请求传递给下一个Processor并清空集合
+                // 2.1 将toProcess集合中待处理的非事务请求或者已经被过半learner处理的请求
+                // 传递给下一个Processor并toProcess集合
                 int len = toProcess.size();
                 for (int i = 0; i < len; i++) {
                     nextProcessor.processRequest(toProcess.get(i));
@@ -94,7 +96,7 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
                 synchronized (this) {
                     // 3.1
                     // a.没有待处理的请求(queuedRequests.size() == 0) 或者 有事务请求正在等待过半learner处理后的回复(nextPending != null)
-                    // b.没有事务请求被过半learner处理(committedRequests.size() == 0)
+                    // b.没有事务请求已经被过半learner处理(committedRequests.size() == 0)
                     // a && b成立,阻塞等待,直到被commit()或者processRequest()方法唤醒也就是有新的请求或者有已经被过半learner处理的事务请求
                     if ((queuedRequests.size() == 0 || nextPending != null)
                             && committedRequests.size() == 0) {
@@ -140,7 +142,8 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
 
                 // We haven't matched the pending requests, so go back to
                 // waiting
-                // 有事务请求存在,返回等待
+                // 有事务请求存在,不继续往下执行(因为当前事务请求还未被过半learner处理掉)
+                // 所以返回继续等待
                 if (nextPending != null) {
                     continue;
                 }
