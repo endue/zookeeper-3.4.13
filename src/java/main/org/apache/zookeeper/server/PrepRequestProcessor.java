@@ -135,6 +135,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
         try {
             while (true) {
                 // 获取已提交的请求
+                // 注意take()方法在取不到数据时是阻塞的
                 Request request = submittedRequests.take();
                 long traceMask = ZooTrace.CLIENT_REQUEST_TRACE_MASK;
                 if (request.type == OpCode.ping) {
@@ -567,6 +568,7 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 // 记录sessionId和对应的超时时间
                 // 并生成SessionImpl(如果不存在的话)
                 zks.sessionTracker.addSession(request.sessionId, to);
+                // 设置客户端对应的SessionImpl的owner属性为request的owner也就是ServerCnxn
                 zks.setOwner(request.sessionId, request.getOwner());
                 break;
             case OpCode.closeSession:
@@ -817,11 +819,15 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
             }
 
             LOG.error("Dumping request buffer: 0x" + sb.toString());
+            // 出现异常会设置请求头类型为error
             if (request.hdr != null) {
                 request.hdr.setType(OpCode.error);
                 request.txn = new ErrorTxn(Code.MARSHALLINGERROR.intValue());
             }
         }
+        // 为当前请求分配一个zxid,注意这里是getZxid也就是获取当前hzxid的值,
+        // 1.对于事务请求来说在上面的pRequest2Txn()中第二个参数已调用zks.getNextZxid()将hzxid递增了
+        // 2.对于非事务请求来说,分配一个当前最新的zxid即可,这个对于非事务请求是没用的
         request.zxid = zks.getZxid();
 
         nextProcessor.processRequest(request);

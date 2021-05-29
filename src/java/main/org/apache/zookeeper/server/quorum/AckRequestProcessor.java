@@ -34,6 +34,10 @@ class AckRequestProcessor implements RequestProcessor {
     private static final Logger LOG = LoggerFactory.getLogger(AckRequestProcessor.class);
     Leader leader;
 
+    /**
+     * 初始化的地点见{@link ProposalRequestProcessor#ProposalRequestProcessor}
+     * @param leader
+     */
     AckRequestProcessor(Leader leader) {
         this.leader = leader;
     }

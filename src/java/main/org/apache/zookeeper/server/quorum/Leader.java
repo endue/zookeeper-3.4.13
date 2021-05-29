@@ -109,6 +109,10 @@ public class Leader {
     private final HashSet<LearnerHandler> forwardingFollowers =
         new HashSet<LearnerHandler>();
 
+    /**
+     * 提案统计类
+     * 参考 {@link Leader#propose(org.apache.zookeeper.server.Request)}
+     */
     private final ProposalStats proposalStats;
 
     public ProposalStats getProposalStats() {
@@ -316,10 +320,11 @@ public class Leader {
      */
     final static int INFORM = 8;
     /**
-     * 已经提交给集群中其他成员但是还没有ACK的提案
-     * 参考 {@link Leader#propose(org.apache.zookeeper.server.Request)}
+     * 已经提交给集群中其他成员但是还没有ACK的提案 key是提案中请求的zxid,value是提案Proposal
+     * 1.放的地方参考:{@link Leader#propose(org.apache.zookeeper.server.Request)}
      * 上面方法的调用参考
      * {@link ProposalRequestProcessor#processRequest(org.apache.zookeeper.server.Request)}
+     * 2.取的地方参考:{@link Leader#processAck(long, long, java.net.SocketAddress)}
      */
     ConcurrentMap<Long, Proposal> outstandingProposals = new ConcurrentHashMap<Long, Proposal>();
 
@@ -327,7 +332,10 @@ public class Leader {
      * 记录以及被过半learner接收到的请求,但是还未被FinalRequestProcessor处理添加到database的请求
      * 参考 {@link Leader#processAck(long, long, java.net.SocketAddress)}
      *
-     * 删除的地点参考{@link org.apache.zookeeper.server.quorum.Leader.ToBeAppliedRequestProcessor#processRequest(org.apache.zookeeper.server.Request)}
+     * 放Request地方参考
+     * {@link org.apache.zookeeper.server.quorum.Leader#processAck(long, long, java.net.SocketAddress)}
+     * 取Request地点参考
+     * {@link org.apache.zookeeper.server.quorum.Leader.ToBeAppliedRequestProcessor#processRequest(org.apache.zookeeper.server.Request)}
      */
     ConcurrentLinkedQueue<Proposal> toBeApplied = new ConcurrentLinkedQueue<Proposal>();
     // new leader提案
@@ -597,7 +605,13 @@ public class Leader {
      *                the zxid of the proposal sent out
      * @param followerAddr learner的Socket信息
      */
-    // 处理接收到的follower和leader自己的Leader.ACK类型数据包
+    /**
+     * 处理接收到的follower和leader自己的Leader.ACK类型数据包
+     * leader自己调用这个方法参考{@link org.apache.zookeeper.server.quorum.AckRequestProcessor#processRequest(org.apache.zookeeper.server.Request)}
+     * @param sid
+     * @param zxid
+     * @param followerAddr
+     */
     synchronized public void processAck(long sid, long zxid, SocketAddress followerAddr) {
         if (LOG.isTraceEnabled()) {
             LOG.trace("Ack zxid: 0x{}", Long.toHexString(zxid));
@@ -624,8 +638,8 @@ public class Leader {
             }
             return;
         }
-        // 虽然接收到learner的ACK数据包,但是learner返回的ACK针对的zxid小于当前最后提交的请求的zxid, 不继续处理
-        // todo? 这里如何确定一定被提交了?
+        // 虽然接收到follower的ACK数据包,但是数据包中的zxid小于当前leader已经发送出去的commit请求的zxid, 不继续处理
+        // 因为leader针对当前zxid已经收到过半follower的处理了
         if (lastCommitted >= zxid) {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("proposal has already been committed, pzxid: 0x{} zxid: 0x{}",
@@ -634,15 +648,15 @@ public class Leader {
             // The proposal has already been committed
             return;
         }
-        // 获取zxid对应的提案,该提案是等待过半learner ACK的提案
-        // 此时说明该提案已被learner接收到
+        // 获取zxid对应的提案,该提案是等待过半follower ACK的提案
         Proposal p = outstandingProposals.get(zxid);
         if (p == null) {
             LOG.warn("Trying to commit future proposal: zxid 0x{} from {}",
                     Long.toHexString(zxid), followerAddr);
             return;
         }
-        // 将learner的sid记录到提案自己的ackSet中
+        // 将learner的sid记录到Proposal提案自己的ackSet中
+        // ackSet用来记录已经收到的ack的服务的sid
         p.ackSet.add(sid);
         if (LOG.isDebugEnabled()) {
             LOG.debug("Count for zxid: 0x{} is {}",
@@ -660,7 +674,7 @@ public class Leader {
             // 因为该提案已经被过半learner接收到
             outstandingProposals.remove(zxid);
             if (p.request != null) {
-                // 获取提案中的请求,记录到toBeApplied集合
+                // 记录到toBeApplied集合
                 toBeApplied.add(p);
             }
 
@@ -689,6 +703,11 @@ public class Leader {
          * 赋值地点参考
          * {@link LeaderZooKeeperServer#setupRequestProcessors()}
          * 该属性为Leader.toBeApplied属性的引用
+         *
+         * 放Request地方参考
+         * {@link org.apache.zookeeper.server.quorum.Leader#processAck(long, long, java.net.SocketAddress)}
+         * 取Request地点参考
+         * {@link ToBeAppliedRequestProcessor#processRequest(org.apache.zookeeper.server.Request)}
          */
         private ConcurrentLinkedQueue<Proposal> toBeApplied;
 
@@ -751,7 +770,17 @@ public class Leader {
      * @param qp
      *                the packet to be sent
      */
-    // 将数据包提交给各个learner的LearnerHandler线程来处理
+    /**
+     * 将数据包提交给各个learner的LearnerHandler线程来处理
+     *
+     * forwardingFollowers初始化流程如下
+     * 1.{@link org.apache.zookeeper.server.quorum.LearnerHandler#run}
+     *                      ↓↓↓
+     * 2.{@link org.apache.zookeeper.server.quorum.Leader#startForwarding}
+     *                      ↓↓↓
+     * 3.{@link org.apache.zookeeper.server.quorum.Leader#addForwardingFollower}
+     * @param qp
+     */
     void sendPacket(QuorumPacket qp) {
         synchronized (forwardingFollowers) {
             for (LearnerHandler f : forwardingFollowers) {                
@@ -773,7 +802,7 @@ public class Leader {
 
     /**
      * Create a commit packet and send it to all the members of the quorum
-     * 
+     * 发送commit请求给集群中的follower
      * @param zxid
      */
     public void commit(long zxid) {
@@ -795,7 +824,10 @@ public class Leader {
         sendObserverPacket(qp);
     }
 
-    // 最后一次提案中的zxid
+    /**
+     * 最后一次提案中的zxid
+     * 参考{@link Leader#propose(org.apache.zookeeper.server.Request)}
+     */
     long lastProposed;
 
     
@@ -834,13 +866,13 @@ public class Leader {
             throw new XidRolloverException(msg);
         }
         /* 1. 序列化请求封装为QuorumPacket数据包 */
-        // 1.1将请求序列化为byte数组
+        // 1.1 将请求序列化为byte数组
         byte[] data = SerializeUtils.serializeRequest(request);
-        // 1.2记录提案中请求的大小
+        // 1.2 统计提案中请求的大小
         proposalStats.setLastProposalSize(data.length);
-        // 1.3封装为一个请求数据包
+        // 1.3 封装为一个请求数据包
         QuorumPacket pp = new QuorumPacket(Leader.PROPOSAL, request.zxid, data, null);
-        
+        // 1.4 构建Proposal
         Proposal p = new Proposal();
         p.packet = pp;
         p.request = request;
@@ -848,7 +880,7 @@ public class Leader {
             if (LOG.isDebugEnabled()) {
                 LOG.debug("Proposing:: " + request);
             }
-
+            // 记录最后提案的zxid
             lastProposed = p.packet.getZxid();
             // 将提案记录到outstandingProposals集合中
             outstandingProposals.put(lastProposed, p);

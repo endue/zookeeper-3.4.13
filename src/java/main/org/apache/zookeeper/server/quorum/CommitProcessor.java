@@ -95,8 +95,8 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
 
                 synchronized (this) {
                     // 3.1
-                    // a.没有待处理的请求(queuedRequests.size() == 0) 或者 有事务请求正在等待过半learner处理后的回复(nextPending != null)
-                    // b.没有事务请求已经被过半learner处理(committedRequests.size() == 0)
+                    // a.没有待处理的请求(queuedRequests.size() == 0) 或者 有事务请求正在等待过半follower的ACK回复(nextPending != null)
+                    // b.没有事务请求被过半follower响应了ACK(committedRequests.size() == 0)
                     // a && b成立,阻塞等待,直到被commit()或者processRequest()方法唤醒也就是有新的请求或者有已经被过半learner处理的事务请求
                     if ((queuedRequests.size() == 0 || nextPending != null)
                             && committedRequests.size() == 0) {
@@ -106,8 +106,8 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
                     // First check and see if the commit came in for the pending
                     // request
                     // 3.2
-                    // a.没有待处理的请求(queuedRequests.size() == 0) 或者  有事务请求正在等待过半learner处理后的回复(nextPending != null)
-                    // b.有事务请求被过半learner处理(committedRequests.size() > 0)
+                    // a.没有待处理的请求(queuedRequests.size() == 0) 或者 有事务请求正在等待过半follower的ACK回复(nextPending != null)
+                    // b.有事务请求被过半follower响应了ACK(committedRequests.size() > 0)
                     // a && b成立,说明有某个事务请求被过半learner处理了
                     if ((queuedRequests.size() == 0 || nextPending != null)
                             && committedRequests.size() > 0) {
@@ -142,7 +142,7 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
 
                 // We haven't matched the pending requests, so go back to
                 // waiting
-                // 有事务请求存在,不继续往下执行(因为当前事务请求还未被过半learner处理掉)
+                // 有事务请求存在,不继续往下执行(因为当前事务请求还未被过半follower处理掉)
                 // 所以返回继续等待
                 if (nextPending != null) {
                     continue;
@@ -209,7 +209,7 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
         if (LOG.isDebugEnabled()) {
             LOG.debug("Processing request:: " + request);
         }
-        
+
         if (!finished) {
             queuedRequests.add(request);
             notifyAll();

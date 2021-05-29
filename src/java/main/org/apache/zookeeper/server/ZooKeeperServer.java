@@ -824,7 +824,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
      * @param authInfo
      */
     private void submitRequest(ServerCnxn cnxn, long sessionId, int type,
-            int xid, ByteBuffer bb, List<Id> authInfo) {
+                                    int xid, ByteBuffer bb, List<Id> authInfo) {
         // 创建一个在责任链中传递的请求
         Request si = new Request(cnxn, sessionId, xid, type, bb, authInfo);
         submitRequest(si);

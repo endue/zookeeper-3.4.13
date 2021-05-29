@@ -45,6 +45,7 @@ public class ProposalRequestProcessor implements RequestProcessor {
             RequestProcessor nextProcessor) {
         this.zks = zks;
         this.nextProcessor = nextProcessor;
+        // 这里将self.leader传递了进入
         AckRequestProcessor ackProcessor = new AckRequestProcessor(zks.getLeader());
         syncProcessor = new SyncRequestProcessor(zks, ackProcessor);
     }
