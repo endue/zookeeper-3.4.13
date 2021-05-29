@@ -687,7 +687,6 @@ public class Leader {
             inform(p);
             // 将请求传递给CommitProcessor唤醒里面的等待
             zk.commitProcessor.commit(p.request);
-            // todo 这里是什么请求
             if(pendingSyncs.containsKey(zxid)){
                 for(LearnerSyncRequest r: pendingSyncs.remove(zxid)) {
                     sendSync(r);
@@ -771,7 +770,7 @@ public class Leader {
      *                the packet to be sent
      */
     /**
-     * 将数据包提交给各个learner的LearnerHandler线程来处理
+     * 将数据包提交给各个learner的LearnerHandler线程来处理,此时并不包含Leader自己
      *
      * forwardingFollowers初始化流程如下
      * 1.{@link org.apache.zookeeper.server.quorum.LearnerHandler#run}
@@ -798,6 +797,10 @@ public class Leader {
         }
     }
 
+    /**
+     * 最后一个发送commit的请求
+     * 参考{@link Leader#commit(long)}
+     */
     long lastCommitted = -1;
 
     /**

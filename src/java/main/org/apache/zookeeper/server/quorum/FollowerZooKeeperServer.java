@@ -94,6 +94,8 @@ public class FollowerZooKeeperServer extends LearnerZooKeeperServer {
 
     /**
      * 记录收到的Leader.PROPOSAL类型数据包,也就是提案.此时的提案还未进行commit操作
+     * 放请求:{@link org.apache.zookeeper.server.quorum.FollowerZooKeeperServer#logRequest}
+     * 取请求:{@link org.apache.zookeeper.server.quorum.FollowerZooKeeperServer#commit}
      */
     LinkedBlockingQueue<Request> pendingTxns = new LinkedBlockingQueue<Request>();
 

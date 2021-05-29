@@ -97,8 +97,8 @@ public class ObserverZooKeeperServer extends LearnerZooKeeperServer {
      */
     // 设置请求处理链ObserverRequestProcessor->CommitProcessor->FinalRequestProcessor
     @Override
-    protected void setupRequestProcessors() {      
-        // We might consider changing the processor behaviour of 
+    protected void setupRequestProcessors() {
+        // We might consider changing the processor behaviour of
         // Observers to, for example, remove the disk sync requirements.
         // Currently, they behave almost exactly the same as followers.
         RequestProcessor finalProcessor = new FinalRequestProcessor(this);
