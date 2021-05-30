@@ -1201,7 +1201,8 @@ public class NIOServerCnxn extends ServerCnxn {
             bb.putInt(b.length - 4).rewind();
             sendBuffer(bb);
             if (h.getXid() > 0) {
-                // 请求收到了响应,记录数递减1
+                // 服务端针对请求返回了响应,记录数递减1
+                // 参考org.apache.zookeeper.server.FinalRequestProcessor.processRequest
                 synchronized(this){
                     outstandingRequests--;
                 }
@@ -1224,6 +1225,7 @@ public class NIOServerCnxn extends ServerCnxn {
      * (non-Javadoc)
      * 触发事件
      * @see org.apache.zookeeper.server.ServerCnxnIface#process(org.apache.zookeeper.proto.WatcherEvent)
+     * {@link org.apache.zookeeper.server.WatchManager.triggerWatch}
      */
     @Override
     synchronized public void process(WatchedEvent event) {
