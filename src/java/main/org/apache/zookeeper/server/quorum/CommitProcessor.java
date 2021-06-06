@@ -60,6 +60,9 @@ public class CommitProcessor extends ZooKeeperCriticalThread implements RequestP
      * This flag indicates whether we need to wait for a response to come back from the
      * leader or we just let the sync operation flow through like a read. The flag will
      * be false if the CommitProcessor is in a Leader pipeline.
+     * leader初始化为false,{@link LeaderZooKeeperServer#setupRequestProcessors()}
+     * follower初始化为true,{@link FollowerZooKeeperServer#setupRequestProcessors()}
+     * observer初始化为true,{@link ObserverZooKeeperServer#setupRequestProcessors()}
      */
     boolean matchSyncs;
 

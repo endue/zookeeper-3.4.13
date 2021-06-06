@@ -153,6 +153,12 @@ public class Leader {
     }
 
     // Pending sync requests. Must access under 'this' lock.
+    /**
+     * 记录收到的follower或observer发送过来的LearnerSyncRequest请求
+     * 对应的是客户端的Sync命令
+     * 添加参考{@link org.apache.zookeeper.server.quorum.Leader#processSync}
+     * 移除参考{@link Leader#processAck(long, long, java.net.SocketAddress)}
+     */
     private final HashMap<Long,List<LearnerSyncRequest>> pendingSyncs =
         new HashMap<Long,List<LearnerSyncRequest>>();
     
@@ -687,6 +693,7 @@ public class Leader {
             inform(p);
             // 将请求传递给CommitProcessor唤醒里面的等待
             zk.commitProcessor.commit(p.request);
+            // 如果当前请求在进行过半投票时,有对应的LearnerSyncRequest命令那么执行该命令
             if(pendingSyncs.containsKey(zxid)){
                 for(LearnerSyncRequest r: pendingSyncs.remove(zxid)) {
                     sendSync(r);
@@ -900,9 +907,14 @@ public class Leader {
      */
     
     synchronized public void processSync(LearnerSyncRequest r){
+        // 如果没有等到ACK的请求
+        // 那么执行sendSync()方法,构建一个Leader.SYNC请求发给learner
         if(outstandingProposals.isEmpty()){
             sendSync(r);
+        // 有等到ACK的请求,也就是leader将请求发送给了follower正在等待过半的回复
         } else {
+            // 获取最后发送出去的请求的zxid,然后与当前的LearnerSyncRequest进行绑定记录到pendingSyncs集合中
+            // 当对应的zxid收到过半的回复后,在从pendingSyncs集合中获取对应的LearnerSyncRequest请求并处理
             List<LearnerSyncRequest> l = pendingSyncs.get(lastProposed);
             if (l == null) {
                 l = new ArrayList<LearnerSyncRequest>();

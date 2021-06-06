@@ -1181,6 +1181,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
                   h.getType(), incomingBuffer, cnxn.getAuthInfo());
                 /**
                  * 详见{@link SessionTrackerImpl#checkSession(long, java.lang.Object)}
+                 * 注意这里设置了Reuqest的owner属性
                  */
                 si.setOwner(ServerCnxn.me);
                 // 提交请求

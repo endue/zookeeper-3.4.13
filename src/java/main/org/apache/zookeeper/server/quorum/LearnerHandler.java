@@ -757,6 +757,8 @@ public class LearnerHandler extends ZooKeeperThread {
                     if(type == OpCode.sync){
                         si = new LearnerSyncRequest(this, sessionId, cxid, type, bb, qp.getAuthinfo());
                     } else {
+                        // 收到其他请求将Request中的cnxn置为null,这样就不会响应客户端了
+                        // 也就是谁接收的请求,谁响应客户端
                         si = new Request(null, sessionId, cxid, type, bb, qp.getAuthinfo());
                     }
                     si.setOwner(this);

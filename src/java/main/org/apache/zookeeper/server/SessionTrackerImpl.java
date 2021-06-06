@@ -322,7 +322,7 @@ public class SessionTrackerImpl extends ZooKeeperCriticalThread implements Sessi
 
     /**
      * 设置当前session的持有者,也就是ServerCnxn
-     * 调用地点参考 {@link PrepRequestProcessor#pRequest2Txn(int, long, org.apache.zookeeper.server.Request, org.apache.jute.Record, boolean)}
+     * 调用地点参考 {@link PrepRequestProcessor#pRequest2Txn(int, long, org.apache.zookeeper.server.Request, org.apache.jute.Record, boolean)}中的处理OpCode.createSession命令
      * @param id
      * @param owner
      * @throws SessionExpiredException

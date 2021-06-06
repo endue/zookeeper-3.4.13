@@ -49,10 +49,11 @@ public class FollowerZooKeeperServer extends LearnerZooKeeperServer {
     // 同步处理器
     SyncRequestProcessor syncProcessor;
 
-    /*
+    /**
      * Pending sync requests
+     * 记录SyncRquest请求
+     * 添加地点{@link FollowerRequestProcessor#run()}中处理Sync请求
      */
-    // 等待同步的请求(sync 请求)
     ConcurrentLinkedQueue<Request> pendingSyncs;
     
     /**
