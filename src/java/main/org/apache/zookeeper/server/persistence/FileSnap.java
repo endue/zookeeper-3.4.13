@@ -207,13 +207,6 @@ public class FileSnap implements SnapShot {
      * @throws IOException
      */
     // 查找最近n个数据快照日志文件
-    // 比如目前磁盘上此次snapshot文件如下：
-    // snapshot.0
-    // snapshot.1c
-    // snapshot.1d
-    // snapshot.300000000
-    // snapshot.b00000098
-    // n为3时，返回的是snapshot.1d、snapshot.300000000、snapshot.b00000098
     public List<File> findNRecentSnapshots(int n) throws IOException {
         // 获取snapDir目录下所有以snapshot为前缀的文件并降序排列
         // 在进行数据快照文件的序列化时,是基于当前已处理的zxid来进行的,所以数据快照文件的名字应该是随着时间的变化不断变大的

@@ -289,8 +289,8 @@ public class FileTxnLog implements TxnLog {
      * @param snapshotZxid return files at, or before this zxid
      * @return
      */
-    // 从参数logDirList中获取snapshotZxid所在事务日志文件及之后的所有事务文件
-    // 这些事务日志文件是需要保留下来的
+    // 从参数logDirList中获取snapshotZxid所在事务日志文件及之前的所有事务文件
+    // 这些事务日志文件是可以删除的
     public static File[] getLogFiles(File[] logDirList,long snapshotZxid) {
         // 获取所有的事务日志文件,按照文件中最小的zxid升序排列
         List<File> files = Util.sortDataDir(logDirList, LOG_FILE_PREFIX, true);
@@ -302,7 +302,7 @@ public class FileTxnLog implements TxnLog {
         for (File f : files) {
             // 获取事务日志文件名中的zxid,也就是当前文件中记录的最小的zxid
             long fzxid = Util.getZxidFromName(f.getName(), LOG_FILE_PREFIX);
-            // 当前事务日志文件中最小的zxid还大于参数snapshotZxid,不处理这个文件
+            // 当前事务日志文件中最小的zxid还大于参数snapshotZxid,该文件需要保留不处理
             if (fzxid > snapshotZxid) {
                 continue;
             }

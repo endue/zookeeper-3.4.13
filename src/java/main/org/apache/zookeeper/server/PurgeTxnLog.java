@@ -80,13 +80,13 @@ public class PurgeTxnLog {
         }
 
         FileTxnSnapLog txnLog = new FileTxnSnapLog(dataDir, snapDir);
-        // 获取最近num个数据快照文件,num默认为3
+        // 获取最近num个需要保留的数据快照文件,num默认为3
         // 这num个文件是基于自己文件名中的zxid由大到小排列
         List<File> snaps = txnLog.findNRecentSnapshots(num);
         int numSnaps = snaps.size();
         if (numSnaps > 0) {
             // 删除旧的数据快照和事物日志文件
-            // 传入的参数为最近num个数据快照文件中zxid最小的文件
+            // 传入的参数为最近num个要保留的数据快照文件中zxid最小的文件，也就是小于该zxid的文件都不需要保留了
             purgeOlderSnapshots(txnLog, snaps.get(numSnaps - 1));
         }
     }

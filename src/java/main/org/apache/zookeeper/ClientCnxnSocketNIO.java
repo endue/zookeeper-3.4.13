@@ -136,7 +136,7 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
                         if ((p.requestHeader != null) &&
                                 (p.requestHeader.getType() != OpCode.ping) &&
                                 (p.requestHeader.getType() != OpCode.auth)) {
-                            // 注意这里:设置请求头中的xid
+                            // 注意这里:设置请求头中的xid也就是为请求分配一个客户端自动的事务id
                             p.requestHeader.setXid(cnxn.getXid());
                         }
                         // 组装数据到p.bb中
@@ -329,7 +329,7 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
         boolean immediateConnect = sock.connect(addr);
         // 3. 如果是立即建立成功,那么重新注册一些时间,然后关注OP_READ和OP_WRITE事件
         // 主要是客户端重新建立连接时,由于服务端已经把旧的连接关闭了,会删除事件等相关内存
-        // 所以这里需要将数据理解在注册到zk服务,参考
+        // 所以这里需要将数据立即再次注册到zk服务,参考
         //{@Link org.apache.zookeeper.server.NIOServerCnxn.close}
         if (immediateConnect) {
             sendThread.primeConnection();

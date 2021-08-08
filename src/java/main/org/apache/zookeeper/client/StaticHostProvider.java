@@ -47,7 +47,7 @@ public final class StaticHostProvider implements HostProvider {
 
     private static final Logger LOG = LoggerFactory
             .getLogger(StaticHostProvider.class);
-    // zk服务地址列表
+    // zk服务集群地址列表
     private final List<InetSocketAddress> serverAddresses = new ArrayList<InetSocketAddress>(5);
 
     private int lastIndex = -1;
