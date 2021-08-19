@@ -792,6 +792,7 @@ public class FastLeaderElection implements Election {
      * role of the server.
      *
      * @return ServerState
+     * 如果当前服务参加选举，那么就成为FOLLOWING，否则成为OBSERVING
      */
     private ServerState learningState(){
         if(self.getLearnerType() == LearnerType.PARTICIPANT){
@@ -928,7 +929,7 @@ public class FastLeaderElection implements Election {
                      * voting view for a replica in the voting view.
                      */
                     switch (n.state) {
-                    case LOOKING:// 当前服务处于LOOKING状态，收到选票并且发送该选票的服务处于LOOKING状态
+                    case LOOKING:// 发送选票服务处于LOOKING状态，并且收到选票的服务处于LOOKING状态
                         // If notification > current, replace and send messages out
                         // 收到选票里的被选举服务器的选票周期 > 当前服务上的选票周期，说明当前zkServer上进行的本轮选举周期已经过时，更新自己的选举周期(logicalclock)
                         // 清空所有已经收到的选票，更新自己本地的选票周期等信息，最终再将内部选票发送出去
@@ -1017,10 +1018,10 @@ public class FastLeaderElection implements Election {
                             }
                         }
                         break;
-                    case OBSERVING:// 当前服务处于LOOKING状态，收到n的选票n处于OBSERVING状态,不处理
+                    case OBSERVING:// 发送选票服务处于LOOKING状态，收到选票的服务处于LOOKING状态,不处理
                         LOG.debug("Notification from observer: " + n.sid);
                         break;
-                    case FOLLOWING:// 当前服务处于LOOKING状态，收到n的选票n处于FOLLOWING或LEADING状态
+                    case FOLLOWING:// 发送选票服务处于FOLLOWING或LEADING状态，收到选票的服务处于LOOKING状态
                     case LEADING:
                         /*
                          * Consider all notifications from the same epoch

@@ -907,11 +907,11 @@ public class Leader {
      */
     
     synchronized public void processSync(LearnerSyncRequest r){
-        // 如果没有等到ACK的请求
+        // 如果没有等待ACK的请求
         // 那么执行sendSync()方法,构建一个Leader.SYNC请求发给learner
         if(outstandingProposals.isEmpty()){
             sendSync(r);
-        // 有等到ACK的请求,也就是leader将请求发送给了follower正在等待过半的回复
+        // 有等待ACK的请求,也就是leader将请求发送给了follower正在等待过半的回复
         } else {
             // 获取最后发送出去的请求的zxid,然后与当前的LearnerSyncRequest进行绑定记录到pendingSyncs集合中
             // 当对应的zxid收到过半的回复后,在从pendingSyncs集合中获取对应的LearnerSyncRequest请求并处理
